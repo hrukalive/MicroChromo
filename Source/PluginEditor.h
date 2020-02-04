@@ -23,7 +23,7 @@ class MicroChromoAudioProcessorEditor  :
 	public Button::Listener
 {
 public:
-    MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor&);
+    MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor&, ApplicationProperties&, KnownPluginList&, AudioPluginFormatManager&);
     ~MicroChromoAudioProcessorEditor();
 
 	//==============================================================================
@@ -40,11 +40,10 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     MicroChromoAudioProcessor& processor;
-	AudioPluginFormatManager formatManager;
+	ApplicationProperties& appProperties;
+	AudioPluginFormatManager& formatManager;
 
-	std::unique_ptr<ApplicationProperties> appProperties;
-
-	KnownPluginList knownPluginList;
+	KnownPluginList& knownPluginList;
 	KnownPluginList::SortMethod pluginSortMethod;
 	Array<PluginDescription> pluginDescriptions;
 

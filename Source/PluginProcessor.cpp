@@ -28,6 +28,16 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 		   })
 #endif
 {
+	PropertiesFile::Options options;
+	options.folderName = "MicroChromo";
+	options.applicationName = "MicroChromo Host";
+	options.filenameSuffix = "settings";
+	options.osxLibrarySubFolder = "Preferences";
+	appProperties.setStorageParameters(options);
+
+	formatManager.addDefaultFormats();
+	if (auto savedPluginList = appProperties.getUserSettings()->getXmlValue("pluginList"))
+		knownPluginList.recreateFromXml(*savedPluginList);
 }
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
@@ -164,7 +174,7 @@ bool MicroChromoAudioProcessor::hasEditor() const
 
 AudioProcessorEditor* MicroChromoAudioProcessor::createEditor()
 {
-    return new MicroChromoAudioProcessorEditor (*this);
+    return new MicroChromoAudioProcessorEditor (*this, appProperties, knownPluginList, formatManager);
 }
 
 //==============================================================================

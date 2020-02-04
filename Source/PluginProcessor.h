@@ -66,7 +66,10 @@ public:
 
 private:
     //==============================================================================
+	ApplicationProperties appProperties;
+	KnownPluginList knownPluginList;
 	AudioProcessorGraph mainProcessor;
+	AudioPluginFormatManager formatManager;
 	Node::Ptr audioInputNode;
 	Node::Ptr audioOutputNode;
 	Node::Ptr midiInputNode;

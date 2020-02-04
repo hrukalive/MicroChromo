@@ -22,9 +22,9 @@ public:
 			DocumentWindow::minimiseButton | DocumentWindow::closeButton),
 		owner(mw)
 	{
-		auto deadMansPedalFile = owner.appProperties->getUserSettings()->getFile().getSiblingFile("RecentlyCrashedPluginsList");
+		auto deadMansPedalFile = owner.appProperties.getUserSettings()->getFile().getSiblingFile("RecentlyCrashedPluginsList");
 
-		setContentOwned(new PluginListComponent(pluginFormatManager, owner.knownPluginList, deadMansPedalFile, owner.appProperties->getUserSettings(), true), true);
+		setContentOwned(new PluginListComponent(pluginFormatManager, owner.knownPluginList, deadMansPedalFile, owner.appProperties.getUserSettings(), true), true);
 
 		setResizable(true, false);
 		setResizeLimits(300, 400, 800, 1500);
@@ -48,19 +48,9 @@ private:
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginListWindow)
 };
 
-MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor& p)
-    : AudioProcessorEditor (&p), processor (p)
+MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor& p, ApplicationProperties& _appProperties, KnownPluginList& _knownPluginList, AudioPluginFormatManager& _formatManager)
+    : AudioProcessorEditor (&p), processor (p), appProperties(_appProperties), knownPluginList(_knownPluginList), formatManager(_formatManager)
 {
-	PropertiesFile::Options options;
-	options.folderName = "MicroChromo";
-	options.applicationName = "MicroChromo Host";
-	options.filenameSuffix = "settings";
-	options.osxLibrarySubFolder = "Preferences";
-
-	appProperties.reset(new ApplicationProperties());
-	appProperties->setStorageParameters(options);
-
-	formatManager.addDefaultFormats();
     setSize (400, 300);
 
 	button1.reset(new TextButton("test"));
@@ -68,9 +58,7 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 	button1->addListener(this);
 	button1->setBounds(10, 10, 100, 50);
 
-	if (auto savedPluginList = appProperties->getUserSettings()->getXmlValue("pluginList"))
-		knownPluginList.recreateFromXml(*savedPluginList);
-	pluginSortMethod = (KnownPluginList::SortMethod)(appProperties->getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
+	pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
 	knownPluginList.addChangeListener(this);
 
 	//AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Editor init", "INIT");
@@ -80,8 +68,6 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 {
 	knownPluginList.removeChangeListener(this);
 
-	appProperties = nullptr;
-	pluginListWindow = nullptr;
 	button1 = nullptr;
 }
 
@@ -92,8 +78,8 @@ void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* 
 	{
 		if (auto savedPluginList = std::unique_ptr<XmlElement>(knownPluginList.createXml()))
 		{
-			appProperties->getUserSettings()->setValue("pluginList", savedPluginList.get());
-			appProperties->saveIfNeeded();
+			appProperties.getUserSettings()->setValue("pluginList", savedPluginList.get());
+			appProperties.saveIfNeeded();
 		}
 	}
 }
