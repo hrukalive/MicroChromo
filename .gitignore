@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+
+# JUCE
+Builds/
+JuceLibraryCode/*.cpp
+JuceLibraryCode/*.mm
+JuceLibraryCode/*.r
+JuceLibraryCode/JuceHeader.h
+JuceLibraryCode/ReadMe.txt
