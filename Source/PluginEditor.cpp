@@ -48,20 +48,26 @@ private:
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginListWindow)
 };
 
+//==============================================================================
 MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor& p, ApplicationProperties& _appProperties, KnownPluginList& _knownPluginList, AudioPluginFormatManager& _formatManager)
     : AudioProcessorEditor (&p), processor (p), appProperties(_appProperties), knownPluginList(_knownPluginList), formatManager(_formatManager)
 {
     setSize (400, 300);
 
 	button1.reset(new TextButton("test"));
-	addAndMakeVisible(button1.get());
 	button1->addListener(this);
 	button1->setBounds(10, 10, 100, 50);
 
+	menuBar.reset(new MenuBarComponent(this));
+	setApplicationCommandManagerToWatch(&commandManager);
+	commandManager.registerAllCommandsForTarget(this);
+	addKeyListener(commandManager.getKeyMappings());
+
+	addAndMakeVisible(button1.get());
+	addAndMakeVisible(menuBar.get());
+
 	pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
 	knownPluginList.addChangeListener(this);
-
-	//AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Editor init", "INIT");
 }
 
 MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
@@ -69,6 +75,7 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 	knownPluginList.removeChangeListener(this);
 
 	button1 = nullptr;
+	menuBar = nullptr;
 }
 
 //==============================================================================
@@ -82,6 +89,82 @@ void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* 
 			appProperties.saveIfNeeded();
 		}
 	}
+}
+
+//==============================================================================
+StringArray MicroChromoAudioProcessorEditor::getMenuBarNames()
+{
+	return { "File", "Plugins" };
+}
+
+PopupMenu MicroChromoAudioProcessorEditor::getMenuForIndex(int menuIndex, const String& /*menuName*/)
+{
+	PopupMenu menu;
+
+	if (menuIndex == 0)
+	{
+		menu.addCommandItem(&commandManager, CommandIDs::openPluginScanner);
+		menu.addCommandItem(&commandManager, CommandIDs::testCommand);
+	}
+	else if (menuIndex == 1)
+	{
+		KnownPluginList::addToMenu(menu, knownPluginList.getTypes(), pluginSortMethod);
+	}
+
+	return menu;
+}
+
+//==============================================================================
+ApplicationCommandTarget* MicroChromoAudioProcessorEditor::getNextCommandTarget()
+{
+	return findFirstTargetParentComponent();
+}
+
+void MicroChromoAudioProcessorEditor::getAllCommands(Array<CommandID>& c)
+{
+	Array<CommandID> commands{
+		CommandIDs::openPluginScanner,
+		CommandIDs::testCommand
+	};
+	c.addArray(commands);
+}
+void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, ApplicationCommandInfo& result)
+{
+	switch (commandID)
+	{
+	case CommandIDs::openPluginScanner:
+		result.setInfo("Open Plugin Scanner", "Open the scanner for plugins", "File", 0);
+#if JUCE_MAC
+		result.addDefaultKeypress('q', ModifierKeys::commandModifier);
+#else
+		result.addDefaultKeypress('q', ModifierKeys::ctrlModifier);
+#endif
+		break;
+	case CommandIDs::testCommand:
+		result.setInfo("Test", "Test", "File", 0);
+		break;
+	default:
+		break;
+	}
+}
+bool MicroChromoAudioProcessorEditor::perform(const InvocationInfo& info)
+{
+	switch (info.commandID)
+	{
+	case CommandIDs::openPluginScanner:
+	{
+		if (pluginListWindow == nullptr)
+			pluginListWindow.reset(new PluginListWindow(*this, formatManager));
+		pluginListWindow->toFront(true);
+		break;
+	}
+	case CommandIDs::testCommand:
+		AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Editor init", "INIT");
+		break;
+	default:
+		return false;
+	}
+	return true;
 }
 
 //==============================================================================
@@ -105,8 +188,6 @@ void MicroChromoAudioProcessorEditor::buttonClicked(Button* btn)
 {
 	if (btn == button1.get())
 	{
-		if (pluginListWindow == nullptr)
-			pluginListWindow.reset(new PluginListWindow(*this, formatManager));
-		pluginListWindow->toFront(true);
+		
 	}
 }
