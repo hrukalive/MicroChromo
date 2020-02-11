@@ -42,6 +42,7 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
 {
+	mainProcessor.clear();
 }
 
 //==============================================================================
@@ -227,6 +228,38 @@ void MicroChromoAudioProcessor::connectMidiNodes()
 
 void MicroChromoAudioProcessor::updateGraph()
 {
+}
+
+void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, Point<double> pos, GUICallback callback)
+{
+	formatManager.createPluginInstanceAsync(desc,
+		mainProcessor.getSampleRate(),
+		mainProcessor.getBlockSize(),
+		[this, pos, callback](std::unique_ptr<AudioPluginInstance> instance, const String& error)
+		{
+			addPluginCallback(std::move(instance), error, pos);
+			callback();
+		});
+}
+
+void MicroChromoAudioProcessor::addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, Point<double> pos)
+{
+	if (instance == nullptr)
+	{
+		AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon,
+			TRANS("Couldn't create plugin"),
+			error);
+	}
+	else
+	{
+		instance->enableAllBuses();
+
+		if (auto node = mainProcessor.addNode(std::move(instance)))
+		{
+			node->properties.set("x", pos.x);
+			node->properties.set("y", pos.y);
+		}
+	}
 }
 
 //==============================================================================

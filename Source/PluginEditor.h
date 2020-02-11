@@ -19,9 +19,9 @@
 */
 class MicroChromoAudioProcessorEditor  : 
 	public AudioProcessorEditor,
-	public ChangeListener,
 	public ApplicationCommandTarget,
 	public MenuBarModel,
+	public ChangeListener,
 	public Button::Listener
 {
 public:
@@ -41,7 +41,7 @@ public:
 	//==============================================================================
 	StringArray getMenuBarNames() override;
 	PopupMenu getMenuForIndex(int menuIndex, const String& /*menuName*/) override;
-	void menuItemSelected(int /*menuItemID*/, int /*topLevelMenuIndex*/) override {};
+	void menuItemSelected(int menuItemID, int topLevelMenuIndex) override;
 
 	//==============================================================================
 	ApplicationCommandTarget* getNextCommandTarget() override;
@@ -65,7 +65,6 @@ private:
 
 	KnownPluginList& knownPluginList;
 	KnownPluginList::SortMethod pluginSortMethod;
-	Array<PluginDescription> pluginDescriptions;
 
 	class PluginListWindow;
 	std::unique_ptr<PluginListWindow> pluginListWindow;
