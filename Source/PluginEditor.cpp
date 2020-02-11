@@ -52,28 +52,32 @@ private:
 MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor& p, ApplicationProperties& _appProperties, KnownPluginList& _knownPluginList, AudioPluginFormatManager& _formatManager)
     : AudioProcessorEditor (&p), processor (p), appProperties(_appProperties), knownPluginList(_knownPluginList), formatManager(_formatManager)
 {
-    setSize (400, 300);
-
 	button1.reset(new TextButton("test"));
 	button1->addListener(this);
-	button1->setBounds(10, 10, 100, 50);
 
 	menuBar.reset(new MenuBarComponent(this));
+	menuBar->setVisible(true);
+
+	commandManager.setFirstCommandTarget(this);
 	setApplicationCommandManagerToWatch(&commandManager);
 	commandManager.registerAllCommandsForTarget(this);
 	addKeyListener(commandManager.getKeyMappings());
 
+	pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
+	knownPluginList.addChangeListener(this);
+
 	addAndMakeVisible(button1.get());
 	addAndMakeVisible(menuBar.get());
 
-	pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
-	knownPluginList.addChangeListener(this);
+	setSize(400, 300);
 }
 
 MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 {
 	knownPluginList.removeChangeListener(this);
-
+#if JUCE_MAC
+	MenuBarModel::setMacMainMenu(nullptr);
+#endif
 	button1 = nullptr;
 	menuBar = nullptr;
 }
@@ -114,6 +118,20 @@ PopupMenu MicroChromoAudioProcessorEditor::getMenuForIndex(int menuIndex, const 
 	return menu;
 }
 
+void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLevelMenuIndex)
+{
+	if (topLevelMenuIndex == 1)
+	{
+		auto& types = knownPluginList.getTypes();
+		int result = knownPluginList.getIndexChosenByMenu(menuItemID);
+		auto& desc = types.getReference(result);
+
+		Point<int> position{ proportionOfWidth(0.3f + Random::getSystemRandom().nextFloat() * 0.6f),
+													proportionOfHeight(0.3f + Random::getSystemRandom().nextFloat() * 0.6f) };
+		processor.addPlugin(desc, position.toDouble() / Point<double>((double)getWidth(), (double)getHeight()), [&]() { commandManager.invokeDirectly(CommandIDs::testCommand, true); });
+	}
+}
+
 //==============================================================================
 ApplicationCommandTarget* MicroChromoAudioProcessorEditor::getNextCommandTarget()
 {
@@ -128,12 +146,13 @@ void MicroChromoAudioProcessorEditor::getAllCommands(Array<CommandID>& c)
 	};
 	c.addArray(commands);
 }
+
 void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, ApplicationCommandInfo& result)
 {
 	switch (commandID)
 	{
 	case CommandIDs::openPluginScanner:
-		result.setInfo("Open Plugin Scanner", "Open the scanner for plugins", "File", 0);
+		result.setInfo("Open Scanner", "Open the scanner for plugins", "File", 0);
 #if JUCE_MAC
 		result.addDefaultKeypress('q', ModifierKeys::commandModifier);
 #else
@@ -159,7 +178,7 @@ bool MicroChromoAudioProcessorEditor::perform(const InvocationInfo& info)
 		break;
 	}
 	case CommandIDs::testCommand:
-		AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Editor init", "INIT");
+		AlertWindow::showMessageBoxAsync(AlertWindow::InfoIcon, "Command Test", "TEST");
 		break;
 	default:
 		return false;
@@ -170,18 +189,15 @@ bool MicroChromoAudioProcessorEditor::perform(const InvocationInfo& info)
 //==============================================================================
 void MicroChromoAudioProcessorEditor::paint (Graphics& g)
 {
-    // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll (getLookAndFeel().findColour (ResizableWindow::backgroundColourId));
-
-    g.setColour (Colours::white);
-    g.setFont (15.0f);
-    g.drawFittedText ("Hello World!", getLocalBounds(), Justification::centred, 1);
 }
 
 void MicroChromoAudioProcessorEditor::resized()
 {
-    // This is generally where you'll want to lay out the positions of any
-    // subcomponents in your editor..
+	auto b = getLocalBounds();
+#if !JUCE_MAC
+	menuBar->setBounds(b.removeFromTop(LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight()));
+#endif
 }
 
 void MicroChromoAudioProcessorEditor::buttonClicked(Button* btn)

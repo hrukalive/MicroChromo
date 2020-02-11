@@ -14,6 +14,7 @@
 
 //using AudioGraphIOProcessor = AudioProcessorGraph::AudioGraphIOProcessor;
 using Node = AudioProcessorGraph::Node;
+using GUICallback = std::function<void()>;
 
 //==============================================================================
 /**
@@ -59,6 +60,8 @@ public:
 	void connectAudioNodes();
 	void connectMidiNodes();
 	void updateGraph();
+	void addPlugin(const PluginDescription& desc, Point<double> pos, GUICallback callback);
+	void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, Point<double> pos);
 
     //==============================================================================
     void getStateInformation (MemoryBlock& destData) override;
