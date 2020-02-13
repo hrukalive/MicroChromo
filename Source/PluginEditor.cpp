@@ -75,11 +75,16 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 	pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
 	knownPluginList.addChangeListener(this);
 
+	lnf.setColour(foleys::LevelMeter::lmMeterGradientLowColour, juce::Colours::green);
+	meter.setLookAndFeel(&lnf);
+	meter.setMeterSource(&processor.getMeterSource());
+
 	addAndMakeVisible(menuBar.get());
 	addAndMakeVisible(synthBtn.get());
 	addAndMakeVisible(psBtn.get());
 	addAndMakeVisible(synthLabel.get());
 	addAndMakeVisible(psLabel.get());
+	addAndMakeVisible(meter);
 
 	setSize(400, 300);
 }
@@ -97,6 +102,7 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 	psBtn = nullptr;
 	synthLabel = nullptr;
 	psLabel = nullptr;
+	meter.setLookAndFeel(nullptr);
 }
 
 //==============================================================================
@@ -254,6 +260,9 @@ void MicroChromoAudioProcessorEditor::resized()
 	psBtn->setBounds(tmp.removeFromLeft(100));
 	tmp.removeFromLeft(10);
 	psLabel->setBounds(tmp.removeFromLeft(100));
+
+	b.removeFromTop(10);
+	meter.setBounds(b.removeFromLeft(60).withTrimmedBottom(10));
 }
 
 void MicroChromoAudioProcessorEditor::buttonClicked(Button* btn)

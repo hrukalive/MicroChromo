@@ -16,7 +16,7 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
      : AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
-                      #if ! JucePlugin_IsSynth
+                      #if JucePlugin_IsSynth
                        .withInput  ("Input",  AudioChannelSet::stereo(), true)
                       #endif
                        .withOutput ("Output", AudioChannelSet::stereo(), true)
@@ -160,10 +160,11 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
     // This is here to avoid people getting screaming feedback
     // when they first compile a plugin, but obviously you don't need to keep
     // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+    //for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+    //    buffer.clear (i, 0, buffer.getNumSamples());
 
-	updateGraph();
+	//updateGraph();
+    meterSource.measureBlock(buffer);
 	mainProcessor.processBlock(buffer, midiMessages);
 }
 
@@ -203,14 +204,13 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
 void MicroChromoAudioProcessor::initializeGraph()
 {
 	mainProcessor.clear();
-
-	//audioInputNode = mainProcessor->addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor(AudioGraphIOProcessor::audioInputNode)));
-	//audioOutputNode = mainProcessor->addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor(AudioGraphIOProcessor::audioOutputNode)));
-	//midiInputNode = mainProcessor->addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor(AudioGraphIOProcessor::midiInputNode)));
-	//midiOutputNode = mainProcessor->addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor(AudioGraphIOProcessor::midiOutputNode)));
+	audioInputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::audioInputNode));
+	audioOutputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::audioOutputNode));
+	midiInputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::midiInputNode));
+	midiOutputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::midiOutputNode));
 
 	//connectAudioNodes();
-	//connectMidiNodes();
+	connectMidiNodes();
 }
 
 void MicroChromoAudioProcessor::connectAudioNodes()

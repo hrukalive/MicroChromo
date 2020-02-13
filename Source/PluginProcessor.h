@@ -12,8 +12,7 @@
 
 #include "../JuceLibraryCode/JuceHeader.h"
 
-//using AudioGraphIOProcessor = AudioProcessorGraph::AudioGraphIOProcessor;
-using Node = AudioProcessorGraph::Node;
+using AudioGraphIOProcessor = AudioProcessorGraph::AudioGraphIOProcessor;
 using GUICallback = std::function<void()>;
 
 //==============================================================================
@@ -72,6 +71,7 @@ public:
 	AudioPluginFormatManager& getAudioPluginFormatManager() { return formatManager; }
 	KnownPluginList& getKnownPluginList() { return knownPluginList; }
 	AudioProcessorGraph& getAudioProcessorGraph() { return mainProcessor; }
+    foleys::LevelMeterSource& getMeterSource() { return meterSource; }
 
 private:
     //==============================================================================
@@ -79,12 +79,14 @@ private:
 	KnownPluginList knownPluginList;
 	AudioProcessorGraph mainProcessor;
 	AudioPluginFormatManager formatManager;
-	Node::Ptr audioInputNode;
-	Node::Ptr audioOutputNode;
-	Node::Ptr midiInputNode;
-	Node::Ptr midiOutputNode;
+    AudioProcessorGraph::Node::Ptr audioInputNode;
+    AudioProcessorGraph::Node::Ptr audioOutputNode;
+    AudioProcessorGraph::Node::Ptr midiInputNode;
+    AudioProcessorGraph::Node::Ptr midiOutputNode;
 
 	AudioProcessorValueTreeState parameters;
+
+    foleys::LevelMeterSource meterSource;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessor)
 };
