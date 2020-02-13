@@ -102,35 +102,36 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 //==============================================================================
 void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
 {
-	if (e.eventComponent == synthBtn.get())
-	{
-		showPopupMenu(0, e.position.toInt(), [this](int r) {
+	auto common = [this](int r, int slot) {
+		auto pluginId = slot == 0 ? this->synthId : this->psId;
+		switch (r)
+		{
+		case 1:  showWindow(PluginWindow::Type::normal, pluginId); break;
+		case 2:  showWindow(PluginWindow::Type::programs, pluginId); break;
+		case 3:  showWindow(PluginWindow::Type::generic, pluginId); break;
+		case 4:  showWindow(PluginWindow::Type::debug, pluginId); break;
+		default:
+		{
 			auto types = knownPluginList.getTypes();
 			int result = KnownPluginList::getIndexChosenByMenu(types, r);
 			auto& desc = types.getReference(result);
 			processor.addPlugin(
 				desc,
-				0, 0,
+				slot, 0,
 				[&]()
-				{
-					this->graphUpdated();
-				});
-		});
+			{
+				this->graphUpdated();
+			});
+		}
+		}
+	};
+	if (e.eventComponent == synthBtn.get())
+	{
+		showPopupMenu(0, e.position.toInt(), [this, common](int r) { common(r, 0); });
 	}
 	else if (e.eventComponent == psBtn.get())
 	{
-		showPopupMenu(0, e.position.toInt(), [this](int r) {
-			auto types = knownPluginList.getTypes();
-			int result = KnownPluginList::getIndexChosenByMenu(types, r);
-			auto& desc = types.getReference(result);
-			processor.addPlugin(
-				desc,
-				1, 0,
-				[&]()
-				{
-					this->graphUpdated();
-				});
-		});
+		showPopupMenu(0, e.position.toInt(), [this, common](int r) { common(r, 1); });
 	}
 }
 
@@ -171,15 +172,6 @@ PopupMenu MicroChromoAudioProcessorEditor::getMenuForIndex(int menuIndex, const 
 
 void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLevelMenuIndex)
 {
-	if (topLevelMenuIndex == 1)
-	{
-		auto types = knownPluginList.getTypes();
-		int result = KnownPluginList::getIndexChosenByMenu(types, menuItemID);
-		auto& desc = types.getReference(result);
-
-		Point<int> position{ proportionOfWidth(0.3f + Random::getSystemRandom().nextFloat() * 0.6f),
-													proportionOfHeight(0.3f + Random::getSystemRandom().nextFloat() * 0.6f) };
-	}
 }
 
 //==============================================================================
@@ -272,6 +264,11 @@ void MicroChromoAudioProcessorEditor::showPopupMenu(int type, Point<int> positio
 {
 	floatMenu.reset(new PopupMenu);
 
+	floatMenu->addItem(1, "Show plugin GUI");
+	floatMenu->addItem(2, "Show all programs");
+	floatMenu->addItem(3, "Show all parameters");
+	floatMenu->addItem(4, "Show debug log");
+	floatMenu->addSeparator();
 	KnownPluginList::addToMenu(*floatMenu, knownPluginList.getTypes(), pluginSortMethod);
 	floatMenu->showMenuAsync({}, ModalCallbackFunction::create([this, callback](int r)
 		{
@@ -289,11 +286,32 @@ void MicroChromoAudioProcessorEditor::graphUpdated()
 			if (static_cast<int>(node->properties["slot_number"]) == 0)
 			{
 				synthLabel->setText(node->getProcessor()->getName(), NotificationType::dontSendNotification);
+				synthId = node->nodeID;
 			}
 			else if (static_cast<int>(node->properties["slot_number"]) == 1)
 			{
 				psLabel->setText(node->getProcessor()->getName(), NotificationType::dontSendNotification);
+				psId = node->nodeID;
 			}
+		}
+	}
+}
+
+void MicroChromoAudioProcessorEditor::showWindow(PluginWindow::Type type, AudioProcessorGraph::NodeID pluginID)
+{
+	if (auto node = mainProcessor.getNodeForId(pluginID))
+	{
+		for (auto* w : activePluginWindows)
+		{
+			if (w->node.get() == node && w->type == type)
+			{
+				w->toFront(true);
+				return;
+			}
+		}
+		if (auto* processor = node->getProcessor())
+		{
+			activePluginWindows.add(new PluginWindow(node, type, activePluginWindows))->toFront(true);
 		}
 	}
 }
