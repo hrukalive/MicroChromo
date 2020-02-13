@@ -60,12 +60,18 @@ public:
 	void connectAudioNodes();
 	void connectMidiNodes();
 	void updateGraph();
-	void addPlugin(const PluginDescription& desc, Point<double> pos, GUICallback callback);
-	void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, Point<double> pos);
+	void addPlugin(const PluginDescription& desc, int slot_number, int copy_number, GUICallback callback);
+	void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int slot_number, int copy_number);
 
     //==============================================================================
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+
+	//==============================================================================
+	ApplicationProperties& getApplicationProperties() { return appProperties; }
+	AudioPluginFormatManager& getAudioPluginFormatManager() { return formatManager; }
+	KnownPluginList& getKnownPluginList() { return knownPluginList; }
+	AudioProcessorGraph& getAudioProcessorGraph() { return mainProcessor; }
 
 private:
     //==============================================================================

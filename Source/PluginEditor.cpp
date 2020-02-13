@@ -49,14 +49,23 @@ private:
 };
 
 //==============================================================================
-MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor& p, ApplicationProperties& _appProperties, KnownPluginList& _knownPluginList, AudioPluginFormatManager& _formatManager)
-    : AudioProcessorEditor (&p), processor (p), appProperties(_appProperties), knownPluginList(_knownPluginList), formatManager(_formatManager)
+MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor& p)
+    : AudioProcessorEditor (&p), 
+	processor (p), 
+	appProperties(p.getApplicationProperties()),
+	knownPluginList(p.getKnownPluginList()),
+	formatManager(p.getAudioPluginFormatManager()),
+	mainProcessor(p.getAudioProcessorGraph())
 {
-	button1.reset(new TextButton("test"));
-	button1->addListener(this);
-
 	menuBar.reset(new MenuBarComponent(this));
 	menuBar->setVisible(true);
+
+	synthBtn.reset(new TextButton("Synth"));
+	psBtn.reset(new TextButton("PitchShift"));
+	synthLabel.reset(new Label("SynthLabel", "<empty>"));
+	psLabel.reset(new Label("PitchShiftLabel", "<empty>"));
+	synthBtn->addMouseListener(this, true);
+	psBtn->addMouseListener(this, true);
 
 	commandManager.setFirstCommandTarget(this);
 	setApplicationCommandManagerToWatch(&commandManager);
@@ -66,8 +75,11 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 	pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
 	knownPluginList.addChangeListener(this);
 
-	addAndMakeVisible(button1.get());
 	addAndMakeVisible(menuBar.get());
+	addAndMakeVisible(synthBtn.get());
+	addAndMakeVisible(psBtn.get());
+	addAndMakeVisible(synthLabel.get());
+	addAndMakeVisible(psLabel.get());
 
 	setSize(400, 300);
 }
@@ -75,14 +87,53 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 {
 	knownPluginList.removeChangeListener(this);
+	synthBtn->removeMouseListener(this);
+	psBtn->removeMouseListener(this);
 #if JUCE_MAC
 	MenuBarModel::setMacMainMenu(nullptr);
 #endif
-	button1 = nullptr;
 	menuBar = nullptr;
+	synthBtn = nullptr;
+	psBtn = nullptr;
+	synthLabel = nullptr;
+	psLabel = nullptr;
 }
 
 //==============================================================================
+void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
+{
+	if (e.eventComponent == synthBtn.get())
+	{
+		showPopupMenu(0, e.position.toInt(), [this](int r) {
+			auto types = knownPluginList.getTypes();
+			int result = KnownPluginList::getIndexChosenByMenu(types, r);
+			auto& desc = types.getReference(result);
+			processor.addPlugin(
+				desc,
+				0, 0,
+				[&]()
+				{
+					this->graphUpdated();
+				});
+		});
+	}
+	else if (e.eventComponent == psBtn.get())
+	{
+		showPopupMenu(0, e.position.toInt(), [this](int r) {
+			auto types = knownPluginList.getTypes();
+			int result = KnownPluginList::getIndexChosenByMenu(types, r);
+			auto& desc = types.getReference(result);
+			processor.addPlugin(
+				desc,
+				1, 0,
+				[&]()
+				{
+					this->graphUpdated();
+				});
+		});
+	}
+}
+
 void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* changed)
 {
 	if (changed == &knownPluginList)
@@ -122,13 +173,12 @@ void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLe
 {
 	if (topLevelMenuIndex == 1)
 	{
-		auto& types = knownPluginList.getTypes();
-		int result = knownPluginList.getIndexChosenByMenu(menuItemID);
+		auto types = knownPluginList.getTypes();
+		int result = KnownPluginList::getIndexChosenByMenu(types, menuItemID);
 		auto& desc = types.getReference(result);
 
 		Point<int> position{ proportionOfWidth(0.3f + Random::getSystemRandom().nextFloat() * 0.6f),
 													proportionOfHeight(0.3f + Random::getSystemRandom().nextFloat() * 0.6f) };
-		processor.addPlugin(desc, position.toDouble() / Point<double>((double)getWidth(), (double)getHeight()), [&]() { commandManager.invokeDirectly(CommandIDs::testCommand, true); });
 	}
 }
 
@@ -198,12 +248,52 @@ void MicroChromoAudioProcessorEditor::resized()
 #if !JUCE_MAC
 	menuBar->setBounds(b.removeFromTop(LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight()));
 #endif
+	b.removeFromLeft(10);
+	b.removeFromTop(10);
+
+	auto tmp = b.removeFromTop(40);
+	synthBtn->setBounds(tmp.removeFromLeft(100));
+	tmp.removeFromLeft(10);
+	synthLabel->setBounds(tmp.removeFromLeft(100));
+
+	b.removeFromTop(10);
+
+	tmp = b.removeFromTop(40);
+	psBtn->setBounds(tmp.removeFromLeft(100));
+	tmp.removeFromLeft(10);
+	psLabel->setBounds(tmp.removeFromLeft(100));
 }
 
 void MicroChromoAudioProcessorEditor::buttonClicked(Button* btn)
 {
-	if (btn == button1.get())
+}
+
+void MicroChromoAudioProcessorEditor::showPopupMenu(int type, Point<int> position, std::function<void(int)> callback)
+{
+	floatMenu.reset(new PopupMenu);
+
+	KnownPluginList::addToMenu(*floatMenu, knownPluginList.getTypes(), pluginSortMethod);
+	floatMenu->showMenuAsync({}, ModalCallbackFunction::create([this, callback](int r)
+		{
+			if (r > 0)
+				callback(r);
+		}));
+}
+
+void MicroChromoAudioProcessorEditor::graphUpdated()
+{ 
+	for (auto* node : mainProcessor.getNodes())
 	{
-		
+		if (static_cast<int>(node->properties["copy_number"]) == 0)
+		{
+			if (static_cast<int>(node->properties["slot_number"]) == 0)
+			{
+				synthLabel->setText(node->getProcessor()->getName(), NotificationType::dontSendNotification);
+			}
+			else if (static_cast<int>(node->properties["slot_number"]) == 1)
+			{
+				psLabel->setText(node->getProcessor()->getName(), NotificationType::dontSendNotification);
+			}
+		}
 	}
 }

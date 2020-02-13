@@ -13,7 +13,6 @@
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "PluginProcessor.h"
 
-
 //==============================================================================
 /**
 */
@@ -32,11 +31,12 @@ public:
 	};
 
 	//==============================================================================
-    MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor&, ApplicationProperties&, KnownPluginList&, AudioPluginFormatManager&);
+    MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor&);
     ~MicroChromoAudioProcessorEditor();
 
 	//==============================================================================
 	void changeListenerCallback(ChangeBroadcaster*) override;
+	void mouseDown(const MouseEvent&) override;
 
 	//==============================================================================
 	StringArray getMenuBarNames() override;
@@ -55,6 +55,8 @@ public:
 
 	//==============================================================================
 	void buttonClicked(Button* btn) override;
+	void showPopupMenu(int type, Point<int> position, std::function<void(int)> callback);
+	void graphUpdated();
 
 private:
     // This reference is provided as a quick way for your editor to
@@ -62,15 +64,20 @@ private:
     MicroChromoAudioProcessor& processor;
 	ApplicationProperties& appProperties;
 	AudioPluginFormatManager& formatManager;
+	AudioProcessorGraph& mainProcessor;
 
 	KnownPluginList& knownPluginList;
 	KnownPluginList::SortMethod pluginSortMethod;
 
 	class PluginListWindow;
 	std::unique_ptr<PluginListWindow> pluginListWindow;
-	std::unique_ptr<Button> button1;
+	std::vector<String> names;
 	ApplicationCommandManager commandManager;
 	std::unique_ptr<MenuBarComponent> menuBar;
+
+	std::unique_ptr<Button> synthBtn, psBtn;
+	std::unique_ptr<Label> synthLabel, psLabel;
+	std::unique_ptr<PopupMenu> floatMenu;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessorEditor)
 };
