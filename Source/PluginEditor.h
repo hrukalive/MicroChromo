@@ -12,6 +12,7 @@
 
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "PluginProcessor.h"
+#include "PluginWindow.h"
 
 //==============================================================================
 /**
@@ -57,6 +58,7 @@ public:
 	void buttonClicked(Button* btn) override;
 	void showPopupMenu(int type, Point<int> position, std::function<void(int)> callback);
 	void graphUpdated();
+	void showWindow(PluginWindow::Type type, AudioProcessorGraph::NodeID pluginID);
 
 private:
     // This reference is provided as a quick way for your editor to
@@ -77,7 +79,9 @@ private:
 
 	std::unique_ptr<Button> synthBtn, psBtn;
 	std::unique_ptr<Label> synthLabel, psLabel;
+	AudioProcessorGraph::NodeID synthId, psId;
 	std::unique_ptr<PopupMenu> floatMenu;
+	OwnedArray<PluginWindow> activePluginWindows;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessorEditor)
 };
