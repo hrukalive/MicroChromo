@@ -175,7 +175,7 @@ bool MicroChromoAudioProcessor::hasEditor() const
 
 AudioProcessorEditor* MicroChromoAudioProcessor::createEditor()
 {
-    return new MicroChromoAudioProcessorEditor (*this, appProperties, knownPluginList, formatManager);
+    return new MicroChromoAudioProcessorEditor (*this);
 }
 
 //==============================================================================
@@ -230,19 +230,19 @@ void MicroChromoAudioProcessor::updateGraph()
 {
 }
 
-void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, Point<double> pos, GUICallback callback)
+void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, int slot_number, int copy_number, GUICallback callback)
 {
 	formatManager.createPluginInstanceAsync(desc,
 		mainProcessor.getSampleRate(),
 		mainProcessor.getBlockSize(),
-		[this, pos, callback](std::unique_ptr<AudioPluginInstance> instance, const String& error)
+		[this, slot_number, copy_number, callback](std::unique_ptr<AudioPluginInstance> instance, const String& error)
 		{
-			addPluginCallback(std::move(instance), error, pos);
+			addPluginCallback(std::move(instance), error, slot_number, copy_number);
 			callback();
 		});
 }
 
-void MicroChromoAudioProcessor::addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, Point<double> pos)
+void MicroChromoAudioProcessor::addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int slot_number, int copy_number)
 {
 	if (instance == nullptr)
 	{
@@ -256,8 +256,8 @@ void MicroChromoAudioProcessor::addPluginCallback(std::unique_ptr<AudioPluginIns
 
 		if (auto node = mainProcessor.addNode(std::move(instance)))
 		{
-			node->properties.set("x", pos.x);
-			node->properties.set("y", pos.y);
+			node->properties.set("slot_number", slot_number);
+			node->properties.set("copy_number", copy_number);
 		}
 	}
 }
