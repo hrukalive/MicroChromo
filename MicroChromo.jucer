@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="ZBRnpX" name="MicroChromo" projectType="audioplug" jucerVersion="5.4.5"
+<JUCERPROJECT id="ZBRnpX" name="MicroChromo" projectType="audioplug" jucerVersion="5.4.7"
               pluginFormats="buildAUv3,buildStandalone,buildVST3" pluginCharacteristicsValue="pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn"
               pluginVST3Category="Instrument" cppLanguageStandard="latest">
   <MAINGROUP id="YsAiD7" name="MicroChromo">
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
+      <FILE id="rkfhtY" name="InternalPlugins.cpp" compile="1" resource="0"
+            file="Source/InternalPlugins.cpp"/>
+      <FILE id="NnANeP" name="InternalPlugins.h" compile="0" resource="0"
+            file="Source/InternalPlugins.h"/>
       <FILE id="WcOkwD" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="bbuHO5" name="PluginProcessor.h" compile="0" resource="0"
@@ -36,6 +40,7 @@
         <MODULEPATH id="juce_gui_basics" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../../../Program Files/JUCE/modules"/>
+        <MODULEPATH id="ff_meters" path="C:/Program Files/JUCE/user_modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
     <VS2019 targetFolder="Builds/VisualStudio2019">
@@ -58,6 +63,7 @@
         <MODULEPATH id="juce_gui_basics" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../../../Program Files/JUCE/modules"/>
+        <MODULEPATH id="ff_meters" path="C:/Program Files/JUCE/user_modules"/>
       </MODULEPATHS>
     </VS2019>
     <VS2017 targetFolder="Builds/VisualStudio2017">
@@ -80,6 +86,7 @@
         <MODULEPATH id="juce_gui_basics" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../../../Program Files/JUCE/modules"/>
+        <MODULEPATH id="ff_meters" path="C:/Program Files/JUCE/user_modules"/>
       </MODULEPATHS>
     </VS2017>
     <LINUX_MAKE targetFolder="Builds/LinuxMakefile">
@@ -102,10 +109,12 @@
         <MODULEPATH id="juce_gui_basics" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../../../Program Files/JUCE/modules"/>
+        <MODULEPATH id="ff_meters" path="C:/Program Files/JUCE/user_modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
   </EXPORTFORMATS>
   <MODULES>
+    <MODULE id="ff_meters" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
@@ -125,5 +134,6 @@
   <LIVE_SETTINGS>
     <WINDOWS/>
   </LIVE_SETTINGS>
-  <JUCEOPTIONS JUCE_VST3_CAN_REPLACE_VST2="0" JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
+  <JUCEOPTIONS JUCE_VST3_CAN_REPLACE_VST2="0" JUCE_STRICT_REFCOUNTEDPOINTER="1"
+               FF_AUDIO_ALLOW_ALLOCATIONS_IN_MEASURE_BLOCK="0"/>
 </JUCERPROJECT>

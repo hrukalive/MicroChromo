@@ -76,15 +76,18 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 	knownPluginList.addChangeListener(this);
 
 	lnf.setColour(foleys::LevelMeter::lmMeterGradientLowColour, juce::Colours::green);
-	meter.setLookAndFeel(&lnf);
-	meter.setMeterSource(&processor.getMeterSource());
+	meterInput.setLookAndFeel(&lnf);
+	meterInput.setMeterSource(&processor.getInputMeterSource());
+	meterOutput.setLookAndFeel(&lnf);
+	meterOutput.setMeterSource(&processor.getOutputMeterSource());
 
 	addAndMakeVisible(menuBar.get());
 	addAndMakeVisible(synthBtn.get());
 	addAndMakeVisible(psBtn.get());
 	addAndMakeVisible(synthLabel.get());
 	addAndMakeVisible(psLabel.get());
-	addAndMakeVisible(meter);
+	addAndMakeVisible(meterInput);
+	addAndMakeVisible(meterOutput);
 
 	setSize(400, 300);
 }
@@ -94,6 +97,8 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 	knownPluginList.removeChangeListener(this);
 	synthBtn->removeMouseListener(this);
 	psBtn->removeMouseListener(this);
+
+	activePluginWindows.clear();
 #if JUCE_MAC
 	MenuBarModel::setMacMainMenu(nullptr);
 #endif
@@ -102,7 +107,8 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 	psBtn = nullptr;
 	synthLabel = nullptr;
 	psLabel = nullptr;
-	meter.setLookAndFeel(nullptr);
+	meterInput.setLookAndFeel(nullptr);
+	meterOutput.setLookAndFeel(nullptr);
 }
 
 //==============================================================================
@@ -262,7 +268,8 @@ void MicroChromoAudioProcessorEditor::resized()
 	psLabel->setBounds(tmp.removeFromLeft(100));
 
 	b.removeFromTop(10);
-	meter.setBounds(b.removeFromLeft(60).withTrimmedBottom(10));
+	meterInput.setBounds(b.withWidth(100).withTrimmedBottom(10));
+	meterOutput.setBounds(b.withTrimmedLeft(110).withWidth(100).withTrimmedBottom(10));
 }
 
 void MicroChromoAudioProcessorEditor::buttonClicked(Button* btn)

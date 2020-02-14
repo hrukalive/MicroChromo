@@ -10,6 +10,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "InternalPlugins.h"
 
 //==============================================================================
 MicroChromoAudioProcessor::MicroChromoAudioProcessor()
@@ -36,8 +37,13 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 	appProperties.setStorageParameters(options);
 
 	formatManager.addDefaultFormats();
+	formatManager.addFormat(new InternalPluginFormat());
+	InternalPluginFormat internalFormat;
+	internalFormat.getAllTypes(internalTypes);
 	if (auto savedPluginList = appProperties.getUserSettings()->getXmlValue("pluginList"))
 		knownPluginList.recreateFromXml(*savedPluginList);
+	for (auto& t : internalTypes)
+		knownPluginList.addType(t);
 }
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
@@ -112,6 +118,12 @@ void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+
+	inputMeterSource.setMaxHoldMS(500);
+	inputMeterSource.resize(getMainBusNumInputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
+	outputMeterSource.setMaxHoldMS(500);
+	outputMeterSource.resize(getMainBusNumOutputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
+
 	mainProcessor.setPlayConfigDetails(getMainBusNumInputChannels(), getMainBusNumOutputChannels(), sampleRate, samplesPerBlock);
 	mainProcessor.prepareToPlay(sampleRate, samplesPerBlock);
 	initializeGraph();
@@ -164,8 +176,9 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
     //    buffer.clear (i, 0, buffer.getNumSamples());
 
 	//updateGraph();
-    meterSource.measureBlock(buffer);
+	inputMeterSource.measureBlock(buffer);
 	mainProcessor.processBlock(buffer, midiMessages);
+	outputMeterSource.measureBlock(buffer);
 }
 
 //==============================================================================
@@ -204,18 +217,19 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
 void MicroChromoAudioProcessor::initializeGraph()
 {
 	mainProcessor.clear();
+
 	audioInputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::audioInputNode));
 	audioOutputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::audioOutputNode));
 	midiInputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::midiInputNode));
 	midiOutputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::midiOutputNode));
 
-	//connectAudioNodes();
+	connectAudioNodes();
 	connectMidiNodes();
 }
 
 void MicroChromoAudioProcessor::connectAudioNodes()
 {
-	for (int channel = 0; channel < 2; ++channel)
+	for (int channel = 0; channel < getMainBusNumOutputChannels(); ++channel)
 		mainProcessor.addConnection({ { audioInputNode->nodeID,  channel },
 										{ audioOutputNode->nodeID, channel } });
 }

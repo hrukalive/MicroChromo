@@ -71,7 +71,8 @@ public:
 	AudioPluginFormatManager& getAudioPluginFormatManager() { return formatManager; }
 	KnownPluginList& getKnownPluginList() { return knownPluginList; }
 	AudioProcessorGraph& getAudioProcessorGraph() { return mainProcessor; }
-    foleys::LevelMeterSource& getMeterSource() { return meterSource; }
+    foleys::LevelMeterSource& getInputMeterSource() { return inputMeterSource; }
+	foleys::LevelMeterSource& getOutputMeterSource() { return outputMeterSource; }
 
 private:
     //==============================================================================
@@ -79,6 +80,7 @@ private:
 	KnownPluginList knownPluginList;
 	AudioProcessorGraph mainProcessor;
 	AudioPluginFormatManager formatManager;
+	Array<PluginDescription> internalTypes;
     AudioProcessorGraph::Node::Ptr audioInputNode;
     AudioProcessorGraph::Node::Ptr audioOutputNode;
     AudioProcessorGraph::Node::Ptr midiInputNode;
@@ -86,7 +88,8 @@ private:
 
 	AudioProcessorValueTreeState parameters;
 
-    foleys::LevelMeterSource meterSource;
+    foleys::LevelMeterSource inputMeterSource;
+	foleys::LevelMeterSource outputMeterSource;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessor)
 };

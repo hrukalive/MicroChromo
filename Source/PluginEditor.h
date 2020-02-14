@@ -84,7 +84,8 @@ private:
 	OwnedArray<PluginWindow> activePluginWindows;
 
 	foleys::LevelMeterLookAndFeel lnf;
-	foleys::LevelMeter meter{ foleys::LevelMeter::MeterFlags::Default };
+	foleys::LevelMeter meterInput{ foleys::LevelMeter::MeterFlags::Default };
+	foleys::LevelMeter meterOutput{ foleys::LevelMeter::MeterFlags::Default };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessorEditor)
 };
