@@ -62,9 +62,10 @@
 
 #define JUCE_USE_DARK_SPLASH_SCREEN 1
 
-#define JUCE_PROJUCER_VERSION 0x50405
+#define JUCE_PROJUCER_VERSION 0x50407
 
 //==============================================================================
+#define JUCE_MODULE_AVAILABLE_ff_meters                     1
 #define JUCE_MODULE_AVAILABLE_juce_audio_basics             1
 #define JUCE_MODULE_AVAILABLE_juce_audio_devices            1
 #define JUCE_MODULE_AVAILABLE_juce_audio_formats            1
@@ -81,6 +82,13 @@
 #define JUCE_MODULE_AVAILABLE_juce_opengl                   1
 
 #define JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED 1
+
+//==============================================================================
+// ff_meters flags:
+
+#ifndef    FF_AUDIO_ALLOW_ALLOCATIONS_IN_MEASURE_BLOCK
+ #define   FF_AUDIO_ALLOW_ALLOCATIONS_IN_MEASURE_BLOCK 0
+#endif
 
 //==============================================================================
 // juce_audio_devices flags:
@@ -171,6 +179,10 @@
  //#define JUCE_USE_STUDIO_ONE_COMPATIBLE_PARAMETERS 1
 #endif
 
+#ifndef    JUCE_AU_WRAPPERS_SAVE_PROGRAM_STATES
+ //#define JUCE_AU_WRAPPERS_SAVE_PROGRAM_STATES 0
+#endif
+
 #ifndef    JUCE_STANDALONE_FILTER_WINDOW_USE_KIOSK_MODE
  //#define JUCE_STANDALONE_FILTER_WINDOW_USE_KIOSK_MODE 0
 #endif
@@ -251,8 +263,8 @@
 //==============================================================================
 // juce_events flags:
 
-#ifndef    JUCE_EXECUTE_APP_SUSPEND_ON_IOS_BACKGROUND_TASK
- //#define JUCE_EXECUTE_APP_SUSPEND_ON_IOS_BACKGROUND_TASK 0
+#ifndef    JUCE_EXECUTE_APP_SUSPEND_ON_BACKGROUND_TASK
+ //#define JUCE_EXECUTE_APP_SUSPEND_ON_BACKGROUND_TASK 0
 #endif
 
 //==============================================================================
