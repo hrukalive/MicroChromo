@@ -112,7 +112,7 @@ public:
     };
 
     PluginWindow (PluginInstance* n, Type t, OwnedArray<PluginWindow>& windowList)
-       : DocumentWindow (n->getProcessor()->getName(),
+       : DocumentWindow (n->processor->getName(),
                          LookAndFeel::getDefaultLookAndFeel().findColour (ResizableWindow::backgroundColourId),
                          DocumentWindow::minimiseButton | DocumentWindow::closeButton),
          activeWindowList (windowList),
@@ -120,7 +120,7 @@ public:
     {
         setSize (400, 300);
 
-        if (auto* ui = createProcessorEditor (*node->getProcessor(), type))
+        if (auto* ui = createProcessorEditor (*node->processor, type))
             setContentOwned (ui, true);
         setTopLeftPosition (node->properties.getWithDefault (getLastXProp (type), Random::getSystemRandom().nextInt (500)),
                             node->properties.getWithDefault (getLastYProp (type), Random::getSystemRandom().nextInt (500)));
