@@ -56,6 +56,7 @@ public:
 
 	//==============================================================================
 	void addPlugin(const PluginDescription& desc, bool isSynth, GUICallback callback);
+    bool checkPluginLoaded(GUICallback callback = nullptr);
 	void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, bool isSynth, int index);
 
     //==============================================================================
@@ -78,7 +79,7 @@ private:
 	AudioPluginFormatManager formatManager;
 	Array<PluginDescription> internalTypes;
 
-	const int numInstances = 1;
+	const int numInstances = 2;
     uint32 uid = 0;
 	OwnedArray<PluginInstance> synthArray, psArray;
 	OwnedArray<AudioBuffer<float>> bufferArray;
@@ -87,6 +88,9 @@ private:
 
     foleys::LevelMeterSource inputMeterSource;
 	foleys::LevelMeterSource outputMeterSource;
+
+    CriticalSection instanceIncrement;
+    size_t instanceStarted = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessor)
 };

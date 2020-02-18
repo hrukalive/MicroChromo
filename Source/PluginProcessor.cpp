@@ -132,10 +132,10 @@ void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
 	outputMeterSource.resize(getTotalNumOutputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
 
 	bufferArray.clear();
-	auto channels = jmax(synthArray[0]->getProcessor()->getTotalNumInputChannels(),
-		synthArray[0]->getProcessor()->getTotalNumOutputChannels(),
-		psArray[0]->getProcessor()->getTotalNumInputChannels(),
-		psArray[0]->getProcessor()->getTotalNumOutputChannels());
+	auto channels = jmax(synthArray[0]->processor->getTotalNumInputChannels(),
+		synthArray[0]->processor->getTotalNumOutputChannels(),
+		psArray[0]->processor->getTotalNumInputChannels(),
+		psArray[0]->processor->getTotalNumOutputChannels());
 	for (int i = 0; i < numInstances; i++)
 	{
 		bufferArray.add(new AudioBuffer<float>(channels, samplesPerBlock));
@@ -212,8 +212,8 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 	{
 		if (synthArray[i] != nullptr && psArray[i] != nullptr)
 		{
-			synthArray[i]->getProcessor()->processBlock(*bufferArray[i], midiMessages);
-			psArray[i]->getProcessor()->processBlock(*bufferArray[i], midiMessages);
+			synthArray[i]->processor->processBlock(*bufferArray[i], midiMessages);
+			psArray[i]->processor->processBlock(*bufferArray[i], midiMessages);
 			for (auto j = 0; j < buffer.getNumChannels(); j++)
 			{
 				buffer.addFrom(j, 0, *bufferArray[i], j, 0, buffer.getNumSamples());
@@ -258,6 +258,8 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
 
 void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool isSynth, GUICallback callback)
 {
+	instanceStarted = 0;
+	suspendProcessing(true);
 	for (auto i = 0; i < numInstances; i++)
 	{
 		formatManager.createPluginInstanceAsync(desc,
@@ -266,9 +268,25 @@ void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool is
 			[this, isSynth, i, callback](std::unique_ptr<AudioPluginInstance> instance, const String& error)
 			{
 				addPluginCallback(std::move(instance), error, isSynth, i);
-				callback();
+				checkPluginLoaded(callback);
 			});
 	}
+}
+
+bool MicroChromoAudioProcessor::checkPluginLoaded(GUICallback callback)
+{
+	const ScopedLock lock(instanceIncrement);
+	if (instanceStarted == numInstances)
+	{
+		if (callback != nullptr)
+		{
+			callback();
+			prepareToPlay(getSampleRate(), getBlockSize());
+		}
+		suspendProcessing(false);
+		return true;
+	}
+	return false;
 }
 
 void MicroChromoAudioProcessor::addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, bool isSynth, int index)
@@ -286,7 +304,10 @@ void MicroChromoAudioProcessor::addPluginCallback(std::unique_ptr<AudioPluginIns
 			synthArray.set(index, new PluginInstance(uid++, std::move(instance)), true);
 		else
 			psArray.set(index, new PluginInstance(uid++, std::move(instance)), true);
-		prepareToPlay(getSampleRate(), getBlockSize());
+		{
+			const ScopedLock lock(instanceIncrement);
+			instanceStarted++;
+		}
 	}
 }
 

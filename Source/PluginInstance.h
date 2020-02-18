@@ -15,17 +15,11 @@
 class PluginInstance
 {
 public:
-    PluginInstance(uint32 n, std::shared_ptr<AudioProcessor> p) noexcept
-        : nodeID(n), processor(p)
+    PluginInstance(uint32 n, std::unique_ptr<AudioProcessor> p) noexcept
+        : nodeID(n), processor(std::move(p))
     {
         jassert(processor != nullptr);
     }
-
-    const uint32 nodeID;
-    AudioProcessor* getProcessor() const noexcept { return processor.get(); }
-    NamedValueSet properties;
-
-    const std::shared_ptr<AudioProcessor> processor;
 
     void prepare(double newSampleRate, int newBlockSize)
     {
@@ -40,6 +34,10 @@ public:
 
         processor->releaseResources();
     }
+
+    const uint32 nodeID;
+    NamedValueSet properties;
+    const std::unique_ptr<AudioProcessor> processor;
 
 private:
     CriticalSection processorLock;
