@@ -44,11 +44,19 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 		knownPluginList.recreateFromXml(*savedPluginList);
 	for (auto& t : internalTypes)
 		knownPluginList.addType(t);
+
+	for (int i = 0; i < numInstances; i++)
+	{
+		synthArray.add(new PluginInstance(uid++, formatManager.createPluginInstance(internalTypes[0], 44100, 1024, String())));
+		psArray.add(new PluginInstance(uid++, formatManager.createPluginInstance(internalTypes[0], 44100, 1024, String())));
+	}
 }
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
 {
-	mainProcessor.clear();
+	synthArray.clear();
+	psArray.clear();
+	bufferArray.clear();
 }
 
 //==============================================================================
@@ -118,22 +126,40 @@ void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
-
 	inputMeterSource.setMaxHoldMS(500);
-	inputMeterSource.resize(getMainBusNumInputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
+	inputMeterSource.resize(getTotalNumInputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
 	outputMeterSource.setMaxHoldMS(500);
-	outputMeterSource.resize(getMainBusNumOutputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
+	outputMeterSource.resize(getTotalNumOutputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
 
-	mainProcessor.setPlayConfigDetails(getMainBusNumInputChannels(), getMainBusNumOutputChannels(), sampleRate, samplesPerBlock);
-	mainProcessor.prepareToPlay(sampleRate, samplesPerBlock);
-	initializeGraph();
+	bufferArray.clear();
+	auto channels = jmax(synthArray[0]->getProcessor()->getTotalNumInputChannels(),
+		synthArray[0]->getProcessor()->getTotalNumOutputChannels(),
+		psArray[0]->getProcessor()->getTotalNumInputChannels(),
+		psArray[0]->getProcessor()->getTotalNumOutputChannels());
+	for (int i = 0; i < numInstances; i++)
+	{
+		bufferArray.add(new AudioBuffer<float>(channels, samplesPerBlock));
+		//if (!synthArray[i]->getProcessor()->setBusesLayout(getBusesLayout()))
+		//	AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Wrong", "Synth bus layout not supported.", "OK");
+		//synthArray[i]->getProcessor()->enableAllBuses();
+		//if (!psArray[i]->getProcessor()->setBusesLayout(getBusesLayout()))
+		//	AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Wrong", "PS bus layout not supported.", "OK");
+		//psArray[i]->getProcessor()->enableAllBuses();
+		synthArray[i]->prepare(sampleRate, samplesPerBlock);
+		psArray[i]->prepare(sampleRate, samplesPerBlock);
+	}
 }
 
 void MicroChromoAudioProcessor::releaseResources()
 {
     // When playback stops, you can use this as an opportunity to free up any
     // spare memory, etc.
-	mainProcessor.releaseResources();
+	for (auto i = 0; i < numInstances; i++)
+	{
+		synthArray[i]->unprepare();
+		psArray[i]->unprepare();
+	}
+	bufferArray.clear();
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -166,18 +192,34 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    //for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-    //    buffer.clear (i, 0, buffer.getNumSamples());
+	for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+		buffer.clear(i, 0, buffer.getNumSamples());
 
-	//updateGraph();
 	inputMeterSource.measureBlock(buffer);
-	mainProcessor.processBlock(buffer, midiMessages);
+
+	for (auto i = 0; i < buffer.getNumChannels(); i++)
+	{
+		for (auto j = 0; j < numInstances; j++)
+		{
+			bufferArray[j]->copyFrom(i, 0, buffer, i, 0, buffer.getNumSamples());
+		}
+	}
+
+	for (auto i = 0; i < buffer.getNumChannels(); ++i)
+		buffer.clear(i, 0, buffer.getNumSamples());
+
+	for (auto i = 0; i < numInstances; i++)
+	{
+		if (synthArray[i] != nullptr && psArray[i] != nullptr)
+		{
+			synthArray[i]->getProcessor()->processBlock(*bufferArray[i], midiMessages);
+			psArray[i]->getProcessor()->processBlock(*bufferArray[i], midiMessages);
+			for (auto j = 0; j < buffer.getNumChannels(); j++)
+			{
+				buffer.addFrom(j, 0, *bufferArray[i], j, 0, buffer.getNumSamples());
+			}
+		}
+	}
 	outputMeterSource.measureBlock(buffer);
 }
 
@@ -214,49 +256,22 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
 			parameters.replaceState(ValueTree::fromXml(*xmlState));
 }
 
-void MicroChromoAudioProcessor::initializeGraph()
+void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool isSynth, GUICallback callback)
 {
-	mainProcessor.clear();
-
-	audioInputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::audioInputNode));
-	audioOutputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::audioOutputNode));
-	midiInputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::midiInputNode));
-	midiOutputNode = mainProcessor.addNode(std::make_unique<AudioGraphIOProcessor>(AudioGraphIOProcessor::midiOutputNode));
-
-	connectAudioNodes();
-	connectMidiNodes();
+	for (auto i = 0; i < numInstances; i++)
+	{
+		formatManager.createPluginInstanceAsync(desc,
+			getSampleRate(),
+			getBlockSize(),
+			[this, isSynth, i, callback](std::unique_ptr<AudioPluginInstance> instance, const String& error)
+			{
+				addPluginCallback(std::move(instance), error, isSynth, i);
+				callback();
+			});
+	}
 }
 
-void MicroChromoAudioProcessor::connectAudioNodes()
-{
-	for (int channel = 0; channel < getMainBusNumOutputChannels(); ++channel)
-		mainProcessor.addConnection({ { audioInputNode->nodeID,  channel },
-										{ audioOutputNode->nodeID, channel } });
-}
-
-void MicroChromoAudioProcessor::connectMidiNodes()
-{
-	mainProcessor.addConnection({ { midiInputNode->nodeID,  AudioProcessorGraph::midiChannelIndex },
-									{ midiOutputNode->nodeID, AudioProcessorGraph::midiChannelIndex } });
-}
-
-void MicroChromoAudioProcessor::updateGraph()
-{
-}
-
-void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, int slot_number, int copy_number, GUICallback callback)
-{
-	formatManager.createPluginInstanceAsync(desc,
-		mainProcessor.getSampleRate(),
-		mainProcessor.getBlockSize(),
-		[this, slot_number, copy_number, callback](std::unique_ptr<AudioPluginInstance> instance, const String& error)
-		{
-			addPluginCallback(std::move(instance), error, slot_number, copy_number);
-			callback();
-		});
-}
-
-void MicroChromoAudioProcessor::addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int slot_number, int copy_number)
+void MicroChromoAudioProcessor::addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, bool isSynth, int index)
 {
 	if (instance == nullptr)
 	{
@@ -267,12 +282,11 @@ void MicroChromoAudioProcessor::addPluginCallback(std::unique_ptr<AudioPluginIns
 	else
 	{
 		instance->enableAllBuses();
-
-		if (auto node = mainProcessor.addNode(std::move(instance)))
-		{
-			node->properties.set("slot_number", slot_number);
-			node->properties.set("copy_number", copy_number);
-		}
+		if (isSynth)
+			synthArray.set(index, new PluginInstance(uid++, std::move(instance)), true);
+		else
+			psArray.set(index, new PluginInstance(uid++, std::move(instance)), true);
+		prepareToPlay(getSampleRate(), getBlockSize());
 	}
 }
 

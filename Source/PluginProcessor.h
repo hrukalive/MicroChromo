@@ -11,8 +11,8 @@
 #pragma once
 
 #include "../JuceLibraryCode/JuceHeader.h"
+#include "PluginInstance.h"
 
-using AudioGraphIOProcessor = AudioProcessorGraph::AudioGraphIOProcessor;
 using GUICallback = std::function<void()>;
 
 //==============================================================================
@@ -55,12 +55,8 @@ public:
     void changeProgramName (int index, const String& newName) override;
 
 	//==============================================================================
-	void initializeGraph();
-	void connectAudioNodes();
-	void connectMidiNodes();
-	void updateGraph();
-	void addPlugin(const PluginDescription& desc, int slot_number, int copy_number, GUICallback callback);
-	void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int slot_number, int copy_number);
+	void addPlugin(const PluginDescription& desc, bool isSynth, GUICallback callback);
+	void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, bool isSynth, int index);
 
     //==============================================================================
     void getStateInformation (MemoryBlock& destData) override;
@@ -70,7 +66,8 @@ public:
 	ApplicationProperties& getApplicationProperties() { return appProperties; }
 	AudioPluginFormatManager& getAudioPluginFormatManager() { return formatManager; }
 	KnownPluginList& getKnownPluginList() { return knownPluginList; }
-	AudioProcessorGraph& getAudioProcessorGraph() { return mainProcessor; }
+	OwnedArray<PluginInstance>& getSynthArray() { return synthArray; }
+	OwnedArray<PluginInstance>& getPitchShiftArray() { return psArray; }
     foleys::LevelMeterSource& getInputMeterSource() { return inputMeterSource; }
 	foleys::LevelMeterSource& getOutputMeterSource() { return outputMeterSource; }
 
@@ -78,13 +75,13 @@ private:
     //==============================================================================
 	ApplicationProperties appProperties;
 	KnownPluginList knownPluginList;
-	AudioProcessorGraph mainProcessor;
 	AudioPluginFormatManager formatManager;
 	Array<PluginDescription> internalTypes;
-    AudioProcessorGraph::Node::Ptr audioInputNode;
-    AudioProcessorGraph::Node::Ptr audioOutputNode;
-    AudioProcessorGraph::Node::Ptr midiInputNode;
-    AudioProcessorGraph::Node::Ptr midiOutputNode;
+
+	const int numInstances = 1;
+    uint32 uid = 0;
+	OwnedArray<PluginInstance> synthArray, psArray;
+	OwnedArray<AudioBuffer<float>> bufferArray;
 
 	AudioProcessorValueTreeState parameters;
 
