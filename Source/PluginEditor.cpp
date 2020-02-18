@@ -55,7 +55,8 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 	appProperties(p.getApplicationProperties()),
 	knownPluginList(p.getKnownPluginList()),
 	formatManager(p.getAudioPluginFormatManager()),
-	mainProcessor(p.getAudioProcessorGraph())
+	synthArray(p.getSynthArray()),
+	psArray(p.getPitchShiftArray())
 {
 	menuBar.reset(new MenuBarComponent(this));
 	menuBar->setVisible(true);
@@ -103,10 +104,12 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 	MenuBarModel::setMacMainMenu(nullptr);
 #endif
 	menuBar = nullptr;
+
 	synthBtn = nullptr;
 	psBtn = nullptr;
 	synthLabel = nullptr;
 	psLabel = nullptr;
+
 	meterInput.setLookAndFeel(nullptr);
 	meterOutput.setLookAndFeel(nullptr);
 }
@@ -114,36 +117,30 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 //==============================================================================
 void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
 {
-	auto common = [this](int r, int slot) {
-		auto pluginId = slot == 0 ? this->synthId : this->psId;
+	auto common = [this](int r, bool isSynth) {
 		switch (r)
 		{
-		case 1:  showWindow(PluginWindow::Type::normal, pluginId); break;
-		case 2:  showWindow(PluginWindow::Type::programs, pluginId); break;
-		case 3:  showWindow(PluginWindow::Type::generic, pluginId); break;
-		case 4:  showWindow(PluginWindow::Type::debug, pluginId); break;
+		case 1:  showWindow(PluginWindow::Type::normal, isSynth); break;
+		case 2:  showWindow(PluginWindow::Type::programs, isSynth); break;
+		case 3:  showWindow(PluginWindow::Type::generic, isSynth); break;
+		case 4:  showWindow(PluginWindow::Type::debug, isSynth); break;
 		default:
 		{
+			activePluginWindows.clear();
 			auto types = knownPluginList.getTypes();
 			int result = KnownPluginList::getIndexChosenByMenu(types, r);
 			auto& desc = types.getReference(result);
-			processor.addPlugin(
-				desc,
-				slot, 0,
-				[&]()
-			{
-				this->graphUpdated();
-			});
+			processor.addPlugin(desc, isSynth, [&]() { this->pluginUpdated(); });
 		}
 		}
 	};
 	if (e.eventComponent == synthBtn.get())
 	{
-		showPopupMenu(0, e.position.toInt(), [this, common](int r) { common(r, 0); });
+		showPopupMenu(0, e.position.toInt(), [this, common](int r) { common(r, true); });
 	}
 	else if (e.eventComponent == psBtn.get())
 	{
-		showPopupMenu(0, e.position.toInt(), [this, common](int r) { common(r, 1); });
+		showPopupMenu(0, e.position.toInt(), [this, common](int r) { common(r, false); });
 	}
 }
 
@@ -162,7 +159,7 @@ void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* 
 //==============================================================================
 StringArray MicroChromoAudioProcessorEditor::getMenuBarNames()
 {
-	return { "File", "Plugins" };
+	return { "File" };
 }
 
 PopupMenu MicroChromoAudioProcessorEditor::getMenuForIndex(int menuIndex, const String& /*menuName*/)
@@ -172,11 +169,6 @@ PopupMenu MicroChromoAudioProcessorEditor::getMenuForIndex(int menuIndex, const 
 	if (menuIndex == 0)
 	{
 		menu.addCommandItem(&commandManager, CommandIDs::openPluginScanner);
-		menu.addCommandItem(&commandManager, CommandIDs::testCommand);
-	}
-	else if (menuIndex == 1)
-	{
-		KnownPluginList::addToMenu(menu, knownPluginList.getTypes(), pluginSortMethod);
 	}
 
 	return menu;
@@ -195,8 +187,7 @@ ApplicationCommandTarget* MicroChromoAudioProcessorEditor::getNextCommandTarget(
 void MicroChromoAudioProcessorEditor::getAllCommands(Array<CommandID>& c)
 {
 	Array<CommandID> commands{
-		CommandIDs::openPluginScanner,
-		CommandIDs::testCommand
+		CommandIDs::openPluginScanner
 	};
 	c.addArray(commands);
 }
@@ -213,9 +204,6 @@ void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, Applic
 		result.addDefaultKeypress('q', ModifierKeys::ctrlModifier);
 #endif
 		break;
-	case CommandIDs::testCommand:
-		result.setInfo("Test", "Test", "File", 0);
-		break;
 	default:
 		break;
 	}
@@ -231,9 +219,6 @@ bool MicroChromoAudioProcessorEditor::perform(const InvocationInfo& info)
 		pluginListWindow->toFront(true);
 		break;
 	}
-	case CommandIDs::testCommand:
-		AlertWindow::showMessageBoxAsync(AlertWindow::InfoIcon, "Command Test", "TEST");
-		break;
 	default:
 		return false;
 	}
@@ -293,33 +278,19 @@ void MicroChromoAudioProcessorEditor::showPopupMenu(int type, Point<int> positio
 		}));
 }
 
-void MicroChromoAudioProcessorEditor::graphUpdated()
-{ 
-	for (auto* node : mainProcessor.getNodes())
-	{
-		if (static_cast<int>(node->properties["copy_number"]) == 0)
-		{
-			if (static_cast<int>(node->properties["slot_number"]) == 0)
-			{
-				synthLabel->setText(node->getProcessor()->getName(), NotificationType::dontSendNotification);
-				synthId = node->nodeID;
-			}
-			else if (static_cast<int>(node->properties["slot_number"]) == 1)
-			{
-				psLabel->setText(node->getProcessor()->getName(), NotificationType::dontSendNotification);
-				psId = node->nodeID;
-			}
-		}
-	}
+void MicroChromoAudioProcessorEditor::pluginUpdated()
+{
+	synthLabel->setText(synthArray[0]->getProcessor()->getName(), NotificationType::dontSendNotification);
+	psLabel->setText(psArray[0]->getProcessor()->getName(), NotificationType::dontSendNotification);
 }
 
-void MicroChromoAudioProcessorEditor::showWindow(PluginWindow::Type type, AudioProcessorGraph::NodeID pluginID)
+void MicroChromoAudioProcessorEditor::showWindow(PluginWindow::Type type, bool isSynth)
 {
-	if (auto node = mainProcessor.getNodeForId(pluginID))
+	if (auto node = (isSynth ? synthArray[0] : psArray[0]))
 	{
 		for (auto* w : activePluginWindows)
 		{
-			if (w->node.get() == node && w->type == type)
+			if (w->node == node && w->type == type)
 			{
 				w->toFront(true);
 				return;

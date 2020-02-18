@@ -1,5 +1,6 @@
 #pragma once
 #include "../JuceLibraryCode/JuceHeader.h"
+#include "PluginInstance.h";
 
 /**
     A window that shows a log of parameter change messagse sent by the plugin.
@@ -110,12 +111,12 @@ public:
         numTypes
     };
 
-    PluginWindow (AudioProcessorGraph::Node* n, Type t, OwnedArray<PluginWindow>& windowList)
+    PluginWindow (PluginInstance* n, Type t, OwnedArray<PluginWindow>& windowList)
        : DocumentWindow (n->getProcessor()->getName(),
                          LookAndFeel::getDefaultLookAndFeel().findColour (ResizableWindow::backgroundColourId),
                          DocumentWindow::minimiseButton | DocumentWindow::closeButton),
          activeWindowList (windowList),
-         node (n), type (t)
+         node(n), type (t)
     {
         setSize (400, 300);
 
@@ -151,7 +152,7 @@ public:
     static String getOpenProp  (Type type)    { return "uiopen_"  + getTypeName (type); }
 
     OwnedArray<PluginWindow>& activeWindowList;
-    const AudioProcessorGraph::Node::Ptr node;
+    PluginInstance* node;
     const Type type;
 
 private:
