@@ -91,6 +91,8 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 	addAndMakeVisible(meterOutput);
 
 	setSize(400, 300);
+
+	pluginUpdated();
 }
 
 MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
@@ -126,11 +128,18 @@ void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
 		case 4:  showWindow(PluginWindow::Type::debug, isSynth); break;
 		default:
 		{
-			activePluginWindows.clear();
-			auto types = knownPluginList.getTypes();
-			int result = KnownPluginList::getIndexChosenByMenu(types, r);
-			auto& desc = types.getReference(result);
-			processor.addPlugin(desc, isSynth, [&]() { this->pluginUpdated(); });
+			if (!processor.checkPluginLoaded())
+			{
+				activePluginWindows.clear();
+				auto types = knownPluginList.getTypes();
+				int result = KnownPluginList::getIndexChosenByMenu(types, r);
+				auto& desc = types.getReference(result);
+				processor.addPlugin(desc, isSynth, [&]() { this->pluginUpdated(); });
+			}
+			else
+			{
+				AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Loading", "Another plugin is loading", "OK");
+			}
 		}
 		}
 	};
@@ -280,8 +289,8 @@ void MicroChromoAudioProcessorEditor::showPopupMenu(int type, Point<int> positio
 
 void MicroChromoAudioProcessorEditor::pluginUpdated()
 {
-	synthLabel->setText(synthArray[0]->getProcessor()->getName(), NotificationType::dontSendNotification);
-	psLabel->setText(psArray[0]->getProcessor()->getName(), NotificationType::dontSendNotification);
+	synthLabel->setText(synthArray[0]->processor->getName(), NotificationType::dontSendNotification);
+	psLabel->setText(psArray[0]->processor->getName(), NotificationType::dontSendNotification);
 }
 
 void MicroChromoAudioProcessorEditor::showWindow(PluginWindow::Type type, bool isSynth)
@@ -296,7 +305,7 @@ void MicroChromoAudioProcessorEditor::showWindow(PluginWindow::Type type, bool i
 				return;
 			}
 		}
-		if (auto* processor = node->getProcessor())
+		if (node->processor != nullptr)
 		{
 			activePluginWindows.add(new PluginWindow(node, type, activePluginWindows))->toFront(true);
 		}
