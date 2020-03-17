@@ -18,7 +18,7 @@
 
 // (You can add your own code in this section, and the Projucer will not overwrite it)
 #ifndef    JUCE_PLUGINHOST_VST
-  #define JUCE_PLUGINHOST_VST 0
+  #define JUCE_PLUGINHOST_VST 1
 #endif
 
 #ifndef    JUCE_PLUGINHOST_VST3

@@ -5,6 +5,9 @@
               pluginVST3Category="Instrument" cppLanguageStandard="latest">
   <MAINGROUP id="YsAiD7" name="MicroChromo">
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
+      <FILE id="uNIWbV" name="PluginBundle.cpp" compile="1" resource="0"
+            file="Source/PluginBundle.cpp"/>
+      <FILE id="yFSpZJ" name="PluginBundle.h" compile="0" resource="0" file="Source/PluginBundle.h"/>
       <FILE id="Z1ZimM" name="PluginInstance.h" compile="0" resource="0"
             file="Source/PluginInstance.h"/>
       <FILE id="rkfhtY" name="InternalPlugins.cpp" compile="1" resource="0"
