@@ -8,7 +8,6 @@
   ==============================================================================
 */
 
-#include "../JuceLibraryCode/JuceHeader.h"
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
@@ -295,19 +294,22 @@ void MicroChromoAudioProcessorEditor::pluginUpdated()
 
 void MicroChromoAudioProcessorEditor::showWindow(PluginWindow::Type type, bool isSynth)
 {
-	if (auto node = (isSynth ? synthArray[0] : psArray[0]))
+	for (auto i = 0; i < processor.getNumInstances(); i++)
 	{
-		for (auto* w : activePluginWindows)
+		if (auto node = (isSynth ? synthArray[i] : psArray[i]))
 		{
-			if (w->node == node && w->type == type)
+			for (auto* w : activePluginWindows)
 			{
-				w->toFront(true);
-				return;
+				if (w->node == node && w->type == type)
+				{
+					w->toFront(true);
+					return;
+				}
 			}
-		}
-		if (node->processor != nullptr)
-		{
-			activePluginWindows.add(new PluginWindow(node, type, activePluginWindows))->toFront(true);
+			if (node->processor != nullptr)
+			{
+				activePluginWindows.add(new PluginWindow(node, type, activePluginWindows))->toFront(true);
+			}
 		}
 	}
 }

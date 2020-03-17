@@ -10,8 +10,9 @@
 
 #pragma once
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
 #include "PluginInstance.h"
+#include "PluginBundle.h"
 
 using GUICallback = std::function<void()>;
 
@@ -71,6 +72,7 @@ public:
 	OwnedArray<PluginInstance>& getPitchShiftArray() { return psArray; }
     foleys::LevelMeterSource& getInputMeterSource() { return inputMeterSource; }
 	foleys::LevelMeterSource& getOutputMeterSource() { return outputMeterSource; }
+    size_t getNumInstances() { return numInstances; }
 
 private:
     //==============================================================================
@@ -79,10 +81,11 @@ private:
 	AudioPluginFormatManager formatManager;
 	Array<PluginDescription> internalTypes;
 
-	const int numInstances = 2;
+	const size_t numInstances = 2;
     uint32 uid = 0;
 	OwnedArray<PluginInstance> synthArray, psArray;
 	OwnedArray<AudioBuffer<float>> bufferArray;
+    std::unique_ptr<PluginBundle> synthBundle, psBundle;
 
 	AudioProcessorValueTreeState parameters;
 
