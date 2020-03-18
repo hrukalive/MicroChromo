@@ -15,7 +15,7 @@
 
 class MicroChromoAudioProcessor;
 
-class PluginBundle : ChangeBroadcaster
+class PluginBundle : public ChangeBroadcaster, AudioProcessorParameter::Listener
 {
 public:
     PluginBundle(size_t numInstances, const PluginDescription desc, MicroChromoAudioProcessor& p);
@@ -34,12 +34,19 @@ public:
     //==============================================================================
     void getStateInformation(MemoryBlock& destData);
     void setStateInformation(const void* data, int sizeInBytes);
+    void propagateState();
+
+    //==============================================================================
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
     //==============================================================================
     void loadPlugin();
+    PluginInstance* getInstanceAt(size_t index);
 
     bool isLoading();
     bool isLoaded();
+    void setPluginDescription(const PluginDescription desc) { _desc = desc; }
 
 private:
     void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int index);
@@ -49,12 +56,11 @@ private:
     AudioPluginFormatManager& formatManager;
 
     size_t _numInstances = 1;
-    const PluginDescription& _desc;
-    uint32 uid = 0;
+    PluginDescription _desc;
+    std::atomic<uint32> uid = 0;
     OwnedArray<PluginInstance> instances;
-    CriticalSection criticalSection;
-    size_t instanceStarted = 0;
-    bool _isLoading = false, _isLoaded = false, _isError = false;
+    std::atomic<int> instanceStarted = 0;
+    std::atomic<bool> _isLoading = false, _isLoaded = false, _isError = false;
     String errMsg;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginBundle)

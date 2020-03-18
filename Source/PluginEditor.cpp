@@ -54,8 +54,8 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 	appProperties(p.getApplicationProperties()),
 	knownPluginList(p.getKnownPluginList()),
 	formatManager(p.getAudioPluginFormatManager()),
-	synthArray(p.getSynthArray()),
-	psArray(p.getPitchShiftArray())
+	synthBundle(p.getSynthBundlePtr()),
+	psBundle(p.getPSBundlePtr())
 {
 	menuBar.reset(new MenuBarComponent(this));
 	menuBar->setVisible(true);
@@ -75,6 +75,11 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 	pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
 	knownPluginList.addChangeListener(this);
 
+	synthBundle->addChangeListener(this);
+	psBundle->addChangeListener(this);
+	synthBundle->sendChangeMessage();
+	psBundle->sendChangeMessage();
+
 	lnf.setColour(foleys::LevelMeter::lmMeterGradientLowColour, juce::Colours::green);
 	meterInput.setLookAndFeel(&lnf);
 	meterInput.setMeterSource(&processor.getInputMeterSource());
@@ -90,8 +95,6 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 	addAndMakeVisible(meterOutput);
 
 	setSize(400, 300);
-
-	pluginUpdated();
 }
 
 MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
@@ -99,6 +102,9 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 	knownPluginList.removeChangeListener(this);
 	synthBtn->removeMouseListener(this);
 	psBtn->removeMouseListener(this);
+
+	synthBundle->removeChangeListener(this);
+	psBundle->removeChangeListener(this);
 
 	activePluginWindows.clear();
 #if JUCE_MAC
@@ -125,20 +131,21 @@ void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
 		case 2:  showWindow(PluginWindow::Type::programs, isSynth); break;
 		case 3:  showWindow(PluginWindow::Type::generic, isSynth); break;
 		case 4:  showWindow(PluginWindow::Type::debug, isSynth); break;
+		case 5:
+		{
+			if (isSynth)
+				synthBundle->propagateState();
+			else
+				psBundle->propagateState();
+			break;
+		}
 		default:
 		{
-			if (!processor.checkPluginLoaded())
-			{
-				activePluginWindows.clear();
-				auto types = knownPluginList.getTypes();
-				int result = KnownPluginList::getIndexChosenByMenu(types, r);
-				auto& desc = types.getReference(result);
-				processor.addPlugin(desc, isSynth, [&]() { this->pluginUpdated(); });
-			}
-			else
-			{
-				AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Loading", "Another plugin is loading", "OK");
-			}
+			activePluginWindows.clear();
+			auto types = knownPluginList.getTypes();
+			int result = KnownPluginList::getIndexChosenByMenu(types, r);
+			auto& desc = types.getReference(result);
+			processor.addPlugin(desc, isSynth);
 		}
 		}
 	};
@@ -161,6 +168,20 @@ void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* 
 			appProperties.getUserSettings()->setValue("pluginList", savedPluginList.get());
 			appProperties.saveIfNeeded();
 		}
+	}
+	else if (changed == synthBundle.get())
+	{
+		if (synthBundle->isLoading())
+			synthLabel->setText("Loading...", NotificationType::dontSendNotification);
+		else if (synthBundle->isLoaded())
+			synthLabel->setText(synthBundle->getName(), NotificationType::dontSendNotification);
+	}
+	else if (changed == psBundle.get())
+	{
+		if (psBundle->isLoading())
+			psLabel->setText("Loading...", NotificationType::dontSendNotification);
+		else if (psBundle->isLoaded())
+			psLabel->setText(psBundle->getName(), NotificationType::dontSendNotification);
 	}
 }
 
@@ -278,6 +299,8 @@ void MicroChromoAudioProcessorEditor::showPopupMenu(int type, Point<int> positio
 	floatMenu->addItem(3, "Show all parameters");
 	floatMenu->addItem(4, "Show debug log");
 	floatMenu->addSeparator();
+	floatMenu->addItem(5, "Propagate state to duplicates");
+	floatMenu->addSeparator();
 	KnownPluginList::addToMenu(*floatMenu, knownPluginList.getTypes(), pluginSortMethod);
 	floatMenu->showMenuAsync({}, ModalCallbackFunction::create([this, callback](int r)
 		{
@@ -286,17 +309,11 @@ void MicroChromoAudioProcessorEditor::showPopupMenu(int type, Point<int> positio
 		}));
 }
 
-void MicroChromoAudioProcessorEditor::pluginUpdated()
-{
-	synthLabel->setText(synthArray[0]->processor->getName(), NotificationType::dontSendNotification);
-	psLabel->setText(psArray[0]->processor->getName(), NotificationType::dontSendNotification);
-}
-
 void MicroChromoAudioProcessorEditor::showWindow(PluginWindow::Type type, bool isSynth)
 {
 	for (auto i = 0; i < processor.getNumInstances(); i++)
 	{
-		if (auto node = (isSynth ? synthArray[i] : psArray[i]))
+		if (auto node = (isSynth ? synthBundle->getInstanceAt(i) : psBundle->getInstanceAt(i)))
 		{
 			for (auto* w : activePluginWindows)
 			{

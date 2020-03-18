@@ -22,21 +22,17 @@ PluginBundle::~PluginBundle()
 
 void PluginBundle::loadPlugin()
 {
+    if (_isLoading.load())
     {
-        ScopedLock lock(criticalSection);
-        if (_isLoaded)
-            return;
-        if (_isLoading)
-        {
-            AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Please Wait", "Wait for current loading to finish", "OK");
-            return;
-        }
-        _isLoading = true;
-        _isLoaded = false;
-        _isError = false;
-        instanceStarted = 0;
+        AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Please Wait", "Wait for current loading to finish", "OK");
+        return;
     }
-    sendChangeMessage();
+    _isLoading = true;
+    _isLoaded = false;
+    _isError = false;
+    instanceStarted = 0;
+
+    sendSynchronousChangeMessage();
     for (auto i = 0; i < _numInstances; i++)
     {
         formatManager.createPluginInstanceAsync(_desc,
@@ -50,11 +46,17 @@ void PluginBundle::loadPlugin()
     }
 }
 
+PluginInstance* PluginBundle::getInstanceAt(size_t index)
+{
+    if (index >= instanceStarted.load())
+        return nullptr;
+    return instances[index];
+}
+
 void PluginBundle::addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int index)
 {
     if (instance == nullptr)
     {
-        ScopedLock lock(criticalSection);
         _isError = true;
         errMsg = error;
     }
@@ -62,21 +64,17 @@ void PluginBundle::addPluginCallback(std::unique_ptr<AudioPluginInstance> instan
     {
         instance->enableAllBuses();
         instances.set(index, new PluginInstance(uid++, std::move(instance)), true);
-        {
-            const ScopedLock lock(criticalSection);
-            instanceStarted++;
-        }
+        instanceStarted++;
     }
 }
 
 void PluginBundle::checkPluginLoaded()
 {
-    const ScopedLock lock(criticalSection);
-    if (instanceStarted == _numInstances)
+    if (instanceStarted.load() == _numInstances)
     {
         _isLoaded = true;
         _isLoading = false;
-        if (_isError)
+        if (_isError.load())
         {
             AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon,
                 "Loading Failed",
@@ -84,36 +82,41 @@ void PluginBundle::checkPluginLoaded()
                 "OK");
             _isLoaded = false;
         }
+        else
+        {
+            for (auto* p : instances[0]->processor->getParameters())
+                p->addListener(this);
+        }
         sendChangeMessage();
     }
 }
 
 void PluginBundle::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    for (int i = 0; i < _numInstances; i++)
+    for (int i = 0; i < instanceStarted.load(); i++)
         instances[i]->prepare(sampleRate, samplesPerBlock);
 }
 
 void PluginBundle::processBlock(OwnedArray<AudioBuffer<float>>& bufferArray, MidiBuffer& midiMessages)
 {
-    for (auto i = 0; i < instanceStarted; i++)
+    for (auto i = 0; i < instanceStarted.load(); i++)
         instances[i]->processor->processBlock(*bufferArray[i], midiMessages);
 }
 
 void PluginBundle::releaseResources()
 {
-    for (int i = 0; i < _numInstances; i++)
+    for (int i = 0; i < instanceStarted.load(); i++)
         instances[i]->unprepare();
 }
 
 bool PluginBundle::isLoading()
 {
-    return _isLoading;
+    return _isLoading.load();
 }
 
 bool PluginBundle::isLoaded()
 {
-    return _isLoaded;
+    return _isLoaded.load();
 }
 
 void PluginBundle::getStateInformation(MemoryBlock& destData)
@@ -123,5 +126,31 @@ void PluginBundle::getStateInformation(MemoryBlock& destData)
 
 void PluginBundle::setStateInformation(const void* data, int sizeInBytes)
 {
-    instances[0]->processor->setStateInformation(data, sizeInBytes);
+    for (auto i = 0; i < instanceStarted.load(); i++)
+        instances[i]->processor->setStateInformation(data, sizeInBytes);
+}
+
+void PluginBundle::propagateState()
+{
+    MemoryBlock block;
+    instances[0]->processor->getStateInformation(block);
+    for (auto i = 1; i < instanceStarted.load(); i++)
+        instances[i]->processor->setStateInformation(block.getData(), block.getSize());
+}
+
+void PluginBundle::parameterValueChanged(int parameterIndex, float newValue)
+{
+    for (auto i = 1; i < instanceStarted.load(); i++)
+        instances[i]->processor->getParameters()[parameterIndex]->setValue(newValue);
+}
+
+void PluginBundle::parameterGestureChanged(int parameterIndex, bool gestureIsStarting)
+{
+    for (auto i = 1; i < instanceStarted.load(); i++)
+    {
+        if (gestureIsStarting)
+            instances[i]->processor->beginParameterChangeGesture(parameterIndex);
+        else
+            instances[i]->processor->endParameterChangeGesture(parameterIndex);
+    }
 }
