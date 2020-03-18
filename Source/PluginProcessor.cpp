@@ -45,17 +45,22 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 	for (auto& t : internalTypes)
 		knownPluginList.addType(t);
 
-	for (int i = 0; i < numInstances; i++)
-	{
-		synthArray.add(new PluginInstance(uid++, formatManager.createPluginInstance(internalTypes[0], 44100, 1024, String())));
-		psArray.add(new PluginInstance(uid++, formatManager.createPluginInstance(internalTypes[0], 44100, 1024, String())));
-	}
+	synthBundle.reset(new PluginBundle(numInstances, internalTypes[0], *this));
+	psBundle.reset(new PluginBundle(numInstances, internalTypes[0], *this));
+
+	synthBundle->loadPlugin();
+	psBundle->loadPlugin();
+
+	synthBundle->addChangeListener(this);
+	psBundle->addChangeListener(this);
 }
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
 {
-	synthArray.clear();
-	psArray.clear();
+	synthBundle->removeChangeListener(this);
+	psBundle->removeChangeListener(this);
+	synthBundle = nullptr;
+	psBundle = nullptr;
 	bufferArray.clear();
 }
 
@@ -132,33 +137,21 @@ void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
 	outputMeterSource.resize(getTotalNumOutputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
 
 	bufferArray.clear();
-	auto channels = jmax(synthArray[0]->processor->getTotalNumInputChannels(),
-		synthArray[0]->processor->getTotalNumOutputChannels(),
-		psArray[0]->processor->getTotalNumInputChannels(),
-		psArray[0]->processor->getTotalNumOutputChannels());
+	auto channels = jmax(synthBundle->getTotalNumInputChannels(),
+		synthBundle->getTotalNumOutputChannels(),
+		psBundle->getTotalNumInputChannels(),
+		psBundle->getTotalNumOutputChannels());
+
 	for (int i = 0; i < numInstances; i++)
-	{
 		bufferArray.add(new AudioBuffer<float>(channels, samplesPerBlock));
-		//if (!synthArray[i]->getProcessor()->setBusesLayout(getBusesLayout()))
-		//	AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Wrong", "Synth bus layout not supported.", "OK");
-		//synthArray[i]->getProcessor()->enableAllBuses();
-		//if (!psArray[i]->getProcessor()->setBusesLayout(getBusesLayout()))
-		//	AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Wrong", "PS bus layout not supported.", "OK");
-		//psArray[i]->getProcessor()->enableAllBuses();
-		synthArray[i]->prepare(sampleRate, samplesPerBlock);
-		psArray[i]->prepare(sampleRate, samplesPerBlock);
-	}
+	synthBundle->prepareToPlay(sampleRate, samplesPerBlock);
+	psBundle->prepareToPlay(sampleRate, samplesPerBlock);
 }
 
 void MicroChromoAudioProcessor::releaseResources()
 {
-    // When playback stops, you can use this as an opportunity to free up any
-    // spare memory, etc.
-	for (auto i = 0; i < numInstances; i++)
-	{
-		synthArray[i]->unprepare();
-		psArray[i]->unprepare();
-	}
+	synthBundle->releaseResources();
+	psBundle->releaseResources();
 	bufferArray.clear();
 }
 
@@ -208,18 +201,12 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 	for (auto i = 0; i < buffer.getNumChannels(); ++i)
 		buffer.clear(i, 0, buffer.getNumSamples());
 
+	synthBundle->processBlock(bufferArray, midiMessages);
+	psBundle->processBlock(bufferArray, midiMessages);
 	for (auto i = 0; i < numInstances; i++)
-	{
-		if (synthArray[i] != nullptr && psArray[i] != nullptr)
-		{
-			synthArray[i]->processor->processBlock(*bufferArray[i], midiMessages);
-			psArray[i]->processor->processBlock(*bufferArray[i], midiMessages);
-			for (auto j = 0; j < buffer.getNumChannels(); j++)
-			{
-				buffer.addFrom(j, 0, *bufferArray[i], j, 0, buffer.getNumSamples());
-			}
-		}
-	}
+		for (auto j = 0; j < buffer.getNumChannels(); j++)
+			buffer.addFrom(j, 0, *bufferArray[i], j, 0, buffer.getNumSamples());
+
 	outputMeterSource.measureBlock(buffer);
 }
 
@@ -256,58 +243,39 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
 			parameters.replaceState(ValueTree::fromXml(*xmlState));
 }
 
-void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool isSynth, GUICallback callback)
+void MicroChromoAudioProcessor::changeListenerCallback(ChangeBroadcaster* changed)
 {
-	instanceStarted = 0;
-	suspendProcessing(true);
-	for (auto i = 0; i < numInstances; i++)
+	if (changed == synthBundle.get())
 	{
-		formatManager.createPluginInstanceAsync(desc,
-			getSampleRate(),
-			getBlockSize(),
-			[this, isSynth, i, callback](std::unique_ptr<AudioPluginInstance> instance, const String& error)
-			{
-				addPluginCallback(std::move(instance), error, isSynth, i);
-				checkPluginLoaded(callback);
-			});
-	}
-}
-
-bool MicroChromoAudioProcessor::checkPluginLoaded(GUICallback callback)
-{
-	const ScopedLock lock(instanceIncrement);
-	if (instanceStarted == numInstances)
-	{
-		if (callback != nullptr)
+		suspendProcessing(true);
+		if (synthBundle->isLoaded())
 		{
-			callback();
 			prepareToPlay(getSampleRate(), getBlockSize());
+			suspendProcessing(false);
 		}
-		suspendProcessing(false);
-		return true;
 	}
-	return false;
+	else if (changed == psBundle.get())
+	{
+		suspendProcessing(true);
+		if (psBundle->isLoaded())
+		{
+			prepareToPlay(getSampleRate(), getBlockSize());
+			suspendProcessing(false);
+		}
+	}
 }
 
-void MicroChromoAudioProcessor::addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, bool isSynth, int index)
+void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool isSynth)
 {
-	if (instance == nullptr)
+	if (isSynth)
 	{
-		AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon,
-			TRANS("Couldn't create plugin"),
-			error);
+		synthBundle->setPluginDescription(desc);
+		synthBundle->loadPlugin();
 	}
 	else
 	{
-		instance->enableAllBuses();
-		if (isSynth)
-			synthArray.set(index, new PluginInstance(uid++, std::move(instance)), true);
-		else
-			psArray.set(index, new PluginInstance(uid++, std::move(instance)), true);
-		{
-			const ScopedLock lock(instanceIncrement);
-			instanceStarted++;
-		}
+		psBundle->setPluginDescription(desc);
+		psBundle->loadPlugin();
 	}
 }
 
