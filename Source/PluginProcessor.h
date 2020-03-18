@@ -19,7 +19,7 @@ using GUICallback = std::function<void()>;
 //==============================================================================
 /**
 */
-class MicroChromoAudioProcessor  : public AudioProcessor
+class MicroChromoAudioProcessor  : public AudioProcessor, ChangeListener
 {
 public:
     //==============================================================================
@@ -56,20 +56,20 @@ public:
     void changeProgramName (int index, const String& newName) override;
 
 	//==============================================================================
-	void addPlugin(const PluginDescription& desc, bool isSynth, GUICallback callback);
-    bool checkPluginLoaded(GUICallback callback = nullptr);
-	void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, bool isSynth, int index);
+	void addPlugin(const PluginDescription& desc, bool isSynth);
 
     //==============================================================================
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    void changeListenerCallback(ChangeBroadcaster* changed) override;
+
 	//==============================================================================
 	ApplicationProperties& getApplicationProperties() { return appProperties; }
 	AudioPluginFormatManager& getAudioPluginFormatManager() { return formatManager; }
 	KnownPluginList& getKnownPluginList() { return knownPluginList; }
-	OwnedArray<PluginInstance>& getSynthArray() { return synthArray; }
-	OwnedArray<PluginInstance>& getPitchShiftArray() { return psArray; }
+    std::shared_ptr<PluginBundle> getSynthBundlePtr() { return synthBundle; }
+    std::shared_ptr<PluginBundle> getPSBundlePtr() { return psBundle; }
     foleys::LevelMeterSource& getInputMeterSource() { return inputMeterSource; }
 	foleys::LevelMeterSource& getOutputMeterSource() { return outputMeterSource; }
     size_t getNumInstances() { return numInstances; }
@@ -82,18 +82,13 @@ private:
 	Array<PluginDescription> internalTypes;
 
 	const size_t numInstances = 2;
-    uint32 uid = 0;
-	OwnedArray<PluginInstance> synthArray, psArray;
 	OwnedArray<AudioBuffer<float>> bufferArray;
-    std::unique_ptr<PluginBundle> synthBundle, psBundle;
+    std::shared_ptr<PluginBundle> synthBundle, psBundle;
 
 	AudioProcessorValueTreeState parameters;
 
     foleys::LevelMeterSource inputMeterSource;
 	foleys::LevelMeterSource outputMeterSource;
-
-    CriticalSection instanceIncrement;
-    size_t instanceStarted = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessor)
 };

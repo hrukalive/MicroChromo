@@ -14,6 +14,7 @@
 #include "PluginProcessor.h"
 #include "PluginWindow.h"
 #include "PluginInstance.h"
+#include "PluginBundle.h"
 
 //==============================================================================
 /**
@@ -58,16 +59,13 @@ public:
 	//==============================================================================
 	void buttonClicked(Button* btn) override;
 	void showPopupMenu(int type, Point<int> position, std::function<void(int)> callback);
-	void pluginUpdated();
 	void showWindow(PluginWindow::Type type, bool isSynth);
 
 private:
-    // This reference is provided as a quick way for your editor to
-    // access the processor object that created it.
     MicroChromoAudioProcessor& processor;
 	ApplicationProperties& appProperties;
 	AudioPluginFormatManager& formatManager;
-	OwnedArray<PluginInstance> &synthArray, &psArray;
+	std::shared_ptr<PluginBundle> synthBundle, psBundle;
 
 	KnownPluginList& knownPluginList;
 	KnownPluginList::SortMethod pluginSortMethod;
