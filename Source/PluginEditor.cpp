@@ -62,10 +62,23 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 
 	synthBtn.reset(new TextButton("Synth"));
 	psBtn.reset(new TextButton("PitchShift"));
+	noteButton.reset(new TextButton("Note"));
+	ccLearnBtn.reset(new ToggleButton("CC Learn"));
+	dragBtn.reset(new TextButton("Drop"));
 	synthLabel.reset(new Label("SynthLabel", "<empty>"));
 	psLabel.reset(new Label("PitchShiftLabel", "<empty>"));
 	synthBtn->addMouseListener(this, true);
 	psBtn->addMouseListener(this, true);
+	noteButton->addMouseListener(this, true);
+	dragBtn->addMouseListener(this, true);
+
+	ccLearnBtn->onClick = [this]()
+	{
+		if (this->ccLearnBtn->getToggleState())
+			this->psBundle->startCcLearn();
+		else
+			this->psBundle->stopCcLearn();
+	};
 
 	commandManager.setFirstCommandTarget(this);
 	setApplicationCommandManagerToWatch(&commandManager);
@@ -89,6 +102,9 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 	addAndMakeVisible(menuBar.get());
 	addAndMakeVisible(synthBtn.get());
 	addAndMakeVisible(psBtn.get());
+	addAndMakeVisible(ccLearnBtn.get());
+	addAndMakeVisible(dragBtn.get());
+	addAndMakeVisible(noteButton.get());
 	addAndMakeVisible(synthLabel.get());
 	addAndMakeVisible(psLabel.get());
 	addAndMakeVisible(meterInput);
@@ -102,6 +118,9 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 	knownPluginList.removeChangeListener(this);
 	synthBtn->removeMouseListener(this);
 	psBtn->removeMouseListener(this);
+	noteButton->removeMouseListener(this);
+	ccLearnBtn->removeMouseListener(this);
+	dragBtn->removeMouseListener(this);
 
 	synthBundle->removeChangeListener(this);
 	psBundle->removeChangeListener(this);
@@ -157,6 +176,61 @@ void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
 	{
 		showPopupMenu(0, e.position.toInt(), [this, common](int r) { common(r, false); });
 	}
+	else if (e.eventComponent == noteButton.get())
+	{
+		if (isTimerRunning())
+		{
+			stopTimer();
+			MidiMessage stopNote = MidiMessage::noteOff(1, lastNote);
+			stopNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+			processor.getMidiMessageCollector().addMessageToQueue(stopNote);
+		}
+		else
+			startTimerHz(10);
+	}
+}
+
+void MicroChromoAudioProcessorEditor::mouseDrag(const MouseEvent& e)
+{
+	if (e.eventComponent == dragBtn.get())
+	{
+		DragAndDropContainer* dragContainer = DragAndDropContainer::findParentDragContainerFor(dragBtn.get());
+		if (!dragContainer->isDragAndDropActive())
+		{
+			std::shared_ptr<TemporaryFile> outf = std::make_shared<TemporaryFile>();
+			if (std::unique_ptr<FileOutputStream> p_os{ outf->getFile().createOutputStream() })
+			{
+				p_os->writeString("This is a test.");
+				DBG("drag clip name " << outf->getFile().getFullPathName());
+				DragAndDropContainer::performExternalDragDropOfFiles({ outf->getFile().getFullPathName() }, false, nullptr,
+					[=]() {
+						DBG("Dropped");
+						outf->deleteTemporaryFile();
+					});
+			}
+		}
+	}
+}
+
+void MicroChromoAudioProcessorEditor::timerCallback()
+{
+	if (test)
+	{
+		MidiMessage controlNote = MidiMessage::controllerEvent(1, 100, Random().nextInt(101) - 50);
+		controlNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+		lastNote = Random().nextInt(40) + 40;
+		MidiMessage startNote = MidiMessage::noteOn(1, lastNote, (uint8)90);
+		startNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+		psBundle->getCollectorAt(0)->addMessageToQueue(controlNote);
+		synthBundle->getCollectorAt(0)->addMessageToQueue(startNote);
+	}
+	else
+	{
+		MidiMessage stopNote = MidiMessage::noteOff(1, lastNote);
+		stopNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
+		synthBundle->getCollectorAt(0)->addMessageToQueue(stopNote);
+	}
+	test = !test;
 }
 
 void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* changed)
@@ -266,13 +340,14 @@ void MicroChromoAudioProcessorEditor::resized()
 #if !JUCE_MAC
 	menuBar->setBounds(b.removeFromTop(LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight()));
 #endif
-	b.removeFromLeft(10);
-	b.removeFromTop(10);
+	b.reduce(10, 10);
 
 	auto tmp = b.removeFromTop(40);
 	synthBtn->setBounds(tmp.removeFromLeft(100));
 	tmp.removeFromLeft(10);
 	synthLabel->setBounds(tmp.removeFromLeft(100));
+
+	noteButton->setBounds(tmp.withTrimmedLeft(50).removeFromLeft(100));
 
 	b.removeFromTop(10);
 
@@ -280,10 +355,15 @@ void MicroChromoAudioProcessorEditor::resized()
 	psBtn->setBounds(tmp.removeFromLeft(100));
 	tmp.removeFromLeft(10);
 	psLabel->setBounds(tmp.removeFromLeft(100));
+	ccLearnBtn->setBounds(tmp.withTrimmedLeft(50).removeFromLeft(100));
 
 	b.removeFromTop(10);
-	meterInput.setBounds(b.withWidth(100).withTrimmedBottom(10));
-	meterOutput.setBounds(b.withTrimmedLeft(110).withWidth(100).withTrimmedBottom(10));
+	meterInput.setBounds(b.removeFromLeft(100));
+	b.removeFromLeft(10);
+	meterOutput.setBounds(b.removeFromLeft(100));
+
+	b.removeFromLeft(10);
+	dragBtn->setBounds(b.removeFromTop(100));
 }
 
 void MicroChromoAudioProcessorEditor::buttonClicked(Button* btn)

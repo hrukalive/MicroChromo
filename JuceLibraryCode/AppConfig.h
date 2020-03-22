@@ -17,21 +17,6 @@
 // [BEGIN_USER_CODE_SECTION]
 
 // (You can add your own code in this section, and the Projucer will not overwrite it)
-#ifndef    JUCE_PLUGINHOST_VST
-  #define JUCE_PLUGINHOST_VST 1
-#endif
-
-#ifndef    JUCE_PLUGINHOST_VST3
-  #define JUCE_PLUGINHOST_VST3 1
-#endif
-
-#ifndef    JUCE_PLUGINHOST_AU
-  #define JUCE_PLUGINHOST_AU 1
-#endif
-
-#ifndef    JUCE_PLUGINHOST_LADSPA
-  #define JUCE_PLUGINHOST_LADSPA 1
-#endif
 
 // [END_USER_CODE_SECTION]
 
@@ -191,19 +176,19 @@
 // juce_audio_processors flags:
 
 #ifndef    JUCE_PLUGINHOST_VST
- //#define JUCE_PLUGINHOST_VST 0
+ #define   JUCE_PLUGINHOST_VST 1
 #endif
 
 #ifndef    JUCE_PLUGINHOST_VST3
- //#define JUCE_PLUGINHOST_VST3 0
+ #define   JUCE_PLUGINHOST_VST3 1
 #endif
 
 #ifndef    JUCE_PLUGINHOST_AU
- //#define JUCE_PLUGINHOST_AU 0
+ #define   JUCE_PLUGINHOST_AU 1
 #endif
 
 #ifndef    JUCE_PLUGINHOST_LADSPA
- //#define JUCE_PLUGINHOST_LADSPA 0
+ #define   JUCE_PLUGINHOST_LADSPA 1
 #endif
 
 //==============================================================================
@@ -361,7 +346,7 @@
  #define JucePlugin_Desc                   "MicroChromo"
 #endif
 #ifndef  JucePlugin_Manufacturer
- #define JucePlugin_Manufacturer           "yourcompany"
+ #define JucePlugin_Manufacturer           "NyLP"
 #endif
 #ifndef  JucePlugin_ManufacturerWebsite
  #define JucePlugin_ManufacturerWebsite    ""
@@ -370,10 +355,10 @@
  #define JucePlugin_ManufacturerEmail      ""
 #endif
 #ifndef  JucePlugin_ManufacturerCode
- #define JucePlugin_ManufacturerCode       0x4d616e75 // 'Manu'
+ #define JucePlugin_ManufacturerCode       0x4e796c70 // 'Nylp'
 #endif
 #ifndef  JucePlugin_PluginCode
- #define JucePlugin_PluginCode             0x5a62726e // 'Zbrn'
+ #define JucePlugin_PluginCode             0x41616161 // 'Aaaa'
 #endif
 #ifndef  JucePlugin_IsSynth
  #define JucePlugin_IsSynth                1
@@ -442,7 +427,7 @@
  #define JucePlugin_RTASDisableMultiMono   0
 #endif
 #ifndef  JucePlugin_AAXIdentifier
- #define JucePlugin_AAXIdentifier          com.yourcompany.MicroChromo
+ #define JucePlugin_AAXIdentifier          com.nylp.MicroChromo
 #endif
 #ifndef  JucePlugin_AAXManufacturerCode
  #define JucePlugin_AAXManufacturerCode    JucePlugin_ManufacturerCode
@@ -466,7 +451,7 @@
  #define JucePlugin_IAASubType             JucePlugin_PluginCode
 #endif
 #ifndef  JucePlugin_IAAName
- #define JucePlugin_IAAName                "yourcompany: MicroChromo"
+ #define JucePlugin_IAAName                "NyLP: MicroChromo"
 #endif
 #ifndef  JucePlugin_VSTNumMidiInputs
  #define JucePlugin_VSTNumMidiInputs       16
