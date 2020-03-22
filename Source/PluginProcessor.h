@@ -73,6 +73,7 @@ public:
     foleys::LevelMeterSource& getInputMeterSource() { return inputMeterSource; }
 	foleys::LevelMeterSource& getOutputMeterSource() { return outputMeterSource; }
     size_t getNumInstances() { return numInstances; }
+    MidiMessageCollector& getMidiMessageCollector() noexcept { return messageCollector; }
 
 private:
     //==============================================================================
@@ -81,11 +82,12 @@ private:
 	AudioPluginFormatManager formatManager;
 	Array<PluginDescription> internalTypes;
 
-	const size_t numInstances = 2;
+	const size_t numInstances = 1;
 	OwnedArray<AudioBuffer<float>> bufferArray;
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
 
 	AudioProcessorValueTreeState parameters;
+    MidiMessageCollector messageCollector;
 
     foleys::LevelMeterSource inputMeterSource;
 	foleys::LevelMeterSource outputMeterSource;

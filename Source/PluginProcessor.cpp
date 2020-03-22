@@ -46,10 +46,10 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 		knownPluginList.addType(t);
 
 	synthBundle.reset(new PluginBundle(numInstances, internalTypes[0], *this));
-	psBundle.reset(new PluginBundle(numInstances, internalTypes[0], *this));
+	psBundle.reset(new PluginBundle(numInstances, internalTypes[2], *this));
 
-	synthBundle->loadPlugin();
-	psBundle->loadPlugin();
+	synthBundle->loadPluginSync();
+	psBundle->loadPluginSync();
 
 	synthBundle->addChangeListener(this);
 	psBundle->addChangeListener(this);
@@ -136,6 +136,8 @@ void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
 	outputMeterSource.setMaxHoldMS(500);
 	outputMeterSource.resize(getTotalNumOutputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
 
+	messageCollector.reset(sampleRate);
+
 	bufferArray.clear();
 	auto channels = jmax(synthBundle->getTotalNumInputChannels(),
 		synthBundle->getTotalNumOutputChannels(),
@@ -188,15 +190,12 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 	for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
 		buffer.clear(i, 0, buffer.getNumSamples());
 
+	messageCollector.removeNextBlockOfMessages(midiMessages, getBlockSize());
+
 	inputMeterSource.measureBlock(buffer);
 
-	for (auto i = 0; i < buffer.getNumChannels(); i++)
-	{
-		for (auto j = 0; j < numInstances; j++)
-		{
-			bufferArray[j]->copyFrom(i, 0, buffer, i, 0, buffer.getNumSamples());
-		}
-	}
+	for (auto j = 0; j < numInstances; j++)
+		bufferArray[j]->makeCopyOf(buffer);
 
 	for (auto i = 0; i < buffer.getNumChannels(); ++i)
 		buffer.clear(i, 0, buffer.getNumSamples());

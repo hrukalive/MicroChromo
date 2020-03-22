@@ -24,7 +24,9 @@ class MicroChromoAudioProcessorEditor  :
 	public ApplicationCommandTarget,
 	public MenuBarModel,
 	public ChangeListener,
-	public Button::Listener
+	public Button::Listener,
+	public Timer,
+	public DragAndDropContainer
 {
 public:
 	enum CommandIDs
@@ -40,6 +42,7 @@ public:
 	//==============================================================================
 	void changeListenerCallback(ChangeBroadcaster*) override;
 	void mouseDown(const MouseEvent&) override;
+	void mouseDrag(const MouseEvent&) override;
 
 	//==============================================================================
 	StringArray getMenuBarNames() override;
@@ -61,11 +64,16 @@ public:
 	void showPopupMenu(int type, Point<int> position, std::function<void(int)> callback);
 	void showWindow(PluginWindow::Type type, bool isSynth);
 
+	void timerCallback() override;
+
 private:
     MicroChromoAudioProcessor& processor;
 	ApplicationProperties& appProperties;
 	AudioPluginFormatManager& formatManager;
 	std::shared_ptr<PluginBundle> synthBundle, psBundle;
+
+	bool test = true;
+	int lastNote = 60;
 
 	KnownPluginList& knownPluginList;
 	KnownPluginList::SortMethod pluginSortMethod;
@@ -76,7 +84,7 @@ private:
 	ApplicationCommandManager commandManager;
 	std::unique_ptr<MenuBarComponent> menuBar;
 
-	std::unique_ptr<Button> synthBtn, psBtn;
+	std::unique_ptr<Button> synthBtn, psBtn, noteButton, ccLearnBtn, dragBtn;
 	std::unique_ptr<Label> synthLabel, psLabel;
 	std::unique_ptr<PopupMenu> floatMenu;
 	OwnedArray<PluginWindow> activePluginWindows;
