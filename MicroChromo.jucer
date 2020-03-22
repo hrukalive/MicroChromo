@@ -2,7 +2,10 @@
 
 <JUCERPROJECT id="ZBRnpX" name="MicroChromo" projectType="audioplug" jucerVersion="5.4.7"
               pluginFormats="buildAUv3,buildStandalone,buildVST3" pluginCharacteristicsValue="pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn"
-              pluginVST3Category="Instrument" cppLanguageStandard="latest">
+              pluginVST3Category="Instrument" cppLanguageStandard="latest"
+              pluginManufacturer="NyLP" pluginManufacturerCode="Nylp" pluginCode="Aaaa"
+              aaxIdentifier="com.nylp.MicroChromo" pluginVSTCategory="kPlugCategSynth"
+              pluginAAXCategory="2048" pluginRTASCategory="2048" headerPath="../../soundtouch/include">
   <MAINGROUP id="YsAiD7" name="MicroChromo">
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
       <FILE id="uNIWbV" name="PluginBundle.cpp" compile="1" resource="0"
@@ -23,6 +26,43 @@
       <FILE id="fD4vtN" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
       <FILE id="Yz8b1b" name="PluginWindow.h" compile="0" resource="0" file="Source/PluginWindow.h"/>
     </GROUP>
+    <GROUP id="{D7A887BC-F737-252E-9A4A-2A38B9EC6D5A}" name="SoundTouch">
+      <FILE id="NqGvHZ" name="AAFilter.cpp" compile="1" resource="0" file="soundtouch/source/SoundTouch/AAFilter.cpp"/>
+      <FILE id="Yf4ukh" name="AAFilter.h" compile="0" resource="0" file="soundtouch/source/SoundTouch/AAFilter.h"/>
+      <FILE id="mUUvrw" name="BPMDetect.cpp" compile="1" resource="0" file="soundtouch/source/SoundTouch/BPMDetect.cpp"/>
+      <FILE id="ugoVFt" name="cpu_detect.h" compile="0" resource="0" file="soundtouch/source/SoundTouch/cpu_detect.h"/>
+      <FILE id="p4w4xX" name="cpu_detect_x86.cpp" compile="1" resource="0"
+            file="soundtouch/source/SoundTouch/cpu_detect_x86.cpp"/>
+      <FILE id="yvH652" name="FIFOSampleBuffer.cpp" compile="1" resource="0"
+            file="soundtouch/source/SoundTouch/FIFOSampleBuffer.cpp"/>
+      <FILE id="NsO8bA" name="FIRFilter.cpp" compile="1" resource="0" file="soundtouch/source/SoundTouch/FIRFilter.cpp"/>
+      <FILE id="fpCqFH" name="FIRFilter.h" compile="0" resource="0" file="soundtouch/source/SoundTouch/FIRFilter.h"/>
+      <FILE id="aWK5sj" name="InterpolateCubic.cpp" compile="1" resource="0"
+            file="soundtouch/source/SoundTouch/InterpolateCubic.cpp"/>
+      <FILE id="UTMh8A" name="InterpolateCubic.h" compile="0" resource="0"
+            file="soundtouch/source/SoundTouch/InterpolateCubic.h"/>
+      <FILE id="kaC4j8" name="InterpolateLinear.cpp" compile="1" resource="0"
+            file="soundtouch/source/SoundTouch/InterpolateLinear.cpp"/>
+      <FILE id="WBRmN0" name="InterpolateLinear.h" compile="0" resource="0"
+            file="soundtouch/source/SoundTouch/InterpolateLinear.h"/>
+      <FILE id="dgaMpH" name="InterpolateShannon.cpp" compile="1" resource="0"
+            file="soundtouch/source/SoundTouch/InterpolateShannon.cpp"/>
+      <FILE id="EtvBDK" name="InterpolateShannon.h" compile="0" resource="0"
+            file="soundtouch/source/SoundTouch/InterpolateShannon.h"/>
+      <FILE id="MSwltz" name="mmx_optimized.cpp" compile="1" resource="0"
+            file="soundtouch/source/SoundTouch/mmx_optimized.cpp"/>
+      <FILE id="fzDFcO" name="PeakFinder.cpp" compile="1" resource="0" file="soundtouch/source/SoundTouch/PeakFinder.cpp"/>
+      <FILE id="CyLZP2" name="PeakFinder.h" compile="0" resource="0" file="soundtouch/source/SoundTouch/PeakFinder.h"/>
+      <FILE id="sA1LrJ" name="RateTransposer.cpp" compile="1" resource="0"
+            file="soundtouch/source/SoundTouch/RateTransposer.cpp"/>
+      <FILE id="clQqP3" name="RateTransposer.h" compile="0" resource="0"
+            file="soundtouch/source/SoundTouch/RateTransposer.h"/>
+      <FILE id="QAEbnH" name="SoundTouch.cpp" compile="1" resource="0" file="soundtouch/source/SoundTouch/SoundTouch.cpp"/>
+      <FILE id="XXgMJj" name="sse_optimized.cpp" compile="1" resource="0"
+            file="soundtouch/source/SoundTouch/sse_optimized.cpp"/>
+      <FILE id="SIs3fL" name="TDStretch.cpp" compile="1" resource="0" file="soundtouch/source/SoundTouch/TDStretch.cpp"/>
+      <FILE id="GzxfNv" name="TDStretch.h" compile="0" resource="0" file="soundtouch/source/SoundTouch/TDStretch.h"/>
+    </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>
     <XCODE_MAC targetFolder="Builds/MacOSX">
@@ -35,7 +75,7 @@
         <MODULEPATH id="juce_audio_devices" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_audio_plugin_client" path="../../../../../Program Files/JUCE/modules"/>
-        <MODULEPATH id="juce_audio_processors" path="../../../../../Program Files/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_audio_utils" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_core" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_cryptography" path="../../../../../Program Files/JUCE/modules"/>
@@ -58,7 +98,7 @@
         <MODULEPATH id="juce_audio_devices" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_audio_plugin_client" path="../../../../../Program Files/JUCE/modules"/>
-        <MODULEPATH id="juce_audio_processors" path="../../../../../Program Files/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_audio_utils" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_core" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_cryptography" path="../../../../../Program Files/JUCE/modules"/>
@@ -81,7 +121,7 @@
         <MODULEPATH id="juce_audio_devices" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_audio_plugin_client" path="../../../../../Program Files/JUCE/modules"/>
-        <MODULEPATH id="juce_audio_processors" path="../../../../../Program Files/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_audio_utils" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_core" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_cryptography" path="../../../../../Program Files/JUCE/modules"/>
@@ -104,7 +144,7 @@
         <MODULEPATH id="juce_audio_devices" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_audio_plugin_client" path="../../../../../Program Files/JUCE/modules"/>
-        <MODULEPATH id="juce_audio_processors" path="../../../../../Program Files/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_audio_utils" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_core" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_cryptography" path="../../../../../Program Files/JUCE/modules"/>
@@ -140,5 +180,6 @@
     <WINDOWS/>
   </LIVE_SETTINGS>
   <JUCEOPTIONS JUCE_VST3_CAN_REPLACE_VST2="0" JUCE_STRICT_REFCOUNTEDPOINTER="1"
-               FF_AUDIO_ALLOW_ALLOCATIONS_IN_MEASURE_BLOCK="0"/>
+               FF_AUDIO_ALLOW_ALLOCATIONS_IN_MEASURE_BLOCK="0" JUCE_PLUGINHOST_VST="1"
+               JUCE_PLUGINHOST_VST3="1" JUCE_PLUGINHOST_AU="1" JUCE_PLUGINHOST_LADSPA="1"/>
 </JUCERPROJECT>
