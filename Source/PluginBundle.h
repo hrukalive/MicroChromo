@@ -51,6 +51,7 @@ public:
     void setPluginDescription(const PluginDescription desc) { _desc = desc; }
     void startCcLearn();
     void stopCcLearn();
+    void setCcLearn(int index, float min, float max);
 
 private:
     void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int index);
