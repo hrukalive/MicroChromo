@@ -450,42 +450,57 @@ private:
 //==============================================================================
 class PitchShiftPlugin : public InternalPlugin, public AudioProcessorValueTreeState::Listener
 {
+    using SoundTouch = soundtouch::SoundTouch;
+
+    class AudioParameterFloatVariant : public AudioParameterFloat
+    {
+    public:
+        AudioParameterFloatVariant(const String& parameterID,
+            const String& parameterName,
+            NormalisableRange<float> normalisableRange,
+            float defaultValue,
+            const String& parameterLabel = String(),
+            Category parameterCategory = AudioProcessorParameter::genericParameter,
+            std::function<String(float value, int maximumStringLength)> stringFromValue = nullptr,
+            std::function<float(const String & text)> valueFromString = nullptr) : 
+            AudioParameterFloat(parameterID,
+                parameterName,
+                normalisableRange,
+                defaultValue,
+                parameterLabel,
+                parameterCategory,
+                stringFromValue,
+                valueFromString)
+        {}
+
+    protected:
+        void valueChanged(float newValue) override
+        {
+            sendValueChangedMessageToListeners(newValue);
+        }
+    };
+
     static AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     {
         std::vector<std::unique_ptr<RangedAudioParameter>> params;
 
-        params.push_back(std::make_unique<AudioParameterFloat>(
+        params.push_back(std::make_unique<AudioParameterFloatVariant>(
             "pitchshift",
             "Cent",
-            NormalisableRange<float>(-1.0f,
+            NormalisableRange<float>(0.0f,
                 1.0f,
-                0.01f),
-            0.0f,
+                0.005f),
+            0.5f,
             String(),
             AudioProcessorParameter::genericParameter,
             [](const float value, int /*maximumStringLength*/)
             {
-                return String(int(value * 100)) + " cents";
+                return String(int(value * 200) - 100) + " cents";
             },
             [](const String& text)
             {
-                return text.getFloatValue() / 100.0f;
+                return (text.getFloatValue() + 100) / 200.0f;
             }));
-        params.push_back(std::make_unique<AudioParameterChoice>(
-            "fftsize",
-            "FFT Size",
-            PitchShiftPlugin::fftSizes,
-            3));
-        params.push_back(std::make_unique<AudioParameterChoice>(
-            "hopsize",
-            "Hop Size",
-            PitchShiftPlugin::hopSizes,
-            0));
-        params.push_back(std::make_unique<AudioParameterChoice>(
-            "windowtype",
-            "Window Type",
-            PitchShiftPlugin::windowTypes,
-            0));
 
         return { params.begin(), params.end() };
     }
@@ -494,20 +509,12 @@ public:
         parameters(*this, nullptr, Identifier("Internal_PitchShift"), createParameterLayout())
     {
         parameters.addParameterListener("pitchshift", this);
-        parameters.addParameterListener("fftsize", this);
-        parameters.addParameterListener("hopsize", this);
-        parameters.addParameterListener("windowtype", this);
         psParameter = parameters.getRawParameterValue("pitchshift");
-        fftSizeParameter = parameters.getRawParameterValue("fftsize");
-        hopSizeParameter = parameters.getRawParameterValue("hopsize");
-        windowTypeParameter = parameters.getRawParameterValue("windowtype");
     }
     ~PitchShiftPlugin()
     {
         parameters.removeParameterListener("pitchshift", this);
-        parameters.removeParameterListener("fftsize", this);
-        parameters.removeParameterListener("hopsize", this);
-        parameters.removeParameterListener("windowtype", this);
+        shifters.clear();
     }
 
     static String getIdentifier()
@@ -522,45 +529,30 @@ public:
 
     void parameterChanged(const String& parameterID, float newValue) override
     {
-        if (parameterID == "pitchshift")
-        {
-            psValue.setTargetValue(newValue);
-            return;
-        }
-
-        suspendProcessing(true);
-        updateFftSize();
-        updateHopSize();
-        updateAnalysisWindow();
-        updateWindowScaleFactor();
-        //if (parameterID == "fftsize")
-        //{
-        //}
-        //else if (parameterID == "hopsize")
-        //{
-        //}
-        //else if (parameterID == "windowtype")
-        //{
-        //}
-        suspendProcessing(false);
+        psValue.setTargetValue(newValue * 2 - 1);
     }
 
-    void prepareToPlay(double newSampleRate, int) override
+    void prepareToPlay(double sampleRate, int blockSize) override
     {
-        psValue.reset(newSampleRate, 0.03);
+        psValue.reset(sampleRate, 0.05);
         psValue.setCurrentAndTargetValue(*psParameter);
 
-        updateFftSize();
-        updateHopSize();
-        updateAnalysisWindow();
-        updateWindowScaleFactor();
-
-        needToResetPhases = true;
+        for (auto i = 0; i < getTotalNumInputChannels(); i++)
+        {
+            std::unique_ptr<SoundTouch> shifter{ new SoundTouch() };
+            shifter->setSetting(SETTING_USE_AA_FILTER, 1);
+            shifter->setChannels(1);
+            shifter->setSampleRate(sampleRate);
+            shifter->adjustAmountOfSamples(blockSize);
+            shifter->clear();
+            shifters.add(std::move(shifter));
+        }
     }
 
-    void reset() override {}
-
-    void releaseResources() override {}
+    void releaseResources() override
+    {
+        shifters.clear();
+    }
 
     void processBlock(AudioBuffer<float>& buffer, MidiBuffer&) override
     {
@@ -568,127 +560,18 @@ public:
         const int numInputChannels = getTotalNumInputChannels();
         const int numOutputChannels = getTotalNumOutputChannels();
         const int numSamples = buffer.getNumSamples();
-        //======================================
-
-        int currentInputBufferWritePosition;
-        int currentOutputBufferWritePosition;
-        int currentOutputBufferReadPosition;
-        int currentSamplesSinceLastFFT;
-
-        float shift = psValue.getNextValue();
-        float ratio = roundf(shift * (float)hopSize) / (float)hopSize;
-        int resampledLength = floorf((float)fftSize / ratio);
-        HeapBlock<float> resampledOutput(resampledLength, true);
-        HeapBlock<float> synthesisWindow(resampledLength, true);
-        updateWindow(synthesisWindow, resampledLength);
-
-        for (int channel = 0; channel < numInputChannels; ++channel) {
-            float* channelData = buffer.getWritePointer(channel);
-
-            currentInputBufferWritePosition = inputBufferWritePosition;
-            currentOutputBufferWritePosition = outputBufferWritePosition;
-            currentOutputBufferReadPosition = outputBufferReadPosition;
-            currentSamplesSinceLastFFT = samplesSinceLastFFT;
-
-            for (int sample = 0; sample < numSamples; ++sample) {
-
-                //======================================
-
-                const float in = channelData[sample];
-                channelData[sample] = outputBuffer.getSample(channel, currentOutputBufferReadPosition);
-
-                //======================================
-
-                outputBuffer.setSample(channel, currentOutputBufferReadPosition, 0.0f);
-                if (++currentOutputBufferReadPosition >= outputBufferLength)
-                    currentOutputBufferReadPosition = 0;
-
-                //======================================
-
-                inputBuffer.setSample(channel, currentInputBufferWritePosition, in);
-                if (++currentInputBufferWritePosition >= inputBufferLength)
-                    currentInputBufferWritePosition = 0;
-
-                //======================================
-
-                if (++currentSamplesSinceLastFFT >= hopSize) {
-                    currentSamplesSinceLastFFT = 0;
-
-                    //======================================
-
-                    int inputBufferIndex = currentInputBufferWritePosition;
-                    for (int index = 0; index < fftSize; ++index) {
-                        fftTimeDomain[index].real(sqrtf(fftWindow[index]) * inputBuffer.getSample(channel, inputBufferIndex));
-                        fftTimeDomain[index].imag(0.0f);
-
-                        if (++inputBufferIndex >= inputBufferLength)
-                            inputBufferIndex = 0;
-                    }
-
-                    //======================================
-
-                    fft->perform(fftTimeDomain, fftFrequencyDomain, false);
-
-                    if (psValue.isSmoothing())
-                        needToResetPhases = true;
-                    if (shift == psValue.getTargetValue() && needToResetPhases) {
-                        inputPhase.clear();
-                        outputPhase.clear();
-                        needToResetPhases = false;
-                    }
-
-                    for (int index = 0; index < fftSize; ++index) {
-                        float magnitude = abs(fftFrequencyDomain[index]);
-                        float phase = arg(fftFrequencyDomain[index]);
-
-                        float phaseDeviation = phase - inputPhase.getSample(channel, index) - omega[index] * (float)hopSize;
-                        float deltaPhi = omega[index] * hopSize + princArg(phaseDeviation);
-                        float newPhase = princArg(outputPhase.getSample(channel, index) + deltaPhi * ratio);
-
-                        inputPhase.setSample(channel, index, phase);
-                        outputPhase.setSample(channel, index, newPhase);
-                        fftFrequencyDomain[index] = std::polar(magnitude, newPhase);
-                    }
-
-                    fft->perform(fftFrequencyDomain, fftTimeDomain, true);
-
-                    for (int index = 0; index < resampledLength; ++index) {
-                        float x = (float)index * (float)fftSize / (float)resampledLength;
-                        int ix = (int)floorf(x);
-                        float dx = x - (float)ix;
-
-                        float sample1 = fftTimeDomain[ix].real();
-                        float sample2 = fftTimeDomain[(ix + 1) % fftSize].real();
-                        resampledOutput[index] = sample1 + dx * (sample2 - sample1);
-                        resampledOutput[index] *= sqrtf(synthesisWindow[index]);
-                    }
-
-                    //======================================
-
-                    int outputBufferIndex = currentOutputBufferWritePosition;
-                    for (int index = 0; index < resampledLength; ++index) {
-                        float out = outputBuffer.getSample(channel, outputBufferIndex);
-                        out += resampledOutput[index] * windowScaleFactor;
-                        outputBuffer.setSample(channel, outputBufferIndex, out);
-
-                        if (++outputBufferIndex >= outputBufferLength)
-                            outputBufferIndex = 0;
-                    }
-
-                    //======================================
-
-                    currentOutputBufferWritePosition += hopSize;
-                    if (currentOutputBufferWritePosition >= outputBufferLength)
-                        currentOutputBufferWritePosition = 0;
-                }
+        
+        for (int i = 0; i < numSamples; i++)
+        {
+            for (int channel = 0; channel < numInputChannels; channel++)
+            {
+                shifters[channel]->setPitchSemiTones(psValue.getNextValue());
+                shifters[channel]->putSamples(buffer.getReadPointer(channel, i), 1);
             }
         }
-
-        inputBufferWritePosition = currentInputBufferWritePosition;
-        outputBufferWritePosition = currentOutputBufferWritePosition;
-        outputBufferReadPosition = currentOutputBufferReadPosition;
-        samplesSinceLastFFT = currentSamplesSinceLastFFT;
-
+        for (int channel = 0; channel < numInputChannels; channel++)
+            shifters[channel]->receiveSamples(buffer.getWritePointer(channel), numSamples);
+        
         for (int channel = numInputChannels; channel < numOutputChannels; ++channel)
             buffer.clear(channel, 0, numSamples);
     }
@@ -711,154 +594,12 @@ public:
                 parameters.replaceState(ValueTree::fromXml(*xmlState));
     }
 
-    //==============================================================================
-    void updateFftSize()
-    {
-        fftSize = (int)*fftSizeParameter;
-        fft = std::make_unique<dsp::FFT>(log2(fftSize));
-
-        inputBufferLength = fftSize;
-        inputBufferWritePosition = 0;
-        inputBuffer.clear();
-        inputBuffer.setSize(getTotalNumInputChannels(), inputBufferLength);
-
-        float maxRatio = powf(2.0f, -1 / 12.0f);
-        outputBufferLength = (int)floorf((float)fftSize / maxRatio);
-        outputBufferWritePosition = 0;
-        outputBufferReadPosition = 0;
-        outputBuffer.clear();
-        outputBuffer.setSize(getTotalNumInputChannels(), outputBufferLength);
-
-        fftWindow.realloc(fftSize);
-        fftWindow.clear(fftSize);
-
-        fftTimeDomain.realloc(fftSize);
-        fftTimeDomain.clear(fftSize);
-
-        fftFrequencyDomain.realloc(fftSize);
-        fftFrequencyDomain.clear(fftSize);
-
-        samplesSinceLastFFT = 0;
-
-        omega.realloc(fftSize);
-        for (int index = 0; index < fftSize; ++index)
-            omega[index] = MathConstants<float>::twoPi * index / (float)fftSize;
-
-        inputPhase.clear();
-        inputPhase.setSize(getTotalNumInputChannels(), outputBufferLength);
-
-        outputPhase.clear();
-        outputPhase.setSize(getTotalNumInputChannels(), outputBufferLength);
-    }
-
-    void updateHopSize()
-    {
-        overlap = (int)*hopSizeParameter;
-        if (overlap != 0) {
-            hopSize = fftSize / overlap;
-            outputBufferWritePosition = hopSize % outputBufferLength;
-        }
-    }
-
-    void updateAnalysisWindow()
-    {
-        updateWindow(fftWindow, fftSize);
-    }
-
-    void updateWindow(const HeapBlock<float>& window, const int windowLength)
-    {
-        switch ((int)*windowTypeParameter) {
-        case windowTypeHann: {
-            for (int sample = 0; sample < windowLength; ++sample)
-                window[sample] = 0.5f - 0.5f * cosf(MathConstants<float>::twoPi * (float)sample / (float)(windowLength - 1));
-            break;
-        }
-        case windowTypeHamming: {
-            for (int sample = 0; sample < windowLength; ++sample)
-                window[sample] = 0.54f - 0.46f * cosf(MathConstants<float>::twoPi * (float)sample / (float)(windowLength - 1));
-            break;
-        }
-        case windowTypeBartlett: {
-            for (int sample = 0; sample < windowLength; ++sample)
-                window[sample] = 1.0f - fabs(2.0f * (float)sample / (float)(windowLength - 1) - 1.0f);
-            break;
-        }
-        }
-    }
-
-    void updateWindowScaleFactor()
-    {
-        float windowSum = 0.0f;
-        for (int sample = 0; sample < fftSize; ++sample)
-            windowSum += fftWindow[sample];
-
-        windowScaleFactor = 0.0f;
-        if (overlap != 0 && windowSum != 0.0f)
-            windowScaleFactor = 1.0f / (float)overlap / windowSum * (float)fftSize;
-    }
-
-    float princArg(const float phase)
-    {
-        if (phase >= 0.0f)
-            return fmod(phase + MathConstants<float>::pi, MathConstants<float>::twoPi) - MathConstants<float>::pi;
-        else
-            return fmod(phase + MathConstants<float>::pi, -MathConstants<float>::twoPi) + MathConstants<float>::pi;
-    }
-
 private:
-    inline static const StringArray fftSizes{ "32", "64", "128", "256", "512", "1024", "2048" };
-    inline static const StringArray hopSizes{ "1/2 Overlap", "1/4 Overlap", "1/8 Overlap" };
-    inline static const StringArray windowTypes{ "Hann", "Hamming", "Bartlett" };
-    enum fftSizeIndex {
-        fftSize32 = 0,
-        fftSize64,
-        fftSize128,
-        fftSize256,
-        fftSize512,
-        fftSize1024,
-        fftSize2048,
-    };
-    enum hopSizeIndex {
-        hopSize2 = 0,
-        hopSize4,
-        hopSize8,
-    };
-    enum windowTypeIndex {
-        windowTypeHann = 0,
-        windowTypeHamming,
-        windowTypeBartlett,
-    };
-
     AudioProcessorValueTreeState parameters;
     SmoothedValue<float> psValue{ 0.0f };
-    std::atomic<float>* psParameter{ nullptr }, * fftSizeParameter{ nullptr }, * hopSizeParameter{ nullptr }, * windowTypeParameter{ nullptr };
+    std::atomic<float>* psParameter{ nullptr };
 
-    int fftSize;
-    std::unique_ptr<dsp::FFT> fft;
-
-    int inputBufferLength;
-    int inputBufferWritePosition;
-    AudioSampleBuffer inputBuffer;
-
-    int outputBufferLength;
-    int outputBufferWritePosition;
-    int outputBufferReadPosition;
-    AudioSampleBuffer outputBuffer;
-
-    HeapBlock<float> fftWindow;
-    HeapBlock<dsp::Complex<float>> fftTimeDomain;
-    HeapBlock<dsp::Complex<float>> fftFrequencyDomain;
-
-    int samplesSinceLastFFT;
-
-    int overlap;
-    int hopSize;
-    float windowScaleFactor;
-
-    HeapBlock<float> omega;
-    AudioSampleBuffer inputPhase;
-    AudioSampleBuffer outputPhase;
-    bool needToResetPhases;
+    OwnedArray<SoundTouch> shifters;
 };
 
 //==============================================================================
