@@ -11,10 +11,12 @@
 #include "PluginBundle.h"
 #include "PluginProcessor.h"
 
-PluginBundle::PluginBundle(size_t numInstances, const PluginDescription desc, MicroChromoAudioProcessor& p)
-    : _numInstances(numInstances), _desc(desc), processor(p), formatManager(p.getAudioPluginFormatManager())
+PluginBundle::PluginBundle(int maxInstances, const PluginDescription desc, MicroChromoAudioProcessor& p)
+    : _maxInstances(maxInstances), _numInstances(1), _desc(desc), processor(p), formatManager(p.getAudioPluginFormatManager())
 {
-    for (auto i = 0; i < _numInstances; i++)
+    jassert(desc.name.isNotEmpty());
+
+    for (auto i = 0; i < maxInstances; i++)
         collectors.set(i, new MidiMessageCollector());
 }
 
@@ -25,8 +27,9 @@ PluginBundle::~PluginBundle()
     collectors.clear();
 }
 
-void PluginBundle::loadPlugin()
+void PluginBundle::preLoadPlugin(size_t numInstances)
 {
+    jassert(numInstances <= _maxInstances);
     if (_isLoading.load())
     {
         AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Please Wait", "Wait for current loading to finish", "OK");
@@ -35,44 +38,38 @@ void PluginBundle::loadPlugin()
     _isLoading = true;
     _isLoaded = false;
     _isError = false;
-    instanceStarted = 0;
+    instanceStartedTemp = 0;
 
     sendSynchronousChangeMessage();
     instanceTemps.clearQuick(false);
-    for (auto i = 0; i < _numInstances; i++)
+}
+
+void PluginBundle::loadPlugin(size_t numInstances, std::function<void(PluginBundle&)> callback)
+{
+    preLoadPlugin(numInstances);
+    for (auto i = 0; i < numInstances; i++)
     {
         formatManager.createPluginInstanceAsync(_desc,
             processor.getSampleRate(),
             processor.getBlockSize(),
-            [this, i](std::unique_ptr<AudioPluginInstance> instance, const String& error)
+            [this, i, numInstances, callback](std::unique_ptr<AudioPluginInstance> instance, const String& error)
             {
                 addPluginCallback(std::move(instance), error, i);
-                checkPluginLoaded();
+                checkPluginLoaded(numInstances, callback);
             });
     }
 }
 
-void PluginBundle::loadPluginSync()
+void PluginBundle::loadPluginSync(size_t numInstances)
 {
-    if (_isLoading.load())
-    {
-        AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Please Wait", "Wait for current loading to finish", "OK");
-        return;
-    }
-    _isLoading = true;
-    _isLoaded = false;
-    _isError = false;
-    instanceStarted = 0;
-
-    sendSynchronousChangeMessage();
-    instanceTemps.clearQuick(false);
-    for (auto i = 0; i < _numInstances; i++)
+    preLoadPlugin(numInstances);
+    for (auto i = 0; i < numInstances; i++)
     {
         String error;
         auto instance = formatManager.createPluginInstance(_desc, processor.getSampleRate(), processor.getBlockSize(), error);
         addPluginCallback(std::move(instance), error, i);
     }
-    checkPluginLoaded();
+    checkPluginLoaded(numInstances);
 }
 
 PluginInstance* PluginBundle::getInstanceAt(size_t index)
@@ -100,15 +97,14 @@ void PluginBundle::addPluginCallback(std::unique_ptr<AudioPluginInstance> instan
     {
         instance->enableAllBuses();
         instanceTemps.set(index, new PluginInstance(uid++, std::move(instance)), true);
-        instanceStarted++;
+        instanceStartedTemp++;
     }
 }
 
-void PluginBundle::checkPluginLoaded()
+void PluginBundle::checkPluginLoaded(size_t numInstances, std::function<void(PluginBundle&)> callback)
 {
-    if (instanceStarted.load() == _numInstances)
+    if (instanceStartedTemp.load() == numInstances)
     {
-        _isLoaded = true;
         _isLoading = false;
         if (_isError.load())
         {
@@ -117,6 +113,8 @@ void PluginBundle::checkPluginLoaded()
                 TRANS("Couldn't create plugin. ") + errMsg,
                 "OK");
             _isLoaded = false;
+            if (!isInit)
+                _isLoaded = true;
         }
         else
         {
@@ -127,14 +125,38 @@ void PluginBundle::checkPluginLoaded()
             }
             else
                 isInit = false;
+            instanceStarted = instanceStartedTemp.load();
+            _numInstances = numInstances;
+
+            startCcLearn();
+            stopCcLearn();
+
+            instances.clear();
             for (auto i = 0; i < _numInstances; i++)
                 instances.set(i, instanceTemps[i], true);
             instanceTemps.clearQuick(false);
+
             for (auto* p : instances[0]->processor->getParameters())
                 p->addListener(this);
+            if (callback)
+                callback(*this);
+
+            _isLoaded = true;
         }
         sendChangeMessage();
     }
+}
+
+void PluginBundle::adjustInstanceNumber(int newNumInstances, std::function<void(void)> callback)
+{
+    MemoryBlock data;
+    getStateInformation(data);
+    loadPlugin(newNumInstances, [data, callback](PluginBundle& bundle)
+        {
+            bundle.setStateInformation(data.getData(), data.getSize());
+            if (callback)
+                callback();
+        });
 }
 
 void PluginBundle::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -150,25 +172,29 @@ void PluginBundle::prepareToPlay(double sampleRate, int samplesPerBlock)
 
 void PluginBundle::processBlock(OwnedArray<AudioBuffer<float>>& bufferArray, MidiBuffer& midiMessages)
 {
-    for (auto i = 0; i < instanceStarted.load(); i++)
+    if (isLoaded())
     {
-        collectors[i]->removeNextBlockOfMessages(midiMessages, _samplesPerBlock.load());
-        MidiMessage midi_message;
-        int sample_offset;
+        for (auto i = 0; i < instanceStarted.load(); i++)
+        {
+            MidiBuffer midiBuffer(midiMessages);
+            collectors[i]->removeNextBlockOfMessages(midiBuffer, _samplesPerBlock.load());
+            MidiMessage midi_message;
+            int sample_offset;
 
-        for (MidiBuffer::Iterator it(midiMessages); it.getNextEvent(midi_message, sample_offset);) {
-            if (midi_message.isController()) {
-                if (midi_message.getControllerNumber() == 100) {
-                    int value = midi_message.getControllerValue();
-                    if (value < 128 && hasLearned)
-                    {
-                        auto* parameter = instances[i]->processor->getParameters()[learnedCc];
-                        parameter->setValueAt(value / 127.0f * (learnedCcMax - learnedCcMin) + learnedCcMin, sample_offset);
+            for (MidiBuffer::Iterator it(midiBuffer); it.getNextEvent(midi_message, sample_offset);) {
+                if (midi_message.isController()) {
+                    if (midi_message.getControllerNumber() == 100) {
+                        int value = midi_message.getControllerValue();
+                        if (value < 128 && hasLearned)
+                        {
+                            auto* parameter = instances[i]->processor->getParameters()[learnedCc];
+                            parameter->setValueAt(value / 127.0f * (learnedCcMax - learnedCcMin) + learnedCcMin, sample_offset);
+                        }
                     }
                 }
             }
+            instances[i]->processor->processBlock(*bufferArray[i], midiBuffer);
         }
-        instances[i]->processor->processBlock(*bufferArray[i], midiMessages);
     }
 }
 
@@ -186,17 +212,6 @@ bool PluginBundle::isLoading()
 bool PluginBundle::isLoaded()
 {
     return _isLoaded.load();
-}
-
-void PluginBundle::getStateInformation(MemoryBlock& destData)
-{
-    instances[0]->processor->getStateInformation(destData);
-}
-
-void PluginBundle::setStateInformation(const void* data, int sizeInBytes)
-{
-    for (auto i = 0; i < instanceStarted.load(); i++)
-        instances[i]->processor->setStateInformation(data, sizeInBytes);
 }
 
 void PluginBundle::propagateState()
@@ -255,4 +270,44 @@ void PluginBundle::setCcLearn(int index, float min, float max)
     learnedCcMax = max;
     isLearning = false;
     hasLearned = true;
+}
+
+void PluginBundle::getStateInformation(MemoryBlock& destData)
+{
+    std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>("bundle");
+    xml->setAttribute("learnedCc", learnedCc);
+    xml->setAttribute("learnedCcMin", learnedCcMin);
+    xml->setAttribute("learnedCcMax", learnedCcMax);
+    MemoryBlock data;
+    instances[0]->processor->getStateInformation(data);
+    xml->setAttribute("data", data.toBase64Encoding());
+    AudioProcessor::copyXmlToBinary(*xml, destData);
+}
+
+void PluginBundle::setStateInformation(const void* data, int sizeInBytes)
+{
+    std::unique_ptr<XmlElement> xml(AudioProcessor::getXmlFromBinary(data, sizeInBytes));
+    if (xml.get() != nullptr)
+    {
+        if (xml->hasTagName("bundle"))
+        {
+            if (xml->hasAttribute("learnedCc"))
+            {
+                learnedCc = xml->getIntAttribute("learnedCc");
+                if (learnedCc > -1)
+                    hasLearned = true;
+            }
+            if (xml->hasAttribute("learnedCcMin"))
+                learnedCcMin = xml->getDoubleAttribute("learnedCcMin");
+            if (xml->hasAttribute("learnedCcMax"))
+                learnedCcMax = xml->getDoubleAttribute("learnedCcMax");
+            if (xml->hasAttribute("data"))
+            {
+                MemoryBlock data;
+                data.fromBase64Encoding(xml->getStringAttribute("data"));
+                for (auto i = 0; i < instanceStarted.load(); i++)
+                    instances[i]->processor->setStateInformation(data.getData(), data.getSize());
+            }
+        }
+    }
 }

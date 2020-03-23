@@ -18,7 +18,7 @@ class MicroChromoAudioProcessor;
 class PluginBundle : public ChangeBroadcaster, AudioProcessorParameter::Listener
 {
 public:
-    PluginBundle(size_t numInstances, const PluginDescription desc, MicroChromoAudioProcessor& p);
+    PluginBundle(int maxInstances, const PluginDescription desc, MicroChromoAudioProcessor& p);
     ~PluginBundle();
 
     //==============================================================================
@@ -30,6 +30,7 @@ public:
 
     //==============================================================================
     const String getName() const { return _desc.descriptiveName; }
+    const PluginDescription getDescription() { return _desc; }
 
     //==============================================================================
     void getStateInformation(MemoryBlock& destData);
@@ -41,10 +42,14 @@ public:
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
     //==============================================================================
-    void loadPlugin();
-    void loadPluginSync();
+    void preLoadPlugin(size_t numInstances);
+    void loadPlugin(size_t numInstances, std::function<void(PluginBundle&)> callback = nullptr);
+    void loadPluginSync(size_t numInstances);
     PluginInstance* getInstanceAt(size_t index);
     MidiMessageCollector* getCollectorAt(size_t index);
+
+    //==============================================================================
+    void adjustInstanceNumber(int newNumInstances, std::function<void(void)> callback = nullptr);
 
     bool isLoading();
     bool isLoaded();
@@ -55,20 +60,21 @@ public:
 
 private:
     void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int index);
-    void checkPluginLoaded();
+    void checkPluginLoaded(size_t numInstances, std::function<void(PluginBundle&)> callback = nullptr);
 
     MicroChromoAudioProcessor& processor;
     AudioPluginFormatManager& formatManager;
     std::atomic<double> _sampleRate;
     std::atomic<int> _samplesPerBlock;
 
-    size_t _numInstances = 1;
+    int _numInstances = 1, _maxInstances = 8;
     PluginDescription _desc;
     std::atomic<uint32> uid = 0;
     OwnedArray<PluginInstance> instances;
     OwnedArray<PluginInstance> instanceTemps;
     OwnedArray<MidiMessageCollector> collectors;
     std::atomic<int> instanceStarted = 0;
+    std::atomic<int> instanceStartedTemp = 0;
     std::atomic<bool> _isLoading = false, _isLoaded = false, _isError = false, isInit = true, isLearning = false, hasLearned = false;
     std::atomic<int> learnedCc{ -1 };
     std::atomic<float> learnedCcMin{ FP_INFINITE }, learnedCcMax{ -FP_INFINITE };
