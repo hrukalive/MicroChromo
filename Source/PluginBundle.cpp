@@ -161,7 +161,10 @@ void PluginBundle::processBlock(OwnedArray<AudioBuffer<float>>& bufferArray, Mid
                 if (midi_message.getControllerNumber() == 100) {
                     int value = midi_message.getControllerValue();
                     if (value < 128 && hasLearned)
-                        instances[i]->processor->getParameters()[learnedCc]->setValueAt(value / 127.0f * (learnedCcMax - learnedCcMin) + learnedCcMin, sample_offset);
+                    {
+                        auto* parameter = instances[i]->processor->getParameters()[learnedCc];
+                        parameter->setValueAt(value / 127.0f * (learnedCcMax - learnedCcMin) + learnedCcMin, sample_offset);
+                    }
                 }
             }
         }
@@ -243,4 +246,13 @@ void PluginBundle::stopCcLearn()
     if (learnedCc != -1 && learnedCcMin != FP_INFINITE && learnedCcMax != -FP_INFINITE)
         hasLearned = true;
     isLearning = false;
+}
+
+void PluginBundle::setCcLearn(int index, float min, float max)
+{
+    learnedCc = index;
+    learnedCcMin = min;
+    learnedCcMax = max;
+    isLearning = false;
+    hasLearned = true;
 }

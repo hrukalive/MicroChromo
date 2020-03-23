@@ -23,6 +23,12 @@ public:
         log.add ("Parameter debug log started");
     }
 
+    ~PluginDebugWindow()
+    {
+        for (auto* p : audioProc.getParameters())
+            p->removeListener(this);
+    }
+
     void parameterValueChanged (int parameterIndex, float newValue) override
     {
         auto* param = audioProc.getParameters()[parameterIndex];
