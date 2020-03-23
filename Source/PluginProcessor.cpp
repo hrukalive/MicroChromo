@@ -23,47 +23,46 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
                        .withOutput ("Output", AudioChannelSet::stereo(), true)
                      #endif
                        ),
-	   parameters(*this, nullptr, Identifier("MicroChromoParam"),
-		   {
-			   std::make_unique<AudioParameterFloat>("gain", "Gain", 0.0f, 1.0f, 0.5f)
-		   })
+       parameters(*this, nullptr, Identifier("MicroChromoParam"),
+           {
+               std::make_unique<AudioParameterInt>("num_instances", "Num Inst", 1, 8, 1)
+           })
 #endif
 {
-	PropertiesFile::Options options;
-	options.folderName = "MicroChromo";
-	options.applicationName = "MicroChromo";
-	options.filenameSuffix = "settings";
-	options.osxLibrarySubFolder = "Preferences";
-	appProperties.setStorageParameters(options);
+    PropertiesFile::Options options;
+    options.folderName = "MicroChromo";
+    options.applicationName = "MicroChromo";
+    options.filenameSuffix = "settings";
+    options.osxLibrarySubFolder = "Preferences";
+    appProperties.setStorageParameters(options);
 
-	formatManager.addDefaultFormats();
-	formatManager.addFormat(new InternalPluginFormat());
-	InternalPluginFormat internalFormat;
-	internalFormat.getAllTypes(internalTypes);
-	if (auto savedPluginList = appProperties.getUserSettings()->getXmlValue("pluginList"))
-		knownPluginList.recreateFromXml(*savedPluginList);
-	for (auto& t : internalTypes)
-		knownPluginList.addType(t);
+    formatManager.addDefaultFormats();
+    formatManager.addFormat(new InternalPluginFormat());
+    InternalPluginFormat internalFormat;
+    internalFormat.getAllTypes(internalTypes);
+    if (auto savedPluginList = appProperties.getUserSettings()->getXmlValue("pluginList"))
+        knownPluginList.recreateFromXml(*savedPluginList);
+    for (auto& t : internalTypes)
+        knownPluginList.addType(t);
 
-	synthBundle.reset(new PluginBundle(numInstances, internalTypes[1], *this));
-	psBundle.reset(new PluginBundle(numInstances, internalTypes[2], *this));
+    synthBundle.reset(new PluginBundle(8, internalTypes[1], *this));
+    psBundle.reset(new PluginBundle(8, internalTypes[2], *this));
 
-	synthBundle->loadPluginSync();
-	psBundle->loadPluginSync();
+    synthBundle->loadPluginSync(numInstancesParameter);
+    psBundle->loadPluginSync(numInstancesParameter);
 
-	psBundle->setCcLearn(0, 0.25f, 0.75f);
+    psBundle->setCcLearn(0, 0.25f, 0.75f);
 
-	synthBundle->addChangeListener(this);
-	psBundle->addChangeListener(this);
+    synthBundle->addChangeListener(this);
+    psBundle->addChangeListener(this);
 }
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
 {
-	synthBundle->removeChangeListener(this);
-	psBundle->removeChangeListener(this);
-	synthBundle = nullptr;
-	psBundle = nullptr;
-	bufferArray.clear();
+    psBundle->removeChangeListener(this);
+    synthBundle = nullptr;
+    psBundle = nullptr;
+    bufferArray.clear();
 }
 
 //==============================================================================
@@ -131,32 +130,30 @@ void MicroChromoAudioProcessor::changeProgramName (int index, const String& newN
 //==============================================================================
 void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-	inputMeterSource.setMaxHoldMS(500);
-	inputMeterSource.resize(getTotalNumInputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
-	outputMeterSource.setMaxHoldMS(500);
-	outputMeterSource.resize(getTotalNumOutputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
+    inputMeterSource.setMaxHoldMS(500);
+    inputMeterSource.resize(getTotalNumInputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
+    outputMeterSource.setMaxHoldMS(500);
+    outputMeterSource.resize(getTotalNumOutputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
 
-	messageCollector.reset(sampleRate);
+    messageCollector.reset(sampleRate);
 
-	bufferArray.clear();
-	auto channels = jmax(synthBundle->getTotalNumInputChannels(),
-		synthBundle->getTotalNumOutputChannels(),
-		psBundle->getTotalNumInputChannels(),
-		psBundle->getTotalNumOutputChannels());
+    bufferArray.clear();
+    auto channels = jmax(synthBundle->getTotalNumInputChannels(),
+        synthBundle->getTotalNumOutputChannels(),
+        psBundle->getTotalNumInputChannels(),
+        psBundle->getTotalNumOutputChannels());
 
-	for (int i = 0; i < numInstances; i++)
-		bufferArray.add(new AudioBuffer<float>(channels, samplesPerBlock));
-	synthBundle->prepareToPlay(sampleRate, samplesPerBlock);
-	psBundle->prepareToPlay(sampleRate, samplesPerBlock);
+    for (int i = 0; i < numInstancesParameter; i++)
+        bufferArray.add(new AudioBuffer<float>(channels, samplesPerBlock));
+    synthBundle->prepareToPlay(sampleRate, samplesPerBlock);
+    psBundle->prepareToPlay(sampleRate, samplesPerBlock);
 }
 
 void MicroChromoAudioProcessor::releaseResources()
 {
-	synthBundle->releaseResources();
-	psBundle->releaseResources();
-	bufferArray.clear();
+    synthBundle->releaseResources();
+    psBundle->releaseResources();
+    bufferArray.clear();
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -189,32 +186,38 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-	for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-		buffer.clear(i, 0, buffer.getNumSamples());
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+        buffer.clear(i, 0, buffer.getNumSamples());
 
-	messageCollector.removeNextBlockOfMessages(midiMessages, getBlockSize());
+    messageCollector.removeNextBlockOfMessages(midiMessages, getBlockSize());
 
-	inputMeterSource.measureBlock(buffer);
+    inputMeterSource.measureBlock(buffer);
 
-	for (auto j = 0; j < numInstances; j++)
-		bufferArray[j]->makeCopyOf(buffer);
+    for (auto j = 0; j < numInstancesParameter; j++)
+        bufferArray[j]->makeCopyOf(buffer);
 
-	for (auto i = 0; i < buffer.getNumChannels(); ++i)
-		buffer.clear(i, 0, buffer.getNumSamples());
+    for (auto i = 0; i < buffer.getNumChannels(); ++i)
+        buffer.clear(i, 0, buffer.getNumSamples());
 
-	synthBundle->processBlock(bufferArray, midiMessages);
-	psBundle->processBlock(bufferArray, midiMessages);
-	for (auto i = 0; i < numInstances; i++)
-		for (auto j = 0; j < buffer.getNumChannels(); j++)
-			buffer.addFrom(j, 0, *bufferArray[i], j, 0, buffer.getNumSamples());
+    synthBundle->processBlock(bufferArray, midiMessages);
+    psBundle->processBlock(bufferArray, midiMessages);
+    for (auto i = 0; i < numInstancesParameter; i++)
+        for (auto j = 0; j < buffer.getNumChannels(); j++)
+            buffer.addFrom(j, 0, *bufferArray[i], j, 0, buffer.getNumSamples());
 
-	outputMeterSource.measureBlock(buffer);
+    outputMeterSource.measureBlock(buffer);
+}
+
+void MicroChromoAudioProcessor::adjustInstanceNumber(int newNumInstances)
+{
+    synthBundle->adjustInstanceNumber(newNumInstances);
+    psBundle->adjustInstanceNumber(newNumInstances, [newNumInstances, this]() {this->numInstancesParameter = newNumInstances; });
 }
 
 //==============================================================================
 bool MicroChromoAudioProcessor::hasEditor() const
 {
-    return true; // (change this to false if you choose to not supply an editor)
+    return true;
 }
 
 AudioProcessorEditor* MicroChromoAudioProcessor::createEditor()
@@ -225,54 +228,151 @@ AudioProcessorEditor* MicroChromoAudioProcessor::createEditor()
 //==============================================================================
 void MicroChromoAudioProcessor::getStateInformation (MemoryBlock& destData)
 {
-	auto state = parameters.copyState();
-	std::unique_ptr<XmlElement> xml(state.createXml());
-	copyXmlToBinary(*xml, destData);
+    auto validDesc = [](PluginDescription desc) {
+        return desc.name.isNotEmpty() && desc.uid != 0;
+    };
+
+    auto state = parameters.copyState();
+    std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>("root");
+    xml->setAttribute("numInstances", numInstancesParameter);
+
+    auto stateXml = state.createXml();
+    auto synthDescXml = synthBundle->getDescription().createXml();
+    auto psDescXml = psBundle->getDescription().createXml();
+
+    MemoryBlock synthData, psData;
+    synthBundle->getStateInformation(synthData);
+    psBundle->getStateInformation(psData);
+
+    xml->addChildElement(stateXml.get());
+
+    std::unique_ptr<XmlElement> synthXml, psXml;
+    bool hasSynth = false, hasPs = false;
+    if (synthBundle->isLoaded() && validDesc(synthBundle->getDescription()))
+    {
+        synthXml = std::make_unique<XmlElement>("synth_bundle");
+        synthXml->addChildElement(synthDescXml.get());
+        xml->addChildElement(synthXml.get());
+        xml->setAttribute("synthStateData", synthData.toBase64Encoding());
+        hasSynth = true;
+    }
+
+    if (psBundle->isLoaded() && validDesc(psBundle->getDescription()))
+    {
+        psXml = std::make_unique<XmlElement>("pitchshift_bundle");
+        psXml->addChildElement(psDescXml.get());
+        xml->addChildElement(psXml.get());
+        xml->setAttribute("psStateData", psData.toBase64Encoding());
+        hasPs = true;
+    }
+
+    copyXmlToBinary(*xml, destData);
+
+    if (hasSynth)
+        synthXml->removeChildElement(synthDescXml.get(), false);
+    if (hasPs)
+        psXml->removeChildElement(psDescXml.get(), false);
+
+    xml->removeChildElement(stateXml.get(), false);
+    xml->removeChildElement(synthXml.get(), false);
+    xml->removeChildElement(psXml.get(), false);
 }
 
 void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-	std::unique_ptr<XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
+    auto validDesc = [](PluginDescription desc) {
+        return desc.name.isNotEmpty() && desc.uid != 0;
+    };
 
-	if (xmlState.get() != nullptr)
-		if (xmlState->hasTagName(parameters.state.getType()))
-			parameters.replaceState(ValueTree::fromXml(*xmlState));
+    std::unique_ptr<XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
+    if (xml.get() != nullptr)
+    {
+        if (xml->hasTagName("root"))
+        {
+            numInstancesParameter = xml->getIntAttribute("numInstances", 1);
+            forEachXmlChildElement(*xml, child)
+            {
+                if (child->hasTagName(parameters.state.getType()))
+                    parameters.replaceState(ValueTree::fromXml(*child));
+                if (child->hasTagName("synth_bundle"))
+                {
+                    PluginDescription desc;
+                    desc.loadFromXml(*child->getFirstChildElement());
+                    if (validDesc(desc))
+                    {
+                        if (xml->hasAttribute("synthStateData"))
+                        {
+                            MemoryBlock data;
+                            data.fromBase64Encoding(xml->getStringAttribute("synthStateData"));
+                            this->addPlugin(desc, true, [data](PluginBundle& bundle) {bundle.setStateInformation(data.getData(), data.getSize()); });
+                        }
+                        else
+                            this->addPlugin(desc, true);
+                    }
+                }
+                if (child->hasTagName("pitchshift_bundle"))
+                {
+                    PluginDescription desc;
+                    desc.loadFromXml(*child->getFirstChildElement());
+                    if (validDesc(desc))
+                    {
+                        if (xml->hasAttribute("psStateData"))
+                        {
+                            MemoryBlock data;
+                            data.fromBase64Encoding(xml->getStringAttribute("psStateData"));
+                            this->addPlugin(desc, false, [data](PluginBundle& bundle) {bundle.setStateInformation(data.getData(), data.getSize()); });
+                        }
+                        else
+                            this->addPlugin(desc, false);
+                    }
+                }
+            }
+        }
+    }
 }
 
 void MicroChromoAudioProcessor::changeListenerCallback(ChangeBroadcaster* changed)
 {
-	if (changed == synthBundle.get())
-	{
-		suspendProcessing(true);
-		if (synthBundle->isLoaded())
-		{
-			prepareToPlay(getSampleRate(), getBlockSize());
-			suspendProcessing(false);
-		}
-	}
-	else if (changed == psBundle.get())
-	{
-		suspendProcessing(true);
-		if (psBundle->isLoaded())
-		{
-			prepareToPlay(getSampleRate(), getBlockSize());
-			suspendProcessing(false);
-		}
-	}
+    if (changed == synthBundle.get())
+    {
+        suspendProcessing(true);
+        if (synthBundle->isLoaded())
+        {
+            prepareToPlay(getSampleRate(), getBlockSize());
+            suspendProcessing(false);
+        }
+    }
+    else if (changed == psBundle.get())
+    {
+        suspendProcessing(true);
+        if (!psBundle->isLoading())
+        {
+            prepareToPlay(getSampleRate(), getBlockSize());
+            suspendProcessing(false);
+        }
+    }
 }
 
-void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool isSynth)
+void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool isSynth, std::function<void(PluginBundle&)> callback)
 {
-	if (isSynth)
-	{
-		synthBundle->setPluginDescription(desc);
-		synthBundle->loadPlugin();
-	}
-	else
-	{
-		psBundle->setPluginDescription(desc);
-		psBundle->loadPlugin();
-	}
+    if (isSynth)
+    {
+        synthBundle->setPluginDescription(desc);
+        synthBundle->loadPlugin(numInstancesParameter, callback);
+    }
+    else
+    {
+        psBundle->setPluginDescription(desc);
+        psBundle->loadPlugin(numInstancesParameter, [desc, callback, this](PluginBundle& bundle) 
+            {
+                if (desc.isDuplicateOf(this->internalTypes[2]))
+                {
+                    if (callback)
+                        callback(bundle);
+                    psBundle->setCcLearn(0, 0.25f, 0.75f);
+                }
+            });
+    }
 }
 
 //==============================================================================
