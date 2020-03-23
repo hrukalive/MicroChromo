@@ -55,42 +55,43 @@ public:
     const String getProgramName (int index) override;
     void changeProgramName (int index, const String& newName) override;
 
-	//==============================================================================
-	void addPlugin(const PluginDescription& desc, bool isSynth);
+    //==============================================================================
+    void addPlugin(const PluginDescription& desc, bool isSynth, std::function<void(PluginBundle&)> callback = nullptr);
 
     //==============================================================================
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     void changeListenerCallback(ChangeBroadcaster* changed) override;
+    void adjustInstanceNumber(int newNumInstances);
 
-	//==============================================================================
-	ApplicationProperties& getApplicationProperties() { return appProperties; }
-	AudioPluginFormatManager& getAudioPluginFormatManager() { return formatManager; }
-	KnownPluginList& getKnownPluginList() { return knownPluginList; }
+    //==============================================================================
+    ApplicationProperties& getApplicationProperties() { return appProperties; }
+    AudioPluginFormatManager& getAudioPluginFormatManager() { return formatManager; }
+    KnownPluginList& getKnownPluginList() { return knownPluginList; }
     std::shared_ptr<PluginBundle> getSynthBundlePtr() { return synthBundle; }
     std::shared_ptr<PluginBundle> getPSBundlePtr() { return psBundle; }
     foleys::LevelMeterSource& getInputMeterSource() { return inputMeterSource; }
-	foleys::LevelMeterSource& getOutputMeterSource() { return outputMeterSource; }
-    size_t getNumInstances() { return numInstances; }
+    foleys::LevelMeterSource& getOutputMeterSource() { return outputMeterSource; }
+    int getNumInstances() { return numInstancesParameter; }
     MidiMessageCollector& getMidiMessageCollector() noexcept { return messageCollector; }
 
 private:
     //==============================================================================
-	ApplicationProperties appProperties;
-	KnownPluginList knownPluginList;
-	AudioPluginFormatManager formatManager;
-	Array<PluginDescription> internalTypes;
+    ApplicationProperties appProperties;
+    KnownPluginList knownPluginList;
+    AudioPluginFormatManager formatManager;
+    Array<PluginDescription> internalTypes;
 
-	const size_t numInstances = 1;
-	OwnedArray<AudioBuffer<float>> bufferArray;
+    std::atomic<int> numInstancesParameter{ 1 };
+    OwnedArray<AudioBuffer<float>> bufferArray;
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
 
-	AudioProcessorValueTreeState parameters;
+    AudioProcessorValueTreeState parameters;
     MidiMessageCollector messageCollector;
 
     foleys::LevelMeterSource inputMeterSource;
-	foleys::LevelMeterSource outputMeterSource;
+    foleys::LevelMeterSource outputMeterSource;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessor)
 };

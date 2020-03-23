@@ -103,7 +103,7 @@ private:
 class EmptyPlugin : public InternalPlugin
 {
 public:
-	EmptyPlugin(const PluginDescription& descr) :   InternalPlugin (descr)
+    EmptyPlugin(const PluginDescription& descr) :   InternalPlugin (descr)
     {}
 
     static String getIdentifier()
@@ -130,11 +130,39 @@ public:
 //==============================================================================
 class SineWaveSynth : public InternalPlugin
 {
+    class AudioParameterFloatVariant : public AudioParameterFloat
+    {
+    public:
+        AudioParameterFloatVariant(const String& parameterID,
+            const String& parameterName,
+            NormalisableRange<float> normalisableRange,
+            float defaultValue,
+            const String& parameterLabel = String(),
+            Category parameterCategory = AudioProcessorParameter::genericParameter,
+            std::function<String(float value, int maximumStringLength)> stringFromValue = nullptr,
+            std::function<float(const String & text)> valueFromString = nullptr) :
+            AudioParameterFloat(parameterID,
+                parameterName,
+                normalisableRange,
+                defaultValue,
+                parameterLabel,
+                parameterCategory,
+                stringFromValue,
+                valueFromString)
+        {}
+
+    protected:
+        void valueChanged(float newValue) override
+        {
+            sendValueChangedMessageToListeners(newValue);
+        }
+    };
+
     static AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     {
         std::vector<std::unique_ptr<RangedAudioParameter>> params;
 
-        params.push_back(std::make_unique<AudioParameterFloat>(
+        params.push_back(std::make_unique<AudioParameterFloatVariant>(
             "outgain",
             "Out Gain",
             NormalisableRange<float>(0.0f,
