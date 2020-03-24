@@ -11,6 +11,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "PluginWindow.h"
 #include "PluginInstance.h"
 
 class MicroChromoAudioProcessor;
@@ -54,9 +55,17 @@ public:
     bool isLoading();
     bool isLoaded();
     void setPluginDescription(const PluginDescription desc) { _desc = desc; }
+    void resetCcLearn();
     void startCcLearn();
     void stopCcLearn();
     void setCcLearn(int index, float min, float max);
+
+    //==============================================================================
+    void closeAllWindows();
+    void showRepresentativeWindow();
+    void showTwoWindows();
+    void showAllWindows();
+    void showWindow(PluginWindow::Type type, int num = 1);
 
 private:
     void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int index);
@@ -79,6 +88,8 @@ private:
     std::atomic<int> learnedCc{ -1 };
     std::atomic<float> learnedCcMin{ FP_INFINITE }, learnedCcMax{ -FP_INFINITE };
     String errMsg;
+
+    OwnedArray<PluginWindow> activePluginWindows;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginBundle)
 };

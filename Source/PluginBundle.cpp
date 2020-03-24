@@ -22,6 +22,7 @@ PluginBundle::PluginBundle(int maxInstances, const PluginDescription desc, Micro
 
 PluginBundle::~PluginBundle()
 {
+    activePluginWindows.clear();
     instances.clear();
     instanceTemps.clear();
     collectors.clear();
@@ -128,8 +129,8 @@ void PluginBundle::checkPluginLoaded(size_t numInstances, std::function<void(Plu
             instanceStarted = instanceStartedTemp.load();
             _numInstances = numInstances;
 
-            startCcLearn();
-            stopCcLearn();
+            hasLearned = false;
+            resetCcLearn();
 
             instances.clear();
             for (auto i = 0; i < _numInstances; i++)
@@ -247,24 +248,43 @@ void PluginBundle::parameterGestureChanged(int parameterIndex, bool gestureIsSta
     }
 }
 
-void PluginBundle::startCcLearn()
+void PluginBundle::resetCcLearn()
 {
+    if (hasLearned)
+    {
+        instances[0]->processor->getParameters()[learnedCc]->addListener(this);
+        const auto val = instances[0]->processor->getParameters()[learnedCc]->getValue();
+        for (auto i = 1; i < instanceStarted.load(); i++)
+            instances[i]->processor->getParameters()[learnedCc]->setValue(val);
+    }
     hasLearned = false;
     learnedCc = -1;
     learnedCcMin = FP_INFINITE;
     learnedCcMax = -FP_INFINITE;
+    isLearning = false;
+}
+
+void PluginBundle::startCcLearn()
+{
+    resetCcLearn();
     isLearning = true;
 }
 
 void PluginBundle::stopCcLearn()
 {
     if (learnedCc != -1 && learnedCcMin != FP_INFINITE && learnedCcMax != -FP_INFINITE)
+    {
         hasLearned = true;
+        instances[0]->processor->getParameters()[learnedCc]->removeListener(this);
+    }
     isLearning = false;
 }
 
 void PluginBundle::setCcLearn(int index, float min, float max)
 {
+    jassert(index > -1);
+    resetCcLearn();
+    instances[0]->processor->getParameters()[index]->removeListener(this);
     learnedCc = index;
     learnedCcMin = min;
     learnedCcMax = max;
@@ -291,23 +311,58 @@ void PluginBundle::setStateInformation(const void* data, int sizeInBytes)
     {
         if (xml->hasTagName("bundle"))
         {
-            if (xml->hasAttribute("learnedCc"))
-            {
-                learnedCc = xml->getIntAttribute("learnedCc");
-                if (learnedCc > -1)
-                    hasLearned = true;
-            }
-            if (xml->hasAttribute("learnedCcMin"))
-                learnedCcMin = xml->getDoubleAttribute("learnedCcMin");
-            if (xml->hasAttribute("learnedCcMax"))
-                learnedCcMax = xml->getDoubleAttribute("learnedCcMax");
+            if (xml->hasAttribute("learnedCc") && xml->getIntAttribute("learnedCc") > -1)
+                setCcLearn(xml->getIntAttribute("learnedCc"), xml->getDoubleAttribute("learnedCcMin", FP_INFINITE), xml->getDoubleAttribute("learnedCcMax", -FP_INFINITE));
             if (xml->hasAttribute("data"))
             {
-                MemoryBlock data;
-                data.fromBase64Encoding(xml->getStringAttribute("data"));
+                MemoryBlock proc_data;
+                proc_data.fromBase64Encoding(xml->getStringAttribute("data"));
                 for (auto i = 0; i < instanceStarted.load(); i++)
-                    instances[i]->processor->setStateInformation(data.getData(), data.getSize());
+                    instances[i]->processor->setStateInformation(proc_data.getData(), proc_data.getSize());
             }
         }
     }
 }
+
+void PluginBundle::closeAllWindows()
+{
+    activePluginWindows.clear();
+}
+
+void PluginBundle::showRepresentativeWindow()
+{
+    showWindow(PluginWindow::Type::normal, 1);
+}
+
+void PluginBundle::showTwoWindows()
+{
+    showWindow(PluginWindow::Type::normal, jmin(instanceStarted.load(), 2));
+}
+
+void PluginBundle::showAllWindows()
+{
+    showWindow(PluginWindow::Type::normal, instanceStarted.load());
+}
+
+void PluginBundle::showWindow(PluginWindow::Type type, int num)
+{
+    for (auto i = num - 1; i >= 0; i--)
+    {
+        if (auto node = instances[i])
+        {
+            for (auto* w : activePluginWindows)
+            {
+                if (w->node == node && w->type == type)
+                {
+                    w->toFront(true);
+                    return;
+                }
+            }
+            if (node->processor != nullptr)
+            {
+                activePluginWindows.add(new PluginWindow(node, type, activePluginWindows))->toFront(true);
+            }
+        }
+    }
+}
+
