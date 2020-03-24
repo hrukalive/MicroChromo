@@ -87,7 +87,8 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
         numInstancesBox.addItem(String(i), i);
     numInstancesBox.setSelectedId(processor.getNumInstances());
     numInstancesBox.onChange = [&]() {
-        activePluginWindows.clear();
+        synthBundle->closeAllWindows();
+        psBundle->closeAllWindows();
         processor.adjustInstanceNumber(numInstancesBox.getSelectedId());
     };
 
@@ -139,7 +140,6 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
     synthBundle->removeChangeListener(this);
     psBundle->removeChangeListener(this);
 
-    activePluginWindows.clear();
 #if JUCE_MAC
     MenuBarModel::setMacMainMenu(nullptr);
 #endif
@@ -158,23 +158,19 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
 {
     auto common = [this](int r, bool isSynth) {
+        auto bundle = isSynth ? this->synthBundle : this->psBundle;
         switch (r)
         {
-        case 1:  showWindow(PluginWindow::Type::normal, isSynth); break;
-        case 2:  showWindow(PluginWindow::Type::programs, isSynth); break;
-        case 3:  showWindow(PluginWindow::Type::generic, isSynth); break;
-        case 4:  showWindow(PluginWindow::Type::debug, isSynth); break;
-        case 5:
-        {
-            if (isSynth)
-                synthBundle->propagateState();
-            else
-                psBundle->propagateState();
-            break;
-        }
+        case 1:  bundle->showRepresentativeWindow(); break;
+        case 2:  bundle->showTwoWindows(); break;
+        case 3:  bundle->showAllWindows(); break;
+        case 4:  bundle->showWindow(PluginWindow::Type::programs); break;
+        case 5:  bundle->showWindow(PluginWindow::Type::generic); break;
+        case 6:  bundle->showWindow(PluginWindow::Type::debug); break;
+        case 7:  bundle->propagateState();
         default:
         {
-            activePluginWindows.clear();
+            bundle->closeAllWindows();
             auto types = knownPluginList.getTypes();
             int result = KnownPluginList::getIndexChosenByMenu(types, r);
             auto& desc = types.getReference(result);
@@ -410,12 +406,14 @@ void MicroChromoAudioProcessorEditor::showPopupMenu(int type, Point<int> positio
 {
     floatMenu.reset(new PopupMenu);
 
-    floatMenu->addItem(1, "Show plugin GUI");
-    floatMenu->addItem(2, "Show all programs");
-    floatMenu->addItem(3, "Show all parameters");
-    floatMenu->addItem(4, "Show debug log");
+    floatMenu->addItem(1, "Show main plugin GUI");
+    floatMenu->addItem(2, "Show two plugin GUI", processor.getNumInstances() > 1);
+    floatMenu->addItem(3, "Show all plugin GUI", processor.getNumInstances() > 2);
+    floatMenu->addItem(4, "Show programs");
+    floatMenu->addItem(5, "Show parameters");
+    floatMenu->addItem(6, "Show debug log");
     floatMenu->addSeparator();
-    floatMenu->addItem(5, "Propagate state to duplicates");
+    floatMenu->addItem(7, "Propagate state to duplicates");
     floatMenu->addSeparator();
     KnownPluginList::addToMenu(*floatMenu, knownPluginList.getTypes(), pluginSortMethod);
     floatMenu->showMenuAsync({}, ModalCallbackFunction::create([this, callback](int r)
@@ -423,26 +421,4 @@ void MicroChromoAudioProcessorEditor::showPopupMenu(int type, Point<int> positio
             if (r > 0)
                 callback(r);
         }));
-}
-
-void MicroChromoAudioProcessorEditor::showWindow(PluginWindow::Type type, bool isSynth)
-{
-    for (auto i = 0; i < processor.getNumInstances(); i++)
-    {
-        if (auto node = (isSynth ? synthBundle->getInstanceAt(i) : psBundle->getInstanceAt(i)))
-        {
-            for (auto* w : activePluginWindows)
-            {
-                if (w->node == node && w->type == type)
-                {
-                    w->toFront(true);
-                    return;
-                }
-            }
-            if (node->processor != nullptr)
-            {
-                activePluginWindows.add(new PluginWindow(node, type, activePluginWindows))->toFront(true);
-            }
-        }
-    }
 }

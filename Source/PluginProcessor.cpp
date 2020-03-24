@@ -302,9 +302,9 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
                     {
                         if (xml->hasAttribute("synthStateData"))
                         {
-                            MemoryBlock data;
-                            data.fromBase64Encoding(xml->getStringAttribute("synthStateData"));
-                            this->addPlugin(desc, true, [data](PluginBundle& bundle) {bundle.setStateInformation(data.getData(), data.getSize()); });
+                            MemoryBlock proc_data;
+                            proc_data.fromBase64Encoding(xml->getStringAttribute("synthStateData"));
+                            this->addPlugin(desc, true, [proc_data](PluginBundle& bundle) {bundle.setStateInformation(proc_data.getData(), proc_data.getSize()); });
                         }
                         else
                             this->addPlugin(desc, true);
@@ -318,9 +318,9 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
                     {
                         if (xml->hasAttribute("psStateData"))
                         {
-                            MemoryBlock data;
-                            data.fromBase64Encoding(xml->getStringAttribute("psStateData"));
-                            this->addPlugin(desc, false, [data](PluginBundle& bundle) {bundle.setStateInformation(data.getData(), data.getSize()); });
+                            MemoryBlock proc_data;
+                            proc_data.fromBase64Encoding(xml->getStringAttribute("psStateData"));
+                            this->addPlugin(desc, false, [proc_data](PluginBundle& bundle) {bundle.setStateInformation(proc_data.getData(), proc_data.getSize()); });
                         }
                         else
                             this->addPlugin(desc, false);
@@ -365,12 +365,10 @@ void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool is
         psBundle->setPluginDescription(desc);
         psBundle->loadPlugin(numInstancesParameter, [desc, callback, this](PluginBundle& bundle) 
             {
+                if (callback)
+                    callback(bundle);
                 if (desc.isDuplicateOf(this->internalTypes[2]))
-                {
-                    if (callback)
-                        callback(bundle);
-                    psBundle->setCcLearn(0, 0.25f, 0.75f);
-                }
+                    bundle.setCcLearn(0, 0.25f, 0.75f);
             });
     }
 }

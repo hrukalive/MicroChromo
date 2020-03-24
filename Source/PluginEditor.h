@@ -12,7 +12,6 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
-#include "PluginWindow.h"
 #include "PluginInstance.h"
 #include "PluginBundle.h"
 
@@ -62,7 +61,6 @@ public:
     //==============================================================================
     void buttonClicked(Button* btn) override;
     void showPopupMenu(int type, Point<int> position, std::function<void(int)> callback);
-    void showWindow(PluginWindow::Type type, bool isSynth);
 
     void timerCallback() override;
 
@@ -88,7 +86,6 @@ private:
     std::unique_ptr<Button> synthBtn, psBtn, noteButton, ccLearnBtn, dragBtn;
     std::unique_ptr<Label> synthLabel, psLabel;
     std::unique_ptr<PopupMenu> floatMenu;
-    OwnedArray<PluginWindow> activePluginWindows;
 
     Label numInstancesLabel;
     ComboBox numInstancesBox;
