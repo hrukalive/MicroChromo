@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <JuceHeader.h>
+#include "Common.h"
 #include "PluginInstance.h"
 #include "PluginBundle.h"
 
@@ -57,6 +57,8 @@ public:
 
     //==============================================================================
     void addPlugin(const PluginDescription& desc, bool isSynth, std::function<void(PluginBundle&)> callback = nullptr);
+    void startLoadingPlugin();
+    void finishLoadingPlugin();
 
     //==============================================================================
     void getStateInformation (MemoryBlock& destData) override;
@@ -71,11 +73,17 @@ public:
     KnownPluginList& getKnownPluginList() { return knownPluginList; }
     std::shared_ptr<PluginBundle> getSynthBundlePtr() { return synthBundle; }
     std::shared_ptr<PluginBundle> getPSBundlePtr() { return psBundle; }
-    foleys::LevelMeterSource& getInputMeterSource() { return inputMeterSource; }
-    foleys::LevelMeterSource& getOutputMeterSource() { return outputMeterSource; }
+    //foleys::LevelMeterSource& getInputMeterSource() { return inputMeterSource; }
+    //foleys::LevelMeterSource& getOutputMeterSource() { return outputMeterSource; }
     int getNumInstances() { return numInstancesParameter; }
-    MidiMessageCollector& getMidiMessageCollector() noexcept { return messageCollector; }
+    AudioProcessorValueTreeState& getValueTreeState() { return parameters; }
+    UndoManager* getUndoManager() noexcept { return &undoManager; }
+    AudioPlayHead::CurrentPositionInfo& getInfo() { return info; }
+    OwnedArray<ParameterLinker>& getSynthParameterLinker() { return synthParamPtr; }
+    OwnedArray<ParameterLinker>& getPSParameterLinker() { return psParamPtr; }
+    int getParameterSlotNumber() { return parameterSlotNumber; }
 
+    static const int MAX_INSTANCES = 8;
 private:
     //==============================================================================
     ApplicationProperties appProperties;
@@ -83,15 +91,20 @@ private:
     AudioPluginFormatManager formatManager;
     Array<PluginDescription> internalTypes;
 
+    AudioPlayHead::CurrentPositionInfo info;
+    int parameterSlotNumber = 16;
+
     std::atomic<int> numInstancesParameter{ 1 };
+    std::atomic<bool> properlyPrepared{ false };
     OwnedArray<AudioBuffer<float>> bufferArray;
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
 
+    UndoManager undoManager;
     AudioProcessorValueTreeState parameters;
-    MidiMessageCollector messageCollector;
+    OwnedArray<ParameterLinker> synthParamPtr, psParamPtr;
 
-    foleys::LevelMeterSource inputMeterSource;
-    foleys::LevelMeterSource outputMeterSource;
+    //foleys::LevelMeterSource inputMeterSource;
+    //foleys::LevelMeterSource outputMeterSource;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessor)
 };

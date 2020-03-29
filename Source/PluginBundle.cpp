@@ -11,11 +11,9 @@
 #include "PluginBundle.h"
 #include "PluginProcessor.h"
 
-PluginBundle::PluginBundle(int maxInstances, const PluginDescription desc, MicroChromoAudioProcessor& p)
-    : _maxInstances(maxInstances), _numInstances(1), _desc(desc), processor(p), formatManager(p.getAudioPluginFormatManager())
+PluginBundle::PluginBundle(MicroChromoAudioProcessor& p, int maxInstances, OwnedArray<ParameterLinker>& linker)
+    : _maxInstances(maxInstances), _numInstances(1), processor(p), formatManager(p.getAudioPluginFormatManager()), parameterLinker(linker)
 {
-    jassert(desc.name.isNotEmpty());
-
     for (auto i = 0; i < maxInstances; i++)
         collectors.set(i, new MidiMessageCollector());
 }
@@ -28,7 +26,7 @@ PluginBundle::~PluginBundle()
     collectors.clear();
 }
 
-void PluginBundle::preLoadPlugin(size_t numInstances)
+void PluginBundle::preLoadPlugin(int numInstances)
 {
     jassert(numInstances <= _maxInstances);
     if (_isLoading.load())
@@ -38,49 +36,53 @@ void PluginBundle::preLoadPlugin(size_t numInstances)
     }
     _isLoading = true;
     _isLoaded = false;
+    _finishedLoading = false;
     _isError = false;
     instanceStartedTemp = 0;
 
     sendSynchronousChangeMessage();
+    processor.startLoadingPlugin();
     instanceTemps.clearQuick(false);
 }
 
-void PluginBundle::loadPlugin(size_t numInstances, std::function<void(PluginBundle&)> callback)
+void PluginBundle::loadPlugin(const PluginDescription desc, int numInstances, std::function<void(PluginBundle&)> callback)
 {
+    jassert(desc.name.isNotEmpty());
     preLoadPlugin(numInstances);
     for (auto i = 0; i < numInstances; i++)
     {
-        formatManager.createPluginInstanceAsync(_desc,
+        formatManager.createPluginInstanceAsync(desc,
             processor.getSampleRate(),
             processor.getBlockSize(),
-            [this, i, numInstances, callback](std::unique_ptr<AudioPluginInstance> instance, const String& error)
+            [this, i, desc, numInstances, callback](std::unique_ptr<AudioPluginInstance> instance, const String& error)
             {
                 addPluginCallback(std::move(instance), error, i);
-                checkPluginLoaded(numInstances, callback);
+                checkPluginLoaded(desc, numInstances, callback);
             });
     }
 }
 
-void PluginBundle::loadPluginSync(size_t numInstances)
+void PluginBundle::loadPluginSync(const PluginDescription desc, int numInstances)
 {
+    jassert(desc.name.isNotEmpty());
     preLoadPlugin(numInstances);
     for (auto i = 0; i < numInstances; i++)
     {
         String error;
-        auto instance = formatManager.createPluginInstance(_desc, processor.getSampleRate(), processor.getBlockSize(), error);
+        auto instance = formatManager.createPluginInstance(desc, processor.getSampleRate(), processor.getBlockSize(), error);
         addPluginCallback(std::move(instance), error, i);
     }
-    checkPluginLoaded(numInstances);
+    checkPluginLoaded(desc, numInstances);
 }
 
-PluginInstance* PluginBundle::getInstanceAt(size_t index)
-{
-    if (index >= instanceStarted.load())
-        return nullptr;
-    return instances[index];
-}
+//PluginInstance* PluginBundle::getInstanceAt(size_t index)
+//{
+//    if (index >= instanceStarted.load())
+//        return nullptr;
+//    return instances[index];
+//}
 
-MidiMessageCollector* PluginBundle::getCollectorAt(size_t index)
+MidiMessageCollector* PluginBundle::getCollectorAt(int index)
 {
     if (index >= instanceStarted.load())
         return nullptr;
@@ -102,7 +104,7 @@ void PluginBundle::addPluginCallback(std::unique_ptr<AudioPluginInstance> instan
     }
 }
 
-void PluginBundle::checkPluginLoaded(size_t numInstances, std::function<void(PluginBundle&)> callback)
+void PluginBundle::checkPluginLoaded(const PluginDescription desc, int numInstances, std::function<void(PluginBundle&)> callback)
 {
     if (instanceStartedTemp.load() == numInstances)
     {
@@ -131,6 +133,8 @@ void PluginBundle::checkPluginLoaded(size_t numInstances, std::function<void(Plu
 
             hasLearned = false;
             resetCcLearn();
+            resetParameterLink();
+            linkParameterIndices.clear();
 
             instances.clear();
             for (auto i = 0; i < _numInstances; i++)
@@ -139,12 +143,18 @@ void PluginBundle::checkPluginLoaded(size_t numInstances, std::function<void(Plu
 
             for (auto* p : instances[0]->processor->getParameters())
                 p->addListener(this);
+
             if (callback)
                 callback(*this);
 
+            if (!currentDesc.isDuplicateOf(desc))
+                currentDesc = desc;
+
             _isLoaded = true;
         }
+        _finishedLoading = true;
         sendChangeMessage();
+        processor.finishLoadingPlugin();
     }
 }
 
@@ -152,12 +162,60 @@ void PluginBundle::adjustInstanceNumber(int newNumInstances, std::function<void(
 {
     MemoryBlock data;
     getStateInformation(data);
-    loadPlugin(newNumInstances, [data, callback](PluginBundle& bundle)
+    loadPlugin(currentDesc, newNumInstances, [data, callback](PluginBundle& bundle)
         {
             bundle.setStateInformation(data.getData(), data.getSize());
             if (callback)
                 callback();
         });
+}
+
+void PluginBundle::openParameterLinkEditor()
+{
+    DialogWindow::LaunchOptions dialogOption;
+
+    dialogOption.dialogTitle = "Choose Parameters to Expose";
+    dialogOption.dialogBackgroundColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
+    dialogOption.escapeKeyTriggersCloseButton = false;
+    dialogOption.useNativeTitleBar = false;
+    dialogOption.resizable = true;
+    dialogOption.content.setOwned(new ParameterLinkEditor(*this));
+    auto* window = dialogOption.create();
+    window->setTitleBarButtonsRequired(0, false);
+    window->enterModalState(true, nullptr, true);
+}
+
+void PluginBundle::resetParameterLink()
+{
+    for (auto& ptr : parameterLinker)
+        ptr->resetLink();
+}
+
+void PluginBundle::linkParameters()
+{
+    int i = 0;
+    auto parameters = getParameters();
+    std::sort(linkParameterIndices.begin(), linkParameterIndices.end());
+    std::remove_if(linkParameterIndices.begin(), linkParameterIndices.end(), [&parameters](int v) { return v >= parameters.size(); });
+    for (auto index : linkParameterIndices)
+    {
+        if (i >= processor.getParameterSlotNumber())
+            break;
+        auto* p = parameters[index];
+        if (p->isAutomatable() && !p->isMetaParameter())
+        {
+            parameterLinker[i]->linkParameter(p);
+            i++;
+        }
+    }
+    processor.updateHostDisplay();
+}
+
+void PluginBundle::linkEditorExit(Array<int> selected)
+{
+    linkParameterIndices = selected;
+    resetParameterLink();
+    linkParameters();
 }
 
 void PluginBundle::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -205,22 +263,22 @@ void PluginBundle::releaseResources()
         instances[i]->unprepare();
 }
 
-bool PluginBundle::isLoading()
-{
-    return _isLoading.load();
-}
-
-bool PluginBundle::isLoaded()
-{
-    return _isLoaded.load();
-}
-
 void PluginBundle::propagateState()
 {
     MemoryBlock block;
     instances[0]->processor->getStateInformation(block);
     for (auto i = 1; i < instanceStarted.load(); i++)
         instances[i]->processor->setStateInformation(block.getData(), block.getSize());
+}
+
+const Array<AudioProcessorParameter*>& PluginBundle::getParameters()
+{
+    return instances[0]->processor->getParameters();
+}
+
+void PluginBundle::setParameter(int parameterIndex, float newValue)
+{
+    instances[0]->processor->getParameters()[parameterIndex]->setValue(newValue);
 }
 
 void PluginBundle::parameterValueChanged(int parameterIndex, float newValue)
@@ -242,9 +300,9 @@ void PluginBundle::parameterGestureChanged(int parameterIndex, bool gestureIsSta
     for (auto i = 1; i < instanceStarted.load(); i++)
     {
         if (gestureIsStarting)
-            instances[i]->processor->beginParameterChangeGesture(parameterIndex);
+            instances[i]->processor->getParameters()[parameterIndex]->beginChangeGesture();
         else
-            instances[i]->processor->endParameterChangeGesture(parameterIndex);
+            instances[i]->processor->getParameters()[parameterIndex]->endChangeGesture();
     }
 }
 
@@ -298,6 +356,14 @@ void PluginBundle::getStateInformation(MemoryBlock& destData)
     xml->setAttribute("learnedCc", learnedCc);
     xml->setAttribute("learnedCcMin", learnedCcMin);
     xml->setAttribute("learnedCcMax", learnedCcMax);
+    
+    MemoryBlock linkedData;
+    MemoryOutputStream stream(linkedData, false);
+    for (int i : linkParameterIndices)
+        stream.writeInt(i);
+    stream.flush();
+    xml->setAttribute("linkParameterIndices", linkedData.toBase64Encoding());
+
     MemoryBlock data;
     instances[0]->processor->getStateInformation(data);
     xml->setAttribute("data", data.toBase64Encoding());
@@ -312,13 +378,24 @@ void PluginBundle::setStateInformation(const void* data, int sizeInBytes)
         if (xml->hasTagName("bundle"))
         {
             if (xml->hasAttribute("learnedCc") && xml->getIntAttribute("learnedCc") > -1)
-                setCcLearn(xml->getIntAttribute("learnedCc"), xml->getDoubleAttribute("learnedCcMin", FP_INFINITE), xml->getDoubleAttribute("learnedCcMax", -FP_INFINITE));
+                setCcLearn(xml->getIntAttribute("learnedCc"), (float)xml->getDoubleAttribute("learnedCcMin", FP_INFINITE), (float)xml->getDoubleAttribute("learnedCcMax", -FP_INFINITE));
             if (xml->hasAttribute("data"))
             {
                 MemoryBlock proc_data;
                 proc_data.fromBase64Encoding(xml->getStringAttribute("data"));
                 for (auto i = 0; i < instanceStarted.load(); i++)
                     instances[i]->processor->setStateInformation(proc_data.getData(), proc_data.getSize());
+            }
+            if (xml->hasAttribute("linkParameterIndices"))
+            {
+                MemoryBlock linkedData;
+                linkedData.fromBase64Encoding(xml->getStringAttribute("linkParameterIndices"));
+                linkParameterIndices.clear();
+                MemoryInputStream stream(linkedData, false);
+                while (!stream.isExhausted())
+                    linkParameterIndices.add(stream.readInt());
+                resetParameterLink();
+                linkParameters();
             }
         }
     }
@@ -365,4 +442,3 @@ void PluginBundle::showWindow(PluginWindow::Type type, int num)
         }
     }
 }
-

@@ -8,6 +8,12 @@
               pluginAAXCategory="2048" pluginRTASCategory="2048" headerPath="../../soundtouch/include">
   <MAINGROUP id="YsAiD7" name="MicroChromo">
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
+      <FILE id="fZXg4x" name="ParameterLinkEditor.cpp" compile="1" resource="0"
+            file="Source/ParameterLinkEditor.cpp"/>
+      <FILE id="K4vpvQ" name="ParameterLinkEditor.h" compile="0" resource="0"
+            file="Source/ParameterLinkEditor.h"/>
+      <FILE id="DdEe8x" name="Common.cpp" compile="1" resource="0" file="Source/Common.cpp"/>
+      <FILE id="KS8Ulu" name="Common.h" compile="0" resource="0" file="Source/Common.h"/>
       <FILE id="uNIWbV" name="PluginBundle.cpp" compile="1" resource="0"
             file="Source/PluginBundle.cpp"/>
       <FILE id="yFSpZJ" name="PluginBundle.h" compile="0" resource="0" file="Source/PluginBundle.h"/>
@@ -85,7 +91,6 @@
         <MODULEPATH id="juce_gui_basics" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../../../Program Files/JUCE/modules"/>
-        <MODULEPATH id="ff_meters" path="C:/Program Files/JUCE/user_modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
     <VS2019 targetFolder="Builds/VisualStudio2019">
@@ -108,7 +113,6 @@
         <MODULEPATH id="juce_gui_basics" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../../../Program Files/JUCE/modules"/>
-        <MODULEPATH id="ff_meters" path="C:/Program Files/JUCE/user_modules"/>
       </MODULEPATHS>
     </VS2019>
     <VS2017 targetFolder="Builds/VisualStudio2017">
@@ -131,7 +135,6 @@
         <MODULEPATH id="juce_gui_basics" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../../../Program Files/JUCE/modules"/>
-        <MODULEPATH id="ff_meters" path="C:/Program Files/JUCE/user_modules"/>
       </MODULEPATHS>
     </VS2017>
     <LINUX_MAKE targetFolder="Builds/LinuxMakefile">
@@ -154,12 +157,10 @@
         <MODULEPATH id="juce_gui_basics" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../../../Program Files/JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../../../Program Files/JUCE/modules"/>
-        <MODULEPATH id="ff_meters" path="C:/Program Files/JUCE/user_modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
   </EXPORTFORMATS>
   <MODULES>
-    <MODULE id="ff_meters" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
