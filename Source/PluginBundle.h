@@ -45,7 +45,8 @@ public:
     //==============================================================================
     const Array<AudioProcessorParameter*>& getParameters();
     const Array<int>& getLinkedArray() { return linkParameterIndices; }
-    void setParameter(int parameterIndex, float newValue);
+    void setParameterValue(int parameterIndex, float newValue);
+    void setParameterGesture(int parameterIndex, bool gestureIsStarting);
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
