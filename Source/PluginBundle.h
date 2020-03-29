@@ -20,7 +20,7 @@ class MicroChromoAudioProcessor;
 class PluginBundle : public ChangeBroadcaster, AudioProcessorParameter::Listener
 {
 public:
-    PluginBundle(MicroChromoAudioProcessor& p, int maxInstances, OwnedArray<ParameterLinker>& linker);
+    PluginBundle(MicroChromoAudioProcessor& p, int maxInstances, OwnedArray<ParameterLinker>& linker, PluginDescription emptyPlugin, PluginDescription defaultPlugin);
     ~PluginBundle();
 
     //==============================================================================
@@ -73,6 +73,9 @@ public:
     void startCcLearn();
     void stopCcLearn();
     void setCcLearn(int index, float min, float max);
+    int getLearnedCc() { return learnedCc; }
+    PluginDescription getEmptyPluginDescription() { return _emptyPlugin; }
+    PluginDescription getDefaultPluginDescription() { return _defaultPlugin; }
 
     //==============================================================================
     void closeAllWindows();
@@ -80,6 +83,7 @@ public:
     void showTwoWindows();
     void showAllWindows();
     void showWindow(PluginWindow::Type type, int num = 1);
+    std::unique_ptr<PopupMenu> getPopupMenu(KnownPluginList::SortMethod pluginSortMethod, KnownPluginList& knownPluginList);
 
 private:
     void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int index);
@@ -98,6 +102,7 @@ private:
     const OwnedArray<ParameterLinker>& parameterLinker;
     Array<int> linkParameterIndices;
     OwnedArray<MidiMessageCollector> collectors;
+    PluginDescription _emptyPlugin, _defaultPlugin;
     std::atomic<int> instanceStarted = 0;
     std::atomic<int> instanceStartedTemp = 0;
     std::atomic<bool> _isLoading = false, _isLoaded = false, _finishedLoading = false, _isError = false, isInit = true, isLearning = false, hasLearned = false;

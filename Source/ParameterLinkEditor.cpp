@@ -27,7 +27,10 @@ ParameterLinkEditor::ParameterLinkEditor (PluginBundle& bundle) :
 {
     int j = 0;
     for (auto* p : bundle.getParameters())
-        parameters.add(std::make_pair(p, j++));
+    {
+        if (j != bundle.getLearnedCc())
+            parameters.add(std::make_pair(p, j++));
+    }
 
     parameterList.setModel(this);
     addAndMakeVisible (parameterList);

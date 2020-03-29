@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <JuceHeader.h>
+#include "Common.h"
 #include "PluginProcessor.h"
 #include "PluginInstance.h"
 #include "PluginBundle.h"
@@ -61,7 +61,7 @@ public:
 
     //==============================================================================
     void buttonClicked(Button* btn) override;
-    void showPopupMenu(int type, Point<int> position, std::function<void(int)> callback);
+    //void showPopupMenu(std::function<void(int, bool)> callback, bool isSynth);
 
     void timerCallback() override;
 

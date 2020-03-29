@@ -14,6 +14,8 @@
 
 class PluginBundle;
 
+enum { mainMenuIdBase = 0x2717, pluginMenuIdBase = 0x324503f4 };
+
 class AudioParameterFloatVariant : public AudioParameterFloat
 {
 public:
