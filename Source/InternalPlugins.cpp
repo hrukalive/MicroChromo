@@ -1,5 +1,5 @@
 
-#include <JuceHeader.h>
+#include "Common.h"
 #include "SoundTouch.h"
 #include "InternalPlugins.h"
 
@@ -116,13 +116,13 @@ public:
         return InternalPlugin::getPluginDescription (getIdentifier(), false, false);
     }
 
-    void prepareToPlay(double newSampleRate, int) override {}
+    void prepareToPlay(double, int) override {}
 
     void reset() override {}
 
     void releaseResources() override {}
 
-    void processBlock(AudioBuffer<float>& buffer, MidiBuffer&) override {}
+    void processBlock(AudioBuffer<float>&, MidiBuffer&) override {}
 
     using InternalPlugin::processBlock;
 };
@@ -130,34 +130,6 @@ public:
 //==============================================================================
 class SineWaveSynth : public InternalPlugin
 {
-    class AudioParameterFloatVariant : public AudioParameterFloat
-    {
-    public:
-        AudioParameterFloatVariant(const String& parameterID,
-            const String& parameterName,
-            NormalisableRange<float> normalisableRange,
-            float defaultValue,
-            const String& parameterLabel = String(),
-            Category parameterCategory = AudioProcessorParameter::genericParameter,
-            std::function<String(float value, int maximumStringLength)> stringFromValue = nullptr,
-            std::function<float(const String & text)> valueFromString = nullptr) :
-            AudioParameterFloat(parameterID,
-                parameterName,
-                normalisableRange,
-                defaultValue,
-                parameterLabel,
-                parameterCategory,
-                stringFromValue,
-                valueFromString)
-        {}
-
-    protected:
-        void valueChanged(float newValue) override
-        {
-            sendValueChangedMessageToListeners(newValue);
-        }
-    };
-
     static AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     {
         std::vector<std::unique_ptr<RangedAudioParameter>> params;
@@ -182,7 +154,7 @@ class SineWaveSynth : public InternalPlugin
             {
                 return Decibels::decibelsToGain(text.getFloatValue());
             }));
-        params.push_back(std::make_unique<AudioParameterFloat>(
+        params.push_back(std::make_unique<AudioParameterFloatVariant>(
             "attack",
             "Attack",
             NormalisableRange<float>(0.0f,
@@ -208,7 +180,7 @@ class SineWaveSynth : public InternalPlugin
                 }
                 return text.getFloatValue();
             }));
-        params.push_back(std::make_unique<AudioParameterFloat>(
+        params.push_back(std::make_unique<AudioParameterFloatVariant>(
             "decay",
             "Decay",
             NormalisableRange<float>(1.0f,
@@ -234,7 +206,7 @@ class SineWaveSynth : public InternalPlugin
                 }
                 return text.getFloatValue();
             }));
-        params.push_back(std::make_unique<AudioParameterFloat>(
+        params.push_back(std::make_unique<AudioParameterFloatVariant>(
             "sustain",
             "Sustain",
             NormalisableRange<float>(0.0f,
@@ -254,7 +226,7 @@ class SineWaveSynth : public InternalPlugin
             {
                 return Decibels::decibelsToGain(text.getFloatValue());
             }));
-        params.push_back(std::make_unique<AudioParameterFloat>(
+        params.push_back(std::make_unique<AudioParameterFloatVariant>(
             "release",
             "Release",
             NormalisableRange<float>(1.0f,
@@ -330,6 +302,21 @@ public:
     }
 
     using InternalPlugin::processBlock;
+
+    void getStateInformation(juce::MemoryBlock& destData) override
+    {
+        auto xmlState = parameters.copyState();
+        std::unique_ptr<XmlElement> xml(xmlState.createXml());
+        copyXmlToBinary(*xml, destData);
+    }
+    void setStateInformation(const void* data, int sizeInBytes) override
+    {
+        std::unique_ptr<XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
+
+        if (xmlState.get() != nullptr)
+            if (xmlState->hasTagName(parameters.state.getType()))
+                parameters.replaceState(ValueTree::fromXml(*xmlState));
+    }
 
 private:
 
@@ -480,34 +467,6 @@ class PitchShiftPlugin : public InternalPlugin, public AudioProcessorValueTreeSt
 {
     using SoundTouch = soundtouch::SoundTouch;
 
-    class AudioParameterFloatVariant : public AudioParameterFloat
-    {
-    public:
-        AudioParameterFloatVariant(const String& parameterID,
-            const String& parameterName,
-            NormalisableRange<float> normalisableRange,
-            float defaultValue,
-            const String& parameterLabel = String(),
-            Category parameterCategory = AudioProcessorParameter::genericParameter,
-            std::function<String(float value, int maximumStringLength)> stringFromValue = nullptr,
-            std::function<float(const String & text)> valueFromString = nullptr) : 
-            AudioParameterFloat(parameterID,
-                parameterName,
-                normalisableRange,
-                defaultValue,
-                parameterLabel,
-                parameterCategory,
-                stringFromValue,
-                valueFromString)
-        {}
-
-    protected:
-        void valueChanged(float newValue) override
-        {
-            sendValueChangedMessageToListeners(newValue);
-        }
-    };
-
     static AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     {
         std::vector<std::unique_ptr<RangedAudioParameter>> params;
@@ -555,12 +514,12 @@ public:
         return InternalPlugin::getPluginDescription(getIdentifier(), false, false);
     }
 
-    void parameterChanged(const String& parameterID, float newValue) override
+    void parameterChanged(const String& /*parameterID*/, float newValue) override
     {
         psValue.setTargetValue(newValue * 2 - 1);
     }
 
-    void prepareToPlay(double sampleRate, int blockSize) override
+    void prepareToPlay(double sampleRate, int newBlockSize) override
     {
         psValue.reset(sampleRate, 0.05);
         psValue.setCurrentAndTargetValue(*psParameter);
@@ -570,8 +529,8 @@ public:
             std::unique_ptr<SoundTouch> shifter{ new SoundTouch() };
             shifter->setSetting(SETTING_USE_AA_FILTER, 1);
             shifter->setChannels(1);
-            shifter->setSampleRate(sampleRate);
-            shifter->adjustAmountOfSamples(blockSize);
+            shifter->setSampleRate((uint)sampleRate);
+            shifter->adjustAmountOfSamples(newBlockSize);
             shifter->clear();
             shifters.add(std::move(shifter));
         }
@@ -609,8 +568,8 @@ public:
     //==============================================================================
     void getStateInformation(juce::MemoryBlock& destData) override
     {
-        const auto state = parameters.copyState();
-        const auto xml(state.createXml());
+        const auto xmlState = parameters.copyState();
+        const auto xml(xmlState.createXml());
         copyXmlToBinary(*xml, destData);
     }
     void setStateInformation(const void* data, int sizeInBytes) override

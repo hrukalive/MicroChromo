@@ -53,6 +53,7 @@ public:
     void getAllCommands(Array<CommandID>& c) override;
     void getCommandInfo(CommandID commandID, ApplicationCommandInfo& result) override;
     bool perform(const InvocationInfo& info) override;
+    MicroChromoAudioProcessor& getProcessor() { return processor; }
 
     //==============================================================================
     void paint (Graphics&) override;
@@ -69,6 +70,7 @@ private:
     ApplicationProperties& appProperties;
     AudioPluginFormatManager& formatManager;
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
+    std::atomic<bool> ignoreInitialChange{ true };
 
     bool test = true;
     int lastNote = 60;
@@ -87,12 +89,16 @@ private:
     std::unique_ptr<Label> synthLabel, psLabel;
     std::unique_ptr<PopupMenu> floatMenu;
 
+    Label transportLabel;
+
     Label numInstancesLabel;
     ComboBox numInstancesBox;
+    TextEditor numParameterSlot;
 
-    foleys::LevelMeterLookAndFeel lnf;
-    foleys::LevelMeter meterInput{ foleys::LevelMeter::MeterFlags::Default };
-    foleys::LevelMeter meterOutput{ foleys::LevelMeter::MeterFlags::Default };
+
+    //foleys::LevelMeterLookAndFeel lnf;
+    //foleys::LevelMeter meterInput{ foleys::LevelMeter::MeterFlags::Default };
+    //foleys::LevelMeter meterOutput{ foleys::LevelMeter::MeterFlags::Default };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessorEditor)
 };

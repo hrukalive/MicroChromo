@@ -1,6 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
-#include "PluginInstance.h";
+#include "PluginInstance.h"
 
 /**
     A window that shows a log of parameter change messagse sent by the plugin.
@@ -15,6 +15,8 @@ public:
         : AudioProcessorEditor (proc), audioProc (proc)
     {
         setSize (500, 200);
+        setAlwaysOnTop(true);
+
         addAndMakeVisible (list);
 
         for (auto* p : audioProc.getParameters())
@@ -125,6 +127,7 @@ public:
          node(n), type (t)
     {
         setSize (400, 300);
+        setAlwaysOnTop(true);
 
         if (auto* ui = createProcessorEditor (*node->processor, type))
             setContentOwned (ui, true);
@@ -201,6 +204,7 @@ private:
         ProgramAudioProcessorEditor (AudioProcessor& p)  : AudioProcessorEditor (p)
         {
             setOpaque (true);
+            setAlwaysOnTop(true);
 
             addAndMakeVisible (panel);
 
