@@ -183,32 +183,49 @@ void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
         auto bundle = isSynth ? this->synthBundle : this->psBundle;
         switch (r)
         {
-        case 1:  bundle->showRepresentativeWindow(); break;
-        case 2:  bundle->showTwoWindows(); break;
-        case 3:  bundle->showAllWindows(); break;
-        case 4:  bundle->closeAllWindows(); break;
-        case 5:  bundle->showWindow(PluginWindow::Type::programs); break;
-        case 6:  bundle->showWindow(PluginWindow::Type::generic); break;
-        case 7:  bundle->showWindow(PluginWindow::Type::debug); break;
-        case 8:  bundle->propagateState(); break;
-        case 9:  bundle->openParameterLinkEditor(); break;
-        default:
+        case 1 + mainMenuIdBase:  bundle->showRepresentativeWindow(); break;
+        case 2 + mainMenuIdBase:  bundle->showTwoWindows(); break;
+        case 3 + mainMenuIdBase:  bundle->showAllWindows(); break;
+        case 4 + mainMenuIdBase:  bundle->closeAllWindows(); break;
+        case 5 + mainMenuIdBase:  bundle->showWindow(PluginWindow::Type::programs); break;
+        case 6 + mainMenuIdBase:  bundle->showWindow(PluginWindow::Type::generic); break;
+        case 7 + mainMenuIdBase:  bundle->showWindow(PluginWindow::Type::debug); break;
+        case 8 + mainMenuIdBase:  bundle->propagateState(); break;
+        case 9 + mainMenuIdBase:  bundle->openParameterLinkEditor(); break;
+        case 10 + mainMenuIdBase:
         {
             bundle->closeAllWindows();
-            auto types = knownPluginList.getTypes();
-            int result = KnownPluginList::getIndexChosenByMenu(types, r);
-            auto& desc = types.getReference(result);
-            processor.addPlugin(desc, isSynth);
+            processor.addPlugin(bundle->getEmptyPluginDescription(), isSynth);
+            break;
+        }
+        case 11 + mainMenuIdBase:
+        {
+            bundle->closeAllWindows();
+            processor.addPlugin(bundle->getDefaultPluginDescription(), isSynth);
+            break;
+        }
+        default:
+        {
+            if (r >= pluginMenuIdBase)
+            {
+                bundle->closeAllWindows();
+                auto types = (isSynth ? processor.getSynthKnownPluginList() : processor.getPsKnownPluginList()).getTypes();
+                int result = KnownPluginList::getIndexChosenByMenu(types, r);
+                auto& desc = types.getReference(result);
+                processor.addPlugin(desc, isSynth);
+            }
         }
         }
     };
     if (e.eventComponent == synthBtn.get())
     {
-        showPopupMenu(0, e.position.toInt(), [this, common](int r) { common(r, true); });
+        floatMenu = synthBundle->getPopupMenu(pluginSortMethod, processor.getSynthKnownPluginList());
+        floatMenu->showMenuAsync({}, ModalCallbackFunction::create([common](int r) { common(r, true); }));
     }
     else if (e.eventComponent == psBtn.get())
     {
-        showPopupMenu(0, e.position.toInt(), [this, common](int r) { common(r, false); });
+        floatMenu = psBundle->getPopupMenu(pluginSortMethod, processor.getPsKnownPluginList());
+        floatMenu->showMenuAsync({}, ModalCallbackFunction::create([common](int r) { common(r, false); }));
     }
     else if (e.eventComponent == noteButton.get())
     {
@@ -425,27 +442,4 @@ void MicroChromoAudioProcessorEditor::resized()
 
 void MicroChromoAudioProcessorEditor::buttonClicked(Button* btn)
 {
-}
-
-void MicroChromoAudioProcessorEditor::showPopupMenu(int type, Point<int> position, std::function<void(int)> callback)
-{
-    floatMenu.reset(new PopupMenu);
-
-    floatMenu->addItem(1, "Show main plugin GUI");
-    floatMenu->addItem(2, "Show two plugin GUI", processor.getNumInstances() > 1);
-    floatMenu->addItem(3, "Show all plugin GUI", processor.getNumInstances() > 2);
-    floatMenu->addItem(4, "Close all window");
-    floatMenu->addItem(5, "Show programs");
-    floatMenu->addItem(6, "Show parameters");
-    floatMenu->addItem(7, "Show debug log");
-    floatMenu->addSeparator();
-    floatMenu->addItem(8, "Propagate state to duplicates");
-    floatMenu->addItem(9, "Expose parameters");
-    floatMenu->addSeparator();
-    KnownPluginList::addToMenu(*floatMenu, knownPluginList.getTypes(), pluginSortMethod);
-    floatMenu->showMenuAsync({}, ModalCallbackFunction::create([this, callback](int r)
-        {
-            if (r > 0)
-                callback(r);
-        }));
 }

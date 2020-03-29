@@ -11,8 +11,8 @@
 #include "PluginBundle.h"
 #include "PluginProcessor.h"
 
-PluginBundle::PluginBundle(MicroChromoAudioProcessor& p, int maxInstances, OwnedArray<ParameterLinker>& linker)
-    : _maxInstances(maxInstances), _numInstances(1), processor(p), formatManager(p.getAudioPluginFormatManager()), parameterLinker(linker)
+PluginBundle::PluginBundle(MicroChromoAudioProcessor& p, int maxInstances, OwnedArray<ParameterLinker>& linker, PluginDescription emptyPlugin, PluginDescription defaultPlugin)
+    : _maxInstances(maxInstances), _numInstances(1), processor(p), formatManager(p.getAudioPluginFormatManager()), parameterLinker(linker), _emptyPlugin(emptyPlugin), _defaultPlugin(defaultPlugin)
 {
     for (auto i = 0; i < maxInstances; i++)
         collectors.set(i, new MidiMessageCollector());
@@ -451,4 +451,27 @@ void PluginBundle::showWindow(PluginWindow::Type type, int num)
             }
         }
     }
+}
+
+std::unique_ptr<PopupMenu> PluginBundle::getPopupMenu(KnownPluginList::SortMethod pluginSortMethod, KnownPluginList& knownPluginList)
+{
+    std::unique_ptr<PopupMenu> floatMenu = std::make_unique<PopupMenu>();
+
+    floatMenu->addItem(1 + mainMenuIdBase, "Show main plugin GUI");
+    floatMenu->addItem(2 + mainMenuIdBase, "Show two plugin GUI", processor.getNumInstances() > 1);
+    floatMenu->addItem(3 + mainMenuIdBase, "Show all plugin GUI", processor.getNumInstances() > 2);
+    floatMenu->addItem(4 + mainMenuIdBase, "Close all window");
+    floatMenu->addItem(5 + mainMenuIdBase, "Show programs");
+    floatMenu->addItem(6 + mainMenuIdBase, "Show parameters");
+    floatMenu->addItem(7 + mainMenuIdBase, "Show debug log");
+    floatMenu->addSeparator();
+    floatMenu->addItem(8 + mainMenuIdBase, "Propagate state to duplicates");
+    floatMenu->addItem(9 + mainMenuIdBase, "Expose parameters");
+    floatMenu->addSeparator();
+    floatMenu->addItem(10 + mainMenuIdBase, _emptyPlugin.name, true, currentDesc.isDuplicateOf(_emptyPlugin));
+    floatMenu->addItem(11 + mainMenuIdBase, _defaultPlugin.name, true, currentDesc.isDuplicateOf(_defaultPlugin));
+    floatMenu->addSeparator();
+    KnownPluginList::addToMenu(*floatMenu, knownPluginList.getTypes(), pluginSortMethod, currentDesc.createIdentifierString());
+
+    return floatMenu;
 }
