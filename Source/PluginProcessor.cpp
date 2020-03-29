@@ -16,7 +16,6 @@
 MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
      : AudioProcessor (BusesProperties()
-                       .withInput  ("Input",  AudioChannelSet::stereo(), true)
                        .withOutput ("Output", AudioChannelSet::stereo(), true)
                        ),
        parameters(*this, nullptr)
@@ -29,6 +28,7 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
     options.osxLibrarySubFolder = "Preferences";
     appProperties.setStorageParameters(options);
 
+    knownPluginList.addChangeListener(this);
     formatManager.addDefaultFormats();
     formatManager.addFormat(new InternalPluginFormat());
     InternalPluginFormat internalFormat;
@@ -36,8 +36,8 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
     if (auto savedPluginList = appProperties.getUserSettings()->getXmlValue("pluginList"))
         knownPluginList.recreateFromXml(*savedPluginList);
     parameterSlotNumber = jmax(appProperties.getUserSettings()->getIntValue("parameterSlotNumber", 16), 4);
-    for (auto& t : internalTypes)
-        knownPluginList.addType(t);
+    //for (auto& t : internalTypes)
+    //    knownPluginList.addType(t);
 
     std::unique_ptr<AudioProcessorParameterGroup> synthParamGroup = std::make_unique<AudioProcessorParameterGroup>("synth_param_group", "Synth Parameters", "-");
     std::unique_ptr<AudioProcessorParameterGroup> psParamGroup = std::make_unique<AudioProcessorParameterGroup>("ps_param_group", "PitchShift Parameters", "-");
@@ -57,8 +57,8 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
     addParameterGroup(std::move(synthParamGroup));
     addParameterGroup(std::move(psParamGroup));
 
-    synthBundle.reset(new PluginBundle(*this, MAX_INSTANCES, synthParamPtr));
-    psBundle.reset(new PluginBundle(*this, MAX_INSTANCES, psParamPtr));
+    synthBundle.reset(new PluginBundle(*this, MAX_INSTANCES, synthParamPtr, internalTypes[0], internalTypes[1]));
+    psBundle.reset(new PluginBundle(*this, MAX_INSTANCES, psParamPtr, internalTypes[0], internalTypes[2]));
 
     synthBundle->loadPluginSync(internalTypes[1], numInstancesParameter);
     psBundle->loadPluginSync(internalTypes[2], numInstancesParameter);
@@ -71,6 +71,7 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
 {
+    knownPluginList.removeChangeListener(this);
     synthParamPtr.clear();
     psParamPtr.clear();
     //synthBundle->removeChangeListener(this);
@@ -172,6 +173,8 @@ void MicroChromoAudioProcessor::releaseResources()
 #ifndef JucePlugin_PreferredChannelConfigurations
 bool MicroChromoAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
+    if (layouts.getMainInputChannelSet() != AudioChannelSet::disabled())
+        return false;
   #if JucePlugin_IsMidiEffect
     ignoreUnused (layouts);
     return true;
@@ -225,9 +228,7 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 
 void MicroChromoAudioProcessor::adjustInstanceNumber(int newNumInstances)
 {
-    synthBundle->adjustInstanceNumber(newNumInstances, [newNumInstances, this]()
-        {
-        });
+    synthBundle->adjustInstanceNumber(newNumInstances);
     psBundle->adjustInstanceNumber(newNumInstances, [newNumInstances, this]()
         {
             this->numInstancesParameter = newNumInstances;
@@ -353,6 +354,18 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
 
 void MicroChromoAudioProcessor::changeListenerCallback(ChangeBroadcaster* changed)
 {
+    if (changed == &knownPluginList)
+    {
+        synthKnownPluginList.clear();
+        psKnownPluginList.clear();
+        for (auto& type : knownPluginList.getTypes())
+        {
+            if (type.isInstrument)
+                synthKnownPluginList.addType(type);
+            else
+                psKnownPluginList.addType(type);
+        }
+    }
     //if (changed == synthBundle.get())
     //{
     //    suspendProcessing(true);

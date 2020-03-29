@@ -71,6 +71,8 @@ public:
     ApplicationProperties& getApplicationProperties() { return appProperties; }
     AudioPluginFormatManager& getAudioPluginFormatManager() { return formatManager; }
     KnownPluginList& getKnownPluginList() { return knownPluginList; }
+    KnownPluginList& getSynthKnownPluginList() { return synthKnownPluginList; }
+    KnownPluginList& getPsKnownPluginList() { return psKnownPluginList; }
     std::shared_ptr<PluginBundle> getSynthBundlePtr() { return synthBundle; }
     std::shared_ptr<PluginBundle> getPSBundlePtr() { return psBundle; }
     //foleys::LevelMeterSource& getInputMeterSource() { return inputMeterSource; }
@@ -87,7 +89,7 @@ public:
 private:
     //==============================================================================
     ApplicationProperties appProperties;
-    KnownPluginList knownPluginList;
+    KnownPluginList knownPluginList, synthKnownPluginList, psKnownPluginList;
     AudioPluginFormatManager formatManager;
     Array<PluginDescription> internalTypes;
 
