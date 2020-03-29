@@ -180,9 +180,7 @@ void PluginBundle::openParameterLinkEditor()
     dialogOption.useNativeTitleBar = false;
     dialogOption.resizable = true;
     dialogOption.content.setOwned(new ParameterLinkEditor(*this));
-    auto* window = dialogOption.create();
-    window->setTitleBarButtonsRequired(0, false);
-    window->enterModalState(true, nullptr, true);
+    dialogOption.launchAsync();
 }
 
 void PluginBundle::resetParameterLink()
@@ -194,7 +192,7 @@ void PluginBundle::resetParameterLink()
 void PluginBundle::linkParameters()
 {
     int i = 0;
-    auto parameters = getParameters();
+    auto& parameters = instances[0]->processor->getParameters();
     std::sort(linkParameterIndices.begin(), linkParameterIndices.end());
     std::remove_if(linkParameterIndices.begin(), linkParameterIndices.end(), [&parameters](int v) { return v >= parameters.size(); });
     for (auto index : linkParameterIndices)
@@ -204,7 +202,7 @@ void PluginBundle::linkParameters()
         auto* p = parameters[index];
         if (p->isAutomatable() && !p->isMetaParameter())
         {
-            parameterLinker[i]->linkParameter(p);
+            parameterLinker[i]->linkParameter(index, p);
             i++;
         }
     }
@@ -276,9 +274,21 @@ const Array<AudioProcessorParameter*>& PluginBundle::getParameters()
     return instances[0]->processor->getParameters();
 }
 
-void PluginBundle::setParameter(int parameterIndex, float newValue)
+void PluginBundle::setParameterValue(int parameterIndex, float newValue)
 {
-    instances[0]->processor->getParameters()[parameterIndex]->setValue(newValue);
+    for (auto i = instanceStarted.load() - 1; i >= 0; i--)
+        instances[i]->processor->getParameters()[parameterIndex]->setValue(newValue);
+}
+
+void PluginBundle::setParameterGesture(int parameterIndex, bool gestureIsStarting)
+{
+    for (auto i = instanceStarted.load() - 1; i >= 0; i--)
+    {
+        if (gestureIsStarting)
+            instances[i]->processor->getParameters()[parameterIndex]->beginChangeGesture();
+        else
+            instances[i]->processor->getParameters()[parameterIndex]->endChangeGesture();
+    }
 }
 
 void PluginBundle::parameterValueChanged(int parameterIndex, float newValue)
