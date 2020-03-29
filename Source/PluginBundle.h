@@ -10,16 +10,17 @@
 
 #pragma once
 
-#include <JuceHeader.h>
+#include "Common.h"
 #include "PluginWindow.h"
 #include "PluginInstance.h"
+#include "ParameterLinkEditor.h"
 
 class MicroChromoAudioProcessor;
 
 class PluginBundle : public ChangeBroadcaster, AudioProcessorParameter::Listener
 {
 public:
-    PluginBundle(int maxInstances, const PluginDescription desc, MicroChromoAudioProcessor& p);
+    PluginBundle(MicroChromoAudioProcessor& p, int maxInstances, OwnedArray<ParameterLinker>& linker);
     ~PluginBundle();
 
     //==============================================================================
@@ -27,11 +28,14 @@ public:
     void releaseResources();
     void processBlock(OwnedArray<AudioBuffer<float>>&, MidiBuffer&);
     int getTotalNumInputChannels() const noexcept { return instances[0]->processor->getTotalNumInputChannels(); }
-    int getTotalNumOutputChannels() const noexcept { return instances[0]->processor->getTotalNumOutputChannels();; }
+    int getTotalNumOutputChannels() const noexcept { return instances[0]->processor->getTotalNumOutputChannels(); }
+    int getMainBusNumInputChannels() const noexcept { return instances[0]->processor->getMainBusNumInputChannels(); }
+    int getMainBusNumOutputChannels() const noexcept { return instances[0]->processor->getMainBusNumOutputChannels(); }
+    MicroChromoAudioProcessor& getProcessor() { return processor; }
 
     //==============================================================================
-    const String getName() const { return _desc.descriptiveName; }
-    const PluginDescription getDescription() { return _desc; }
+    const String getName() const { return currentDesc.descriptiveName; }
+    const PluginDescription getDescription() { return currentDesc; }
 
     //==============================================================================
     void getStateInformation(MemoryBlock& destData);
@@ -39,22 +43,31 @@ public:
     void propagateState();
 
     //==============================================================================
+    const Array<AudioProcessorParameter*>& getParameters();
+    const Array<int>& getLinkedArray() { return linkParameterIndices; }
+    void setParameter(int parameterIndex, float newValue);
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
     //==============================================================================
-    void preLoadPlugin(size_t numInstances);
-    void loadPlugin(size_t numInstances, std::function<void(PluginBundle&)> callback = nullptr);
-    void loadPluginSync(size_t numInstances);
-    PluginInstance* getInstanceAt(size_t index);
-    MidiMessageCollector* getCollectorAt(size_t index);
+    void preLoadPlugin(int numInstances);
+    void loadPlugin(const PluginDescription desc, int numInstances, std::function<void(PluginBundle&)> callback = nullptr);
+    void loadPluginSync(const PluginDescription desc, int numInstances);
+    MidiMessageCollector* getCollectorAt(int index);
 
     //==============================================================================
     void adjustInstanceNumber(int newNumInstances, std::function<void(void)> callback = nullptr);
 
-    bool isLoading();
-    bool isLoaded();
-    void setPluginDescription(const PluginDescription desc) { _desc = desc; }
+    //==============================================================================
+    void openParameterLinkEditor();
+    void resetParameterLink();
+    void linkParameters();
+    void linkEditorExit(Array<int> selected);
+
+    bool isLoading() { return _isLoading.load(); }
+    bool isLoaded() { return _isLoaded.load(); }
+    bool finishedLoading() { return _finishedLoading.load(); }
+    bool hasError() { return _isError.load(); }
     void resetCcLearn();
     void startCcLearn();
     void stopCcLearn();
@@ -69,7 +82,7 @@ public:
 
 private:
     void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int index);
-    void checkPluginLoaded(size_t numInstances, std::function<void(PluginBundle&)> callback = nullptr);
+    void checkPluginLoaded(const PluginDescription desc, int numInstances, std::function<void(PluginBundle&)> callback = nullptr);
 
     MicroChromoAudioProcessor& processor;
     AudioPluginFormatManager& formatManager;
@@ -77,14 +90,16 @@ private:
     std::atomic<int> _samplesPerBlock;
 
     int _numInstances = 1, _maxInstances = 8;
-    PluginDescription _desc;
+    PluginDescription currentDesc;
     std::atomic<uint32> uid = 0;
     OwnedArray<PluginInstance> instances;
     OwnedArray<PluginInstance> instanceTemps;
+    const OwnedArray<ParameterLinker>& parameterLinker;
+    Array<int> linkParameterIndices;
     OwnedArray<MidiMessageCollector> collectors;
     std::atomic<int> instanceStarted = 0;
     std::atomic<int> instanceStartedTemp = 0;
-    std::atomic<bool> _isLoading = false, _isLoaded = false, _isError = false, isInit = true, isLearning = false, hasLearned = false;
+    std::atomic<bool> _isLoading = false, _isLoaded = false, _finishedLoading = false, _isError = false, isInit = true, isLearning = false, hasLearned = false;
     std::atomic<int> learnedCc{ -1 };
     std::atomic<float> learnedCcMin{ FP_INFINITE }, learnedCcMax{ -FP_INFINITE };
     String errMsg;

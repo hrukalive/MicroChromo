@@ -16,17 +16,10 @@
 MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
      : AudioProcessor (BusesProperties()
-                     #if ! JucePlugin_IsMidiEffect
-                      #if JucePlugin_IsSynth
                        .withInput  ("Input",  AudioChannelSet::stereo(), true)
-                      #endif
                        .withOutput ("Output", AudioChannelSet::stereo(), true)
-                     #endif
                        ),
-       parameters(*this, nullptr, Identifier("MicroChromoParam"),
-           {
-               std::make_unique<AudioParameterInt>("num_instances", "Num Inst", 1, 8, 1)
-           })
+       parameters(*this, nullptr)
 #endif
 {
     PropertiesFile::Options options;
@@ -42,24 +35,46 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
     internalFormat.getAllTypes(internalTypes);
     if (auto savedPluginList = appProperties.getUserSettings()->getXmlValue("pluginList"))
         knownPluginList.recreateFromXml(*savedPluginList);
+    parameterSlotNumber = jmax(appProperties.getUserSettings()->getIntValue("parameterSlotNumber", 16), 4);
     for (auto& t : internalTypes)
         knownPluginList.addType(t);
 
-    synthBundle.reset(new PluginBundle(8, internalTypes[1], *this));
-    psBundle.reset(new PluginBundle(8, internalTypes[2], *this));
+    std::unique_ptr<AudioProcessorParameterGroup> synthParamGroup = std::make_unique<AudioProcessorParameterGroup>("synth_param_group", "Synth Parameters", "-");
+    std::unique_ptr<AudioProcessorParameterGroup> psParamGroup = std::make_unique<AudioProcessorParameterGroup>("ps_param_group", "PitchShift Parameters", "-");
+    for (auto i = 0; i < 16; i++)
+    {
+        std::unique_ptr<AudioParameterFloatVariant> param = std::make_unique<AudioParameterFloatVariant>("synth_" + String(i), "Synth Param " + String(i), 0, 1, 0);
+        synthParamPtr.add(new ParameterLinker(param.get(), synthBundle));
+        synthParamGroup->addChild(std::move(param));
+    }
+    for (auto i = 0; i < 16; i++)
+    {
+        std::unique_ptr<AudioParameterFloatVariant> param = std::make_unique<AudioParameterFloatVariant>("ps_" + String(i), "PS Param " + String(i), 0, 1, 0);
+        psParamPtr.add(new ParameterLinker(param.get(), psBundle));
+        psParamGroup->addChild(std::move(param));
+    }
 
-    synthBundle->loadPluginSync(numInstancesParameter);
-    psBundle->loadPluginSync(numInstancesParameter);
+    addParameterGroup(std::move(synthParamGroup));
+    addParameterGroup(std::move(psParamGroup));
+
+    synthBundle.reset(new PluginBundle(*this, MAX_INSTANCES, synthParamPtr));
+    psBundle.reset(new PluginBundle(*this, MAX_INSTANCES, psParamPtr));
+
+    synthBundle->loadPluginSync(internalTypes[1], numInstancesParameter);
+    psBundle->loadPluginSync(internalTypes[2], numInstancesParameter);
 
     psBundle->setCcLearn(0, 0.25f, 0.75f);
 
-    synthBundle->addChangeListener(this);
-    psBundle->addChangeListener(this);
+    //synthBundle->addChangeListener(this);
+    //psBundle->addChangeListener(this);
 }
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
 {
-    psBundle->removeChangeListener(this);
+    synthParamPtr.clear();
+    psParamPtr.clear();
+    //synthBundle->removeChangeListener(this);
+    //psBundle->removeChangeListener(this);
     synthBundle = nullptr;
     psBundle = nullptr;
     bufferArray.clear();
@@ -114,43 +129,41 @@ int MicroChromoAudioProcessor::getCurrentProgram()
     return 0;
 }
 
-void MicroChromoAudioProcessor::setCurrentProgram (int index)
+void MicroChromoAudioProcessor::setCurrentProgram (int /*index*/)
 {
 }
 
-const String MicroChromoAudioProcessor::getProgramName (int index)
+const String MicroChromoAudioProcessor::getProgramName (int /*index*/)
 {
     return {};
 }
 
-void MicroChromoAudioProcessor::changeProgramName (int index, const String& newName)
+void MicroChromoAudioProcessor::changeProgramName (int /*index*/, const String& /*newName*/)
 {
 }
 
 //==============================================================================
 void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    inputMeterSource.setMaxHoldMS(500);
-    inputMeterSource.resize(getTotalNumInputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
-    outputMeterSource.setMaxHoldMS(500);
-    outputMeterSource.resize(getTotalNumOutputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
-
-    messageCollector.reset(sampleRate);
+    //inputMeterSource.setMaxHoldMS(500);
+    //inputMeterSource.resize(getTotalNumInputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
+    //outputMeterSource.setMaxHoldMS(500);
+    //outputMeterSource.resize(getTotalNumOutputChannels(), (int)(0.1 * sampleRate / samplesPerBlock));
 
     bufferArray.clear();
-    auto channels = jmax(synthBundle->getTotalNumInputChannels(),
-        synthBundle->getTotalNumOutputChannels(),
-        psBundle->getTotalNumInputChannels(),
-        psBundle->getTotalNumOutputChannels());
-
     for (int i = 0; i < numInstancesParameter; i++)
-        bufferArray.add(new AudioBuffer<float>(channels, samplesPerBlock));
+        bufferArray.add(new AudioBuffer<float>(synthBundle->getMainBusNumOutputChannels(), samplesPerBlock));
+
     synthBundle->prepareToPlay(sampleRate, samplesPerBlock);
     psBundle->prepareToPlay(sampleRate, samplesPerBlock);
+
+    properlyPrepared = true;
 }
 
 void MicroChromoAudioProcessor::releaseResources()
 {
+    properlyPrepared = false;
+
     synthBundle->releaseResources();
     psBundle->releaseResources();
     bufferArray.clear();
@@ -189,9 +202,7 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
-    messageCollector.removeNextBlockOfMessages(midiMessages, getBlockSize());
-
-    inputMeterSource.measureBlock(buffer);
+    //inputMeterSource.measureBlock(buffer);
 
     for (auto j = 0; j < numInstancesParameter; j++)
         bufferArray[j]->makeCopyOf(buffer);
@@ -204,14 +215,23 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
     for (auto i = 0; i < numInstancesParameter; i++)
         for (auto j = 0; j < buffer.getNumChannels(); j++)
             buffer.addFrom(j, 0, *bufferArray[i], j, 0, buffer.getNumSamples());
+    midiMessages.clear();
 
-    outputMeterSource.measureBlock(buffer);
+    //outputMeterSource.measureBlock(buffer);
+
+    if (getPlayHead())
+        getPlayHead()->getCurrentPosition(info);
 }
 
 void MicroChromoAudioProcessor::adjustInstanceNumber(int newNumInstances)
 {
-    synthBundle->adjustInstanceNumber(newNumInstances);
-    psBundle->adjustInstanceNumber(newNumInstances, [newNumInstances, this]() {this->numInstancesParameter = newNumInstances; });
+    synthBundle->adjustInstanceNumber(newNumInstances, [newNumInstances, this]()
+        {
+        });
+    psBundle->adjustInstanceNumber(newNumInstances, [newNumInstances, this]()
+        {
+            this->numInstancesParameter = newNumInstances;
+        });
 }
 
 //==============================================================================
@@ -333,37 +353,43 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
 
 void MicroChromoAudioProcessor::changeListenerCallback(ChangeBroadcaster* changed)
 {
-    if (changed == synthBundle.get())
-    {
-        suspendProcessing(true);
-        if (synthBundle->isLoaded())
-        {
-            prepareToPlay(getSampleRate(), getBlockSize());
-            suspendProcessing(false);
-        }
-    }
-    else if (changed == psBundle.get())
-    {
-        suspendProcessing(true);
-        if (!psBundle->isLoading())
-        {
-            prepareToPlay(getSampleRate(), getBlockSize());
-            suspendProcessing(false);
-        }
-    }
+    //if (changed == synthBundle.get())
+    //{
+    //    suspendProcessing(true);
+    //    if (synthBundle->isLoaded())
+    //    {
+    //        prepareToPlay(getSampleRate(), getBlockSize());
+    //        suspendProcessing(false);
+    //    }
+    //    else if (synthBundle->isError())
+    //        suspendProcessing(false);
+    //}
+    //else if (changed == psBundle.get())
+    //{
+    //    suspendProcessing(true);
+    //    if (psBundle->isLoaded())
+    //    {
+    //        prepareToPlay(getSampleRate(), getBlockSize());
+    //        suspendProcessing(false);
+    //    }
+    //    else if (synthBundle->isError())
+    //        suspendProcessing(false);
+    //}
 }
 
 void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool isSynth, std::function<void(PluginBundle&)> callback)
 {
     if (isSynth)
     {
-        synthBundle->setPluginDescription(desc);
-        synthBundle->loadPlugin(numInstancesParameter, callback);
+        synthBundle->loadPlugin(desc, numInstancesParameter, [callback, this](PluginBundle& bundle)
+            {
+                if (callback)
+                    callback(bundle);
+            });
     }
     else
     {
-        psBundle->setPluginDescription(desc);
-        psBundle->loadPlugin(numInstancesParameter, [desc, callback, this](PluginBundle& bundle) 
+        psBundle->loadPlugin(desc, numInstancesParameter, [desc, callback, this](PluginBundle& bundle)
             {
                 if (callback)
                     callback(bundle);
@@ -372,6 +398,22 @@ void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool is
             });
     }
 }
+
+void MicroChromoAudioProcessor::startLoadingPlugin()
+{
+    suspendProcessing(true);
+}
+
+void MicroChromoAudioProcessor::finishLoadingPlugin()
+{
+    if (synthBundle->finishedLoading() && psBundle->finishedLoading())
+    {
+        if (properlyPrepared.load())
+            prepareToPlay(getSampleRate(), getBlockSize());
+        suspendProcessing(false);
+    }
+}
+
 
 //==============================================================================
 // This creates new instances of the plugin..

@@ -72,6 +72,24 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     noteButton->addMouseListener(this, true);
     dragBtn->addMouseListener(this, true);
 
+    addAndMakeVisible(numParameterSlot);
+    numParameterSlot.setMultiLine(false);
+    numParameterSlot.setReturnKeyStartsNewLine(false);
+    numParameterSlot.setReadOnly(false);
+    numParameterSlot.setInputRestrictions(4, "0123456789");
+    numParameterSlot.setScrollbarsShown(false);
+    numParameterSlot.setCaretVisible(true);
+    numParameterSlot.setPopupMenuEnabled(false);
+    numParameterSlot.setText(String(p.getParameterSlotNumber()));
+    numParameterSlot.onTextChange = [&]()
+    {
+        appProperties.getUserSettings()->setValue("parameterSlotNumber", numParameterSlot.getText().getIntValue());
+        appProperties.saveIfNeeded();
+    };
+
+    transportLabel.setText("PlayHead", dontSendNotification);
+    addAndMakeVisible(transportLabel);
+
     ccLearnBtn->onClick = [this]()
     {
         if (this->ccLearnBtn->getToggleState())
@@ -83,13 +101,17 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     numInstancesLabel.setText("NumInst", dontSendNotification);
     addAndMakeVisible(numInstancesLabel);
     addAndMakeVisible(numInstancesBox);
-    for (int i = 1; i <= 8; i++)
+    for (int i = 1; i <= MicroChromoAudioProcessor::MAX_INSTANCES; i++)
         numInstancesBox.addItem(String(i), i);
     numInstancesBox.setSelectedId(processor.getNumInstances());
     numInstancesBox.onChange = [&]() {
-        synthBundle->closeAllWindows();
-        psBundle->closeAllWindows();
-        processor.adjustInstanceNumber(numInstancesBox.getSelectedId());
+        if (!ignoreInitialChange)
+        {
+            synthBundle->closeAllWindows();
+            psBundle->closeAllWindows();
+            processor.adjustInstanceNumber(numInstancesBox.getSelectedId());
+        }
+        ignoreInitialChange = false;
     };
 
     commandManager.setFirstCommandTarget(this);
@@ -105,11 +127,11 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     synthBundle->sendChangeMessage();
     psBundle->sendChangeMessage();
 
-    lnf.setColour(foleys::LevelMeter::lmMeterGradientLowColour, juce::Colours::green);
-    meterInput.setLookAndFeel(&lnf);
-    meterInput.setMeterSource(&processor.getInputMeterSource());
-    meterOutput.setLookAndFeel(&lnf);
-    meterOutput.setMeterSource(&processor.getOutputMeterSource());
+    //lnf.setColour(foleys::LevelMeter::lmMeterGradientLowColour, juce::Colours::green);
+    //meterInput.setLookAndFeel(&lnf);
+    //meterInput.setMeterSource(&processor.getInputMeterSource());
+    //meterOutput.setLookAndFeel(&lnf);
+    //meterOutput.setMeterSource(&processor.getOutputMeterSource());
 
     addAndMakeVisible(menuBar.get());
     addAndMakeVisible(synthBtn.get());
@@ -119,8 +141,8 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     addAndMakeVisible(noteButton.get());
     addAndMakeVisible(synthLabel.get());
     addAndMakeVisible(psLabel.get());
-    addAndMakeVisible(meterInput);
-    addAndMakeVisible(meterOutput);
+    //addAndMakeVisible(meterInput);
+    //addAndMakeVisible(meterOutput);
 
     changeListenerCallback(synthBundle.get());
     changeListenerCallback(psBundle.get());
@@ -150,8 +172,8 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
     synthLabel = nullptr;
     psLabel = nullptr;
 
-    meterInput.setLookAndFeel(nullptr);
-    meterOutput.setLookAndFeel(nullptr);
+    //meterInput.setLookAndFeel(nullptr);
+    //meterOutput.setLookAndFeel(nullptr);
 }
 
 //==============================================================================
@@ -164,10 +186,12 @@ void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
         case 1:  bundle->showRepresentativeWindow(); break;
         case 2:  bundle->showTwoWindows(); break;
         case 3:  bundle->showAllWindows(); break;
-        case 4:  bundle->showWindow(PluginWindow::Type::programs); break;
-        case 5:  bundle->showWindow(PluginWindow::Type::generic); break;
-        case 6:  bundle->showWindow(PluginWindow::Type::debug); break;
-        case 7:  bundle->propagateState();
+        case 4:  bundle->closeAllWindows(); break;
+        case 5:  bundle->showWindow(PluginWindow::Type::programs); break;
+        case 6:  bundle->showWindow(PluginWindow::Type::generic); break;
+        case 7:  bundle->showWindow(PluginWindow::Type::debug); break;
+        case 8:  bundle->propagateState(); break;
+        case 9:  bundle->openParameterLinkEditor(); break;
         default:
         {
             bundle->closeAllWindows();
@@ -189,12 +213,7 @@ void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
     else if (e.eventComponent == noteButton.get())
     {
         if (isTimerRunning())
-        {
             stopTimer();
-            MidiMessage stopNote = MidiMessage::noteOff(1, lastNote);
-            stopNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-            processor.getMidiMessageCollector().addMessageToQueue(stopNote);
-        }
         else
             startTimerHz(10);
     }
@@ -259,6 +278,8 @@ void MicroChromoAudioProcessorEditor::timerCallback()
         }
     }
     test = !test;
+
+    transportLabel.setText(String(processor.getInfo().timeInSeconds, 15), dontSendNotification);
 }
 
 void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* changed)
@@ -386,9 +407,11 @@ void MicroChromoAudioProcessorEditor::resized()
     ccLearnBtn->setBounds(tmp.withTrimmedLeft(50).removeFromLeft(100));
 
     b.removeFromTop(10);
-    meterInput.setBounds(b.removeFromLeft(100));
+    numParameterSlot.setBounds(b.removeFromLeft(100));
+    //meterInput.setBounds(b.removeFromLeft(100));
     b.removeFromLeft(10);
-    meterOutput.setBounds(b.removeFromLeft(100));
+    b.removeFromLeft(100);
+    //meterOutput.setBounds(b.removeFromLeft(100));
 
     b.removeFromLeft(10);
     dragBtn->setBounds(b.removeFromTop(40));
@@ -396,6 +419,8 @@ void MicroChromoAudioProcessorEditor::resized()
     tmp = b.removeFromTop(30);
     numInstancesLabel.setBounds(tmp.removeFromLeft(60));
     numInstancesBox.setBounds(tmp);
+
+    transportLabel.setBounds(b);
 }
 
 void MicroChromoAudioProcessorEditor::buttonClicked(Button* btn)
@@ -409,11 +434,13 @@ void MicroChromoAudioProcessorEditor::showPopupMenu(int type, Point<int> positio
     floatMenu->addItem(1, "Show main plugin GUI");
     floatMenu->addItem(2, "Show two plugin GUI", processor.getNumInstances() > 1);
     floatMenu->addItem(3, "Show all plugin GUI", processor.getNumInstances() > 2);
-    floatMenu->addItem(4, "Show programs");
-    floatMenu->addItem(5, "Show parameters");
-    floatMenu->addItem(6, "Show debug log");
+    floatMenu->addItem(4, "Close all window");
+    floatMenu->addItem(5, "Show programs");
+    floatMenu->addItem(6, "Show parameters");
+    floatMenu->addItem(7, "Show debug log");
     floatMenu->addSeparator();
-    floatMenu->addItem(7, "Propagate state to duplicates");
+    floatMenu->addItem(8, "Propagate state to duplicates");
+    floatMenu->addItem(9, "Expose parameters");
     floatMenu->addSeparator();
     KnownPluginList::addToMenu(*floatMenu, knownPluginList.getTypes(), pluginSortMethod);
     floatMenu->showMenuAsync({}, ModalCallbackFunction::create([this, callback](int r)
