@@ -97,16 +97,15 @@ private:
     int parameterSlotNumber = 16;
 
     std::atomic<int> numInstancesParameter{ 1 };
+    int synthBundleTotalNumInputChannels, synthBundleMainBusNumInputChannels, synthBundleMainBusNumOutputChannels,
+        psBundleTotalNumInputChannels, psBundleTotalNumOutputChannels, psBundleMainBusNumInputChannels, psBundleMainBusNumOutputChannels;
     std::atomic<bool> properlyPrepared{ false };
-    OwnedArray<AudioBuffer<float>> bufferArray;
+    OwnedArray<AudioBuffer<float>> bufferArrayA, bufferArrayB;
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
 
     UndoManager undoManager;
     AudioProcessorValueTreeState parameters;
     OwnedArray<ParameterLinker> synthParamPtr, psParamPtr;
-
-    //foleys::LevelMeterSource inputMeterSource;
-    //foleys::LevelMeterSource outputMeterSource;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessor)
 };
