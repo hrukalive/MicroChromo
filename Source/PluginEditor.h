@@ -95,10 +95,5 @@ private:
     ComboBox numInstancesBox;
     TextEditor numParameterSlot;
 
-
-    //foleys::LevelMeterLookAndFeel lnf;
-    //foleys::LevelMeter meterInput{ foleys::LevelMeter::MeterFlags::Default };
-    //foleys::LevelMeter meterOutput{ foleys::LevelMeter::MeterFlags::Default };
-
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessorEditor)
 };
