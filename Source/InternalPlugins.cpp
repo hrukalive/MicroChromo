@@ -415,7 +415,7 @@ private:
                         {
                             const float currentSample = (float)(sin(currentAngle) * level * envValue);
 
-                            for (int i = outputBuffer.getNumChannels(); --i >= 0;)
+                            for (int i = jmin(2, outputBuffer.getNumChannels()); --i >= 0;)
                                 outputBuffer.addSample(i, startSample, currentSample);
 
                             currentAngle += angleDelta;
@@ -544,8 +544,7 @@ public:
     void processBlock(AudioBuffer<float>& buffer, MidiBuffer&) override
     {
         ScopedNoDenormals noDenormals;
-        const int numInputChannels = getTotalNumInputChannels();
-        const int numOutputChannels = getTotalNumOutputChannels();
+        const int numInputChannels = getMainBusNumInputChannels();
         const int numSamples = buffer.getNumSamples();
         
         for (int i = 0; i < numSamples; i++)
@@ -559,7 +558,7 @@ public:
         for (int channel = 0; channel < numInputChannels; channel++)
             shifters[channel]->receiveSamples(buffer.getWritePointer(channel), numSamples);
         
-        for (int channel = numInputChannels; channel < numOutputChannels; ++channel)
+        for (int channel = getMainBusNumOutputChannels(); channel < getTotalNumOutputChannels(); ++channel)
             buffer.clear(channel, 0, numSamples);
     }
 
