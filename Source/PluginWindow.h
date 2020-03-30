@@ -15,7 +15,7 @@ public:
         : AudioProcessorEditor (proc), audioProc (proc)
     {
         setSize (500, 200);
-        setAlwaysOnTop(true);
+        //setAlwaysOnTop(true);
 
         addAndMakeVisible (list);
 
@@ -127,7 +127,7 @@ public:
          node(n), type (t)
     {
         setSize (400, 300);
-        setAlwaysOnTop(true);
+        //setAlwaysOnTop(true);
 
         if (auto* ui = createProcessorEditor (*node->processor, type))
             setContentOwned (ui, true);
@@ -204,7 +204,7 @@ private:
         ProgramAudioProcessorEditor (AudioProcessor& p)  : AudioProcessorEditor (p)
         {
             setOpaque (true);
-            setAlwaysOnTop(true);
+            //setAlwaysOnTop(true);
 
             addAndMakeVisible (panel);
 
