@@ -14,10 +14,11 @@
 #include "PluginWindow.h"
 #include "PluginInstance.h"
 #include "ParameterLinkEditor.h"
+#include "ParameterCcLearn.h"
 
 class MicroChromoAudioProcessor;
 
-class PluginBundle : public ChangeBroadcaster, AudioProcessorParameter::Listener
+class PluginBundle : public ChangeBroadcaster, public AudioProcessorParameter::Listener
 {
 public:
     PluginBundle(MicroChromoAudioProcessor& p, int maxInstances, OwnedArray<ParameterLinker>& linker, PluginDescription emptyPlugin, PluginDescription defaultPlugin);
@@ -43,7 +44,7 @@ public:
     void propagateState();
 
     //==============================================================================
-    const Array<AudioProcessorParameter*>& getParameters();
+    const Array<AudioProcessorParameter*>& getParameters(int index = 0);
     const Array<int>& getLinkedArray() { return linkParameterIndices; }
     void setParameterValue(int parameterIndex, float newValue);
     void setParameterGesture(int parameterIndex, bool gestureIsStarting);
@@ -72,10 +73,11 @@ public:
     void resetCcLearn();
     void startCcLearn();
     void stopCcLearn();
-    void setCcLearn(int index, float min, float max);
-    int getLearnedCc() { return learnedCc; }
+    void setCcLearn(int ccNum, int index, float min, float max);
+    int getLearnedCc() { return ccLearn->getCcLearnedParameterIndex(); }
     PluginDescription getEmptyPluginDescription() { return _emptyPlugin; }
     PluginDescription getDefaultPluginDescription() { return _defaultPlugin; }
+    bool isParameterExposed(int parameterIndex) { return linkParameterIndices.indexOf(parameterIndex) > -1; }
 
     //==============================================================================
     void closeAllWindows();
@@ -109,6 +111,8 @@ private:
     std::atomic<int> learnedCc{ -1 };
     std::atomic<float> learnedCcMin{ FP_INFINITE }, learnedCcMax{ -FP_INFINITE };
     String errMsg;
+
+    std::unique_ptr<ParameterCcLearn> ccLearn{ nullptr };
 
     OwnedArray<PluginWindow> activePluginWindows;
 

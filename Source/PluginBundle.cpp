@@ -16,10 +16,12 @@ PluginBundle::PluginBundle(MicroChromoAudioProcessor& p, int maxInstances, Owned
 {
     for (auto i = 0; i < maxInstances; i++)
         collectors.set(i, new MidiMessageCollector());
+    ccLearn = std::make_unique<ParameterCcLearn>(this);
 }
 
 PluginBundle::~PluginBundle()
 {
+    ccLearn = nullptr;
     activePluginWindows.clear();
     instances.clear();
     instanceTemps.clear();
@@ -194,7 +196,8 @@ void PluginBundle::linkParameters()
     int i = 0;
     auto& parameters = instances[0]->processor->getParameters();
     std::sort(linkParameterIndices.begin(), linkParameterIndices.end());
-    std::remove_if(linkParameterIndices.begin(), linkParameterIndices.end(), [&parameters](int v) { return v >= parameters.size(); });
+    auto learnedCc = getLearnedCc();
+    std::remove_if(linkParameterIndices.begin(), linkParameterIndices.end(), [&parameters, learnedCc](int v) { return v >= parameters.size() || v == learnedCc; });
     for (auto index : linkParameterIndices)
     {
         if (i >= processor.getParameterSlotNumber())
@@ -240,14 +243,7 @@ void PluginBundle::processBlock(OwnedArray<AudioBuffer<float>>& bufferArray, Mid
 
             for (MidiBuffer::Iterator it(midiBuffer); it.getNextEvent(midi_message, sample_offset);) {
                 if (midi_message.isController()) {
-                    if (midi_message.getControllerNumber() == 100) {
-                        int value = midi_message.getControllerValue();
-                        if (value < 128 && hasLearned)
-                        {
-                            auto* parameter = instances[i]->processor->getParameters()[learnedCc];
-                            parameter->setValueAt(value / 127.0f * (learnedCcMax - learnedCcMin) + learnedCcMin, sample_offset);
-                        }
-                    }
+                    ccLearn->processCc(i, midi_message.getControllerNumber(), midi_message.getControllerValue(), sample_offset);
                 }
             }
             instances[i]->processor->processBlock(*bufferArray[i], midiBuffer);
@@ -269,9 +265,9 @@ void PluginBundle::propagateState()
         instances[i]->processor->setStateInformation(block.getData(), block.getSize());
 }
 
-const Array<AudioProcessorParameter*>& PluginBundle::getParameters()
+const Array<AudioProcessorParameter*>& PluginBundle::getParameters(int index)
 {
-    return instances[0]->processor->getParameters();
+    return instances[index]->processor->getParameters();
 }
 
 void PluginBundle::setParameterValue(int parameterIndex, float newValue)
@@ -318,54 +314,31 @@ void PluginBundle::parameterGestureChanged(int parameterIndex, bool gestureIsSta
 
 void PluginBundle::resetCcLearn()
 {
-    if (hasLearned)
-    {
-        instances[0]->processor->getParameters()[learnedCc]->addListener(this);
-        const auto val = instances[0]->processor->getParameters()[learnedCc]->getValue();
-        for (auto i = 1; i < instanceStarted.load(); i++)
-            instances[i]->processor->getParameters()[learnedCc]->setValue(val);
-    }
-    hasLearned = false;
-    learnedCc = -1;
-    learnedCcMin = FP_INFINITE;
-    learnedCcMax = -FP_INFINITE;
-    isLearning = false;
+    ccLearn->reset();
 }
 
 void PluginBundle::startCcLearn()
 {
-    resetCcLearn();
-    isLearning = true;
+    ccLearn->startLearning();
 }
 
 void PluginBundle::stopCcLearn()
 {
-    if (learnedCc != -1 && learnedCcMin != FP_INFINITE && learnedCcMax != -FP_INFINITE)
-    {
-        hasLearned = true;
-        instances[0]->processor->getParameters()[learnedCc]->removeListener(this);
-    }
-    isLearning = false;
+    ccLearn->stopLearning();
 }
 
-void PluginBundle::setCcLearn(int index, float min, float max)
+void PluginBundle::setCcLearn(int ccNum, int index, float min, float max)
 {
-    jassert(index > -1);
-    resetCcLearn();
-    instances[0]->processor->getParameters()[index]->removeListener(this);
-    learnedCc = index;
-    learnedCcMin = min;
-    learnedCcMax = max;
-    isLearning = false;
-    hasLearned = true;
+    ccLearn->setCcLearn(ccNum, index, min, max);
 }
 
 void PluginBundle::getStateInformation(MemoryBlock& destData)
 {
     std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>("bundle");
-    xml->setAttribute("learnedCc", learnedCc);
-    xml->setAttribute("learnedCcMin", learnedCcMin);
-    xml->setAttribute("learnedCcMax", learnedCcMax);
+
+    MemoryBlock ccData;
+    ccLearn->getStateInformation(ccData);
+    xml->setAttribute("ccData", ccData.toBase64Encoding());
     
     MemoryBlock linkedData;
     MemoryOutputStream stream(linkedData, false);
@@ -387,8 +360,12 @@ void PluginBundle::setStateInformation(const void* data, int sizeInBytes)
     {
         if (xml->hasTagName("bundle"))
         {
-            if (xml->hasAttribute("learnedCc") && xml->getIntAttribute("learnedCc") > -1)
-                setCcLearn(xml->getIntAttribute("learnedCc"), (float)xml->getDoubleAttribute("learnedCcMin", FP_INFINITE), (float)xml->getDoubleAttribute("learnedCcMax", -FP_INFINITE));
+            if (xml->hasAttribute("ccData"))
+            {
+                MemoryBlock ccData;
+                ccData.fromBase64Encoding(xml->getStringAttribute("ccData"));
+                ccLearn->setStateInformation(ccData.getData(), ccData.getSize());
+            }
             if (xml->hasAttribute("data"))
             {
                 MemoryBlock proc_data;

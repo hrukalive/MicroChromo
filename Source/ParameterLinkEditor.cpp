@@ -26,10 +26,12 @@ ParameterLinkEditor::ParameterLinkEditor (PluginBundle& bundle) :
     _bundle(bundle), numParameterSlot(bundle.getProcessor().getParameterSlotNumber())
 {
     int j = 0;
+    auto learnedCc = bundle.getLearnedCc();
     for (auto* p : bundle.getParameters())
     {
-        if (j != bundle.getLearnedCc())
-            parameters.add(std::make_pair(p, j++));
+        if (j != learnedCc)
+            parameters.add(std::make_pair(p, j));
+        j++;
     }
 
     parameterList.setModel(this);
