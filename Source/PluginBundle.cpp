@@ -322,11 +322,6 @@ void PluginBundle::startCcLearn()
     ccLearn->startLearning();
 }
 
-void PluginBundle::stopCcLearn()
-{
-    ccLearn->stopLearning();
-}
-
 void PluginBundle::setCcLearn(int ccNum, int index, float min, float max)
 {
     ccLearn->setCcLearn(ccNum, index, min, max);
@@ -434,19 +429,22 @@ std::unique_ptr<PopupMenu> PluginBundle::getPopupMenu(KnownPluginList::SortMetho
 {
     std::unique_ptr<PopupMenu> floatMenu = std::make_unique<PopupMenu>();
 
-    floatMenu->addItem(1 + mainMenuIdBase, "Show main plugin GUI");
-    floatMenu->addItem(2 + mainMenuIdBase, "Show two plugin GUI", processor.getNumInstances() > 1);
-    floatMenu->addItem(3 + mainMenuIdBase, "Show all plugin GUI", processor.getNumInstances() > 2);
-    floatMenu->addItem(4 + mainMenuIdBase, "Close all window");
-    floatMenu->addItem(5 + mainMenuIdBase, "Show programs");
-    floatMenu->addItem(6 + mainMenuIdBase, "Show parameters");
-    floatMenu->addItem(7 + mainMenuIdBase, "Show debug log");
+    floatMenu->addItem(SLOT_MENU_SHOW_MAIN_GUI, "Show main plugin GUI");
+    floatMenu->addItem(SLOT_MENU_SHOW_TWO_GUI, "Show two plugin GUI", processor.getNumInstances() > 1);
+    floatMenu->addItem(SLOT_MENU_SHOW_ALL_GUI, "Show all plugin GUI", processor.getNumInstances() > 2);
+    floatMenu->addItem(SLOT_MENU_CLOSE_ALL_GUI, "Close all window");
+    floatMenu->addItem(SLOT_MENU_SHOW_PROGRAMS, "Show programs");
+    floatMenu->addItem(SLOT_MENU_SHOW_PARAMETERS, "Show parameters");
+    floatMenu->addItem(SLOT_MENU_SHOW_DEBUG_LOG, "Show debug log");
     floatMenu->addSeparator();
-    floatMenu->addItem(8 + mainMenuIdBase, "Propagate state to duplicates");
-    floatMenu->addItem(9 + mainMenuIdBase, "Expose parameters");
+    floatMenu->addItem(SLOT_MENU_PROPAGATE_STATE, "Propagate state to duplicates");
+    floatMenu->addItem(SLOT_MENU_EXPOSE_PARAMETER, "Expose parameters");
+    floatMenu->addItem(SLOT_MENU_START_CC, "Start CC Learn", !ccLearn->isLearning());
+    floatMenu->addItem(SLOT_MENU_SHOW_CC, "Show CC Status");
+    floatMenu->addItem(SLOT_MENU_CLEAR_CC, "Clear CC Learn");
     floatMenu->addSeparator();
-    floatMenu->addItem(10 + mainMenuIdBase, _emptyPlugin.name, true, currentDesc.isDuplicateOf(_emptyPlugin));
-    floatMenu->addItem(11 + mainMenuIdBase, _defaultPlugin.name, true, currentDesc.isDuplicateOf(_defaultPlugin));
+    floatMenu->addItem(SLOT_MENU_LOAD_EMPTY_PLUGIN, _emptyPlugin.name, true, currentDesc.isDuplicateOf(_emptyPlugin));
+    floatMenu->addItem(SLOT_MENU_LOAD_DEFAULT_PLUGIN, _defaultPlugin.name, true, currentDesc.isDuplicateOf(_defaultPlugin));
     floatMenu->addSeparator();
     KnownPluginList::addToMenu(*floatMenu, knownPluginList.getTypes(), pluginSortMethod, currentDesc.createIdentifierString());
 

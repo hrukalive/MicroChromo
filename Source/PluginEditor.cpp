@@ -63,7 +63,6 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     synthBtn.reset(new TextButton("Synth"));
     psBtn.reset(new TextButton("PitchShift"));
     noteButton.reset(new TextButton("Note"));
-    ccLearnBtn.reset(new ToggleButton("CC Learn"));
     dragBtn.reset(new TextButton("Drop"));
     synthLabel.reset(new Label("SynthLabel", "<empty>"));
     psLabel.reset(new Label("PitchShiftLabel", "<empty>"));
@@ -89,14 +88,6 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 
     transportLabel.setText("PlayHead", dontSendNotification);
     addAndMakeVisible(transportLabel);
-
-    ccLearnBtn->onClick = [this]()
-    {
-        if (this->ccLearnBtn->getToggleState())
-            this->psBundle->startCcLearn();
-        else
-            this->psBundle->stopCcLearn();
-    };
 
     numInstancesLabel.setText("NumInst", dontSendNotification);
     addAndMakeVisible(numInstancesLabel);
@@ -136,7 +127,6 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     addAndMakeVisible(menuBar.get());
     addAndMakeVisible(synthBtn.get());
     addAndMakeVisible(psBtn.get());
-    addAndMakeVisible(ccLearnBtn.get());
     addAndMakeVisible(dragBtn.get());
     addAndMakeVisible(noteButton.get());
     addAndMakeVisible(synthLabel.get());
@@ -156,7 +146,6 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
     synthBtn->removeMouseListener(this);
     psBtn->removeMouseListener(this);
     noteButton->removeMouseListener(this);
-    ccLearnBtn->removeMouseListener(this);
     dragBtn->removeMouseListener(this);
 
     synthBundle->removeChangeListener(this);
@@ -183,22 +172,25 @@ void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
         auto bundle = isSynth ? this->synthBundle : this->psBundle;
         switch (r)
         {
-        case 1 + mainMenuIdBase:  bundle->showRepresentativeWindow(); break;
-        case 2 + mainMenuIdBase:  bundle->showTwoWindows(); break;
-        case 3 + mainMenuIdBase:  bundle->showAllWindows(); break;
-        case 4 + mainMenuIdBase:  bundle->closeAllWindows(); break;
-        case 5 + mainMenuIdBase:  bundle->showWindow(PluginWindow::Type::programs); break;
-        case 6 + mainMenuIdBase:  bundle->showWindow(PluginWindow::Type::generic); break;
-        case 7 + mainMenuIdBase:  bundle->showWindow(PluginWindow::Type::debug); break;
-        case 8 + mainMenuIdBase:  bundle->propagateState(); break;
-        case 9 + mainMenuIdBase:  bundle->openParameterLinkEditor(); break;
-        case 10 + mainMenuIdBase:
+        case SLOT_MENU_SHOW_MAIN_GUI:  bundle->showRepresentativeWindow(); break;
+        case SLOT_MENU_SHOW_TWO_GUI:  bundle->showTwoWindows(); break;
+        case SLOT_MENU_SHOW_ALL_GUI:  bundle->showAllWindows(); break;
+        case SLOT_MENU_CLOSE_ALL_GUI:  bundle->closeAllWindows(); break;
+        case SLOT_MENU_SHOW_PROGRAMS:  bundle->showWindow(PluginWindow::Type::programs); break;
+        case SLOT_MENU_SHOW_PARAMETERS:  bundle->showWindow(PluginWindow::Type::generic); break;
+        case SLOT_MENU_SHOW_DEBUG_LOG:  bundle->showWindow(PluginWindow::Type::debug); break;
+        case SLOT_MENU_PROPAGATE_STATE:  bundle->propagateState(); break;
+        case SLOT_MENU_EXPOSE_PARAMETER:  bundle->openParameterLinkEditor(); break;
+        case SLOT_MENU_START_CC: bundle->getCcLearnModule().startLearning(); break;
+        case SLOT_MENU_SHOW_CC: bundle->getCcLearnModule().showStatus(); break;
+        case SLOT_MENU_CLEAR_CC: bundle->getCcLearnModule().reset(); break;
+        case SLOT_MENU_LOAD_EMPTY_PLUGIN:
         {
             bundle->closeAllWindows();
             processor.addPlugin(bundle->getEmptyPluginDescription(), isSynth);
             break;
         }
-        case 11 + mainMenuIdBase:
+        case SLOT_MENU_LOAD_DEFAULT_PLUGIN:
         {
             bundle->closeAllWindows();
             processor.addPlugin(bundle->getDefaultPluginDescription(), isSynth);
@@ -268,6 +260,7 @@ void MicroChromoAudioProcessorEditor::timerCallback()
         MidiMessage startNote = MidiMessage::noteOn(1, lastNote, (uint8)90);
         startNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
         psBundle->getCollectorAt(0)->addMessageToQueue(controlNote);
+        synthBundle->getCollectorAt(0)->addMessageToQueue(controlNote);
         synthBundle->getCollectorAt(0)->addMessageToQueue(startNote);
 
         if (processor.getNumInstances() > 1)
@@ -278,6 +271,7 @@ void MicroChromoAudioProcessorEditor::timerCallback()
             startNote = MidiMessage::noteOn(1, lastNote2, (uint8)90);
             startNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
             psBundle->getCollectorAt(1)->addMessageToQueue(controlNote);
+            synthBundle->getCollectorAt(1)->addMessageToQueue(controlNote);
             synthBundle->getCollectorAt(1)->addMessageToQueue(startNote);
         }
     }
@@ -421,7 +415,6 @@ void MicroChromoAudioProcessorEditor::resized()
     psBtn->setBounds(tmp.removeFromLeft(100));
     tmp.removeFromLeft(10);
     psLabel->setBounds(tmp.removeFromLeft(100));
-    ccLearnBtn->setBounds(tmp.withTrimmedLeft(50).removeFromLeft(100));
 
     b.removeFromTop(10);
     numParameterSlot.setBounds(b.removeFromLeft(100));

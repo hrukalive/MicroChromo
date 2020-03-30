@@ -72,9 +72,9 @@ public:
     bool hasError() { return _isError.load(); }
     void resetCcLearn();
     void startCcLearn();
-    void stopCcLearn();
     void setCcLearn(int ccNum, int index, float min, float max);
     int getLearnedCc() { return ccLearn->getCcLearnedParameterIndex(); }
+    ParameterCcLearn& getCcLearnModule() { return *ccLearn; }
     PluginDescription getEmptyPluginDescription() { return _emptyPlugin; }
     PluginDescription getDefaultPluginDescription() { return _defaultPlugin; }
     bool isParameterExposed(int parameterIndex) { return linkParameterIndices.indexOf(parameterIndex) > -1; }
