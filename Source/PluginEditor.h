@@ -85,7 +85,7 @@ private:
     ApplicationCommandManager commandManager;
     std::unique_ptr<MenuBarComponent> menuBar;
 
-    std::unique_ptr<Button> synthBtn, psBtn, noteButton, ccLearnBtn, dragBtn;
+    std::unique_ptr<Button> synthBtn, psBtn, noteButton, dragBtn;
     std::unique_ptr<Label> synthLabel, psLabel;
     std::unique_ptr<PopupMenu> floatMenu;
 
