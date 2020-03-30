@@ -65,7 +65,7 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
     synthBundle->loadPluginSync(internalTypes[1], numInstancesParameter);
     psBundle->loadPluginSync(internalTypes[2], numInstancesParameter);
 
-    psBundle->setCcLearn(0, 0.25f, 0.75f);
+    psBundle->setCcLearn(100, 0, 0.25f, 0.75f);
 }
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
@@ -411,7 +411,7 @@ void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool is
                 if (callback)
                     callback(bundle);
                 if (desc.isDuplicateOf(this->internalTypes[2]))
-                    bundle.setCcLearn(0, 0.25f, 0.75f);
+                    bundle.setCcLearn(100, 0, 0.25f, 0.75f);
             });
     }
 }
