@@ -107,8 +107,6 @@ MicroChromoAudioProcessorEditor::MainEditor::MainEditor(MicroChromoAudioProcesso
 
     synthBundle->addChangeListener(this);
     psBundle->addChangeListener(this);
-    synthBundle->sendChangeMessage();
-    psBundle->sendChangeMessage();
 
     changeListenerCallback(synthBundle.get());
     changeListenerCallback(psBundle.get());
@@ -308,18 +306,18 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     menuBar->setVisible(true);
 
     mainEditor.reset(new MainEditor(p, *this));
-    emptyTab1.reset(new EmptyTab());
-    emptyTab1->setText("No synth loaded");
-    emptyTab2.reset(new EmptyTab());
-    emptyTab2->setText("No effect loaded");
-    synthTabComp = emptyTab1.get();
-    effectTabComp = emptyTab2.get();
+    auto tab1 = new EmptyTab();
+    tab1->setText("No synth loaded");
+    auto tab2 = new EmptyTab();
+    tab2->setText("No effect loaded");
+    synthUi.reset(tab1);
+    effectUi.reset(tab2);
 
     mainComp.reset(new CustomTabbedComponent(*this, TabbedButtonBar::Orientation::TabsAtTop));
     addAndMakeVisible(mainComp.get());
     mainComp->addTab("Main", Colours::lightgrey, mainEditor.get(), false);
-    mainComp->addTab("Synth - Empty", Colours::lightgrey, synthTabComp, false);
-    mainComp->addTab("Effect - Empty", Colours::lightgrey, effectTabComp, false);
+    mainComp->addTab("Synth - Empty", Colours::lightgrey, synthUi.get(), false);
+    mainComp->addTab("Effect - Empty", Colours::lightgrey, effectUi.get(), false);
     mainComp->setCurrentTabIndex(0);
 
     commandManager.setFirstCommandTarget(this);
@@ -332,6 +330,11 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 
     synthBundle->addChangeListener(this);
     psBundle->addChangeListener(this);
+    synthBundle->sendChangeMessage();
+    psBundle->sendChangeMessage();
+
+    changeListenerCallback(synthBundle.get());
+    changeListenerCallback(psBundle.get());
 
     setSize(400, 300);
 }
@@ -344,10 +347,8 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
     psBundle->removeChangeListener(this);
 
     mainComp = nullptr;
-    emptyTab1 = nullptr;
-    emptyTab2 = nullptr;
-    delete synthUi;
-    delete effectUi;
+    synthUi = nullptr;
+    effectUi = nullptr;
     mainEditor = nullptr;
     menuBar = nullptr;
 }
@@ -371,23 +372,20 @@ void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* 
         {
             if (synthBundle->isLoading())
             {
-                emptyTab1->setText("Loading...");
-                synthTabComp = emptyTab1.get();
                 mainComp->removeTab(1);
-                mainComp->addTab("Synth - Loading", Colours::lightgrey, synthTabComp, false);
+                auto tab = new EmptyTab();
+                tab->setText("Loading...");
+                synthUi.reset(tab);
+                mainComp->addTab("Synth - Loading", Colours::lightgrey, synthUi.get(), false);
                 mainComp->moveTab(2, 1);
-
-                delete synthUi;
-                synthUi = nullptr;
             }
             else if (synthBundle->isLoaded())
             {
-                synthUi = PluginWindow::createProcessorEditor(*synthBundle->getMainProcessor()->processor, PluginWindow::Type::normal);
-                synthTabComp = synthUi;
+                mainComp->removeTab(1);
+                synthUi.reset(PluginWindow::createProcessorEditor(*synthBundle->getMainProcessor()->processor, PluginWindow::Type::normal));
                 synthWidth = synthUi->getWidth();
                 synthHeight = synthUi->getHeight();
-                mainComp->removeTab(1);
-                mainComp->addTab("Synth - " + synthBundle->getName(), Colours::lightgrey, synthTabComp, false);
+                mainComp->addTab("Synth - " + synthBundle->getName(), Colours::lightgrey, synthUi.get(), false);
                 mainComp->moveTab(2, 1);
             }
         }
@@ -395,22 +393,19 @@ void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* 
         {
             if (psBundle->isLoading())
             {
-                emptyTab2->setText("Loading...");
-                effectTabComp = emptyTab2.get();
                 mainComp->removeTab(2);
-                mainComp->addTab("Effect - Loading", Colours::lightgrey, effectTabComp, false);
-
-                delete effectUi;
-                effectUi = nullptr;
+                auto tab = new EmptyTab();
+                tab->setText("Loading...");
+                effectUi.reset(tab);
+                mainComp->addTab("Effect - Loading", Colours::lightgrey, effectUi.get(), false);
             }
             else if (psBundle->isLoaded())
             {
-                effectUi = PluginWindow::createProcessorEditor(*psBundle->getMainProcessor()->processor, PluginWindow::Type::normal);
-                effectTabComp = effectUi;
+                mainComp->removeTab(2);
+                effectUi.reset(PluginWindow::createProcessorEditor(*psBundle->getMainProcessor()->processor, PluginWindow::Type::normal));
                 effectWidth = effectUi->getWidth();
                 effectHeight = effectUi->getHeight();
-                mainComp->removeTab(2);
-                mainComp->addTab("Effect - " + psBundle->getName(), Colours::lightgrey, effectTabComp, false);
+                mainComp->addTab("Effect - " + psBundle->getName(), Colours::lightgrey, effectUi.get(), false);
             }
         }
     }
