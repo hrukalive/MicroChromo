@@ -137,6 +137,8 @@ void PluginBundle::checkPluginLoaded(const PluginDescription desc, int numInstan
             resetCcLearn();
             resetParameterLink();
             linkParameterIndices.clear();
+            linkParameterIndicesHistory.clear();
+            linkParameterIndicesSet.clear();
 
             instances.clear();
             for (auto i = 0; i < _numInstances; i++)
@@ -192,22 +194,80 @@ void PluginBundle::resetParameterLink()
         ptr->resetLink();
 }
 
+struct PairComparator
+{
+    int compareElements(std::pair<int, int> first, std::pair<int, int> second)
+    {
+        if (first.second < second.second)
+            return -1;
+        if (first.second == second.second)
+            return 0;
+        if (first.second > second.second)
+            return 1;
+    }
+};
+
 void PluginBundle::linkParameters()
 {
-    int i = 0;
     auto& parameters = instances[0]->processor->getParameters();
-    std::sort(linkParameterIndices.begin(), linkParameterIndices.end());
+    linkParameterIndices.sort();
     auto learnedCc = getLearnedCc();
-    std::remove_if(linkParameterIndices.begin(), linkParameterIndices.end(), [&parameters, learnedCc](int v) { return v >= parameters.size() || v == learnedCc; });
+    linkParameterIndices.removeIf([&parameters, learnedCc](int v) { return v >= parameters.size() || v == learnedCc; });
+    linkParameterIndicesSet.clear();
+    for (auto index : linkParameterIndices)
+        linkParameterIndicesSet.insert(index);
+
+    Array<int> emptyIndices;
+    for (int i = 0; i < processor.getParameterSlotNumber(); i++)
+        emptyIndices.add(i);
+    for (auto& x : linkParameterIndicesHistory)
+        emptyIndices.removeAllInstancesOf(x.second);
+
+    Array<std::pair<int, int>> overrideIndices;
+    for (auto x : linkParameterIndicesHistory)
+        if (!linkParameterIndicesSet.contains(x.first) && x.second > -1 && x.second < processor.getParameterSlotNumber())
+            overrideIndices.add(x);
+    overrideIndices.sort(PairComparator(), true);
+
+    int linkedCount = 0, j = 0;
     for (auto index : linkParameterIndices)
     {
-        if (i >= processor.getParameterSlotNumber())
+        if (linkedCount >= processor.getParameterSlotNumber())
             break;
         auto* p = parameters[index];
         if (p->isAutomatable() && !p->isMetaParameter())
         {
-            parameterLinker[i]->linkParameter(index, p);
-            i++;
+            if (linkParameterIndicesHistory.find(index) != linkParameterIndicesHistory.end())
+            {
+                auto i = linkParameterIndicesHistory[index];
+                if (i > -1 && i < processor.getParameterSlotNumber())
+                {
+                    parameterLinker[i]->linkParameter(index, p);
+                    linkedCount++;
+                    continue;
+                }
+                else
+                {
+                    linkParameterIndicesHistory.erase(index);
+                }
+            }
+
+            if (emptyIndices.size() > 0)
+            {
+                parameterLinker[emptyIndices[0]]->linkParameter(index, p);
+                linkedCount++;
+                linkParameterIndicesHistory[index] = emptyIndices[0];
+                emptyIndices.remove(&emptyIndices.getReference(0));
+            }
+            else if (overrideIndices.size() > 0)
+            {
+                auto pair = overrideIndices[0];
+                linkParameterIndicesHistory.erase(pair.first);
+                parameterLinker[pair.second]->linkParameter(index, p);
+                linkedCount++;
+                linkParameterIndicesHistory[index] = pair.second;
+                overrideIndices.remove(&overrideIndices.getReference(0));
+            }
         }
     }
     processor.updateHostDisplay();
@@ -335,6 +395,18 @@ void PluginBundle::getStateInformation(MemoryBlock& destData)
     stream.flush();
     xml->setAttribute("linkParameterIndices", linkedData.toBase64Encoding());
 
+    MemoryBlock linkedKeyData, linkedValueData;
+    MemoryOutputStream keyStream(linkedKeyData, false), valueStream(linkedValueData, false);
+    for (auto& x : linkParameterIndicesHistory)
+    {
+        keyStream.writeInt(x.first);
+        valueStream.writeInt(x.second);
+    }
+    keyStream.flush();
+    valueStream.flush();
+    xml->setAttribute("linkParameterHistoryKey", linkedKeyData.toBase64Encoding());
+    xml->setAttribute("linkParameterHistoryValue", linkedValueData.toBase64Encoding());
+
     MemoryBlock data;
     instances[0]->processor->getStateInformation(data);
     xml->setAttribute("data", data.toBase64Encoding());
@@ -363,6 +435,25 @@ void PluginBundle::setStateInformation(const void* data, int sizeInBytes)
             }
             if (xml->hasAttribute("linkParameterIndices"))
             {
+                if (xml->hasAttribute("linkParameterHistoryKey") && xml->hasAttribute("linkParameterHistoryValue"))
+                {
+                    MemoryBlock linkedKeyData, linkedValueData;
+                    linkedKeyData.fromBase64Encoding(xml->getStringAttribute("linkParameterHistoryKey"));
+                    linkedValueData.fromBase64Encoding(xml->getStringAttribute("linkParameterHistoryValue"));
+                    MemoryInputStream keyStream(linkedKeyData, false), valueStream(linkedValueData, false);
+                    Array<int> keyArr, valArr;
+                    while (!keyStream.isExhausted())
+                        keyArr.add(keyStream.readInt());
+                    while (!valueStream.isExhausted())
+                        valArr.add(valueStream.readInt());
+                    if (keyArr.size() == valArr.size())
+                    {
+                        linkParameterIndicesHistory.clear();
+                        for (int i = 0; i < keyArr.size(); i++)
+                            linkParameterIndicesHistory[keyArr[i]] = valArr[i];
+                    }
+                }
+
                 MemoryBlock linkedData;
                 linkedData.fromBase64Encoding(xml->getStringAttribute("linkParameterIndices"));
                 linkParameterIndices.clear();

@@ -78,7 +78,7 @@ public:
     ParameterCcLearn& getCcLearnModule() { return *ccLearn; }
     PluginDescription getEmptyPluginDescription() { return _emptyPlugin; }
     PluginDescription getDefaultPluginDescription() { return _defaultPlugin; }
-    bool isParameterExposed(int parameterIndex) { return linkParameterIndices.indexOf(parameterIndex) > -1; }
+    bool isParameterExposed(int parameterIndex) { return linkParameterIndicesSet.contains(parameterIndex); }
     PluginInstance* getMainProcessor() { return instances[0]; }
 
     //==============================================================================
@@ -106,6 +106,8 @@ private:
     OwnedArray<PluginInstance> instanceTemps;
     const OwnedArray<ParameterLinker>& parameterLinker;
     Array<int> linkParameterIndices;
+    std::unordered_set<int> linkParameterIndicesSet;
+    std::unordered_map<int, int> linkParameterIndicesHistory;
     OwnedArray<MidiMessageCollector> collectors;
     PluginDescription _emptyPlugin, _defaultPlugin;
     std::atomic<int> instanceStarted = 0;

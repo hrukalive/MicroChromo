@@ -21,8 +21,7 @@ class MicroChromoAudioProcessorEditor  :
     public AudioProcessorEditor,
     public ApplicationCommandTarget,
     public MenuBarModel,
-    public ChangeListener,
-    public DragAndDropContainer
+    public ChangeListener
 {
 public:
     enum CommandIDs
@@ -181,10 +180,8 @@ private:
         Label label;
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EmptyTab)
     };
-    std::unique_ptr<EmptyTab> emptyTab1, emptyTab2;
-    AudioProcessorEditor* synthUi{ nullptr }, * effectUi{ nullptr };
+    std::unique_ptr<Component> synthUi{ nullptr }, effectUi{ nullptr };
     int synthWidth, synthHeight, effectWidth, effectHeight;
-    Component* synthTabComp{ nullptr }, * effectTabComp{ nullptr };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessorEditor)
 };
