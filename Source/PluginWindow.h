@@ -15,7 +15,6 @@ public:
         : AudioProcessorEditor (proc), audioProc (proc)
     {
         setSize (500, 200);
-        //setAlwaysOnTop(true);
 
         addAndMakeVisible (list);
 
@@ -127,7 +126,6 @@ public:
          node(n), type (t)
     {
         setSize (400, 300);
-        //setAlwaysOnTop(true);
 
         if (auto* ui = createProcessorEditor (*node->processor, type))
             setContentOwned (ui, true);
@@ -164,11 +162,7 @@ public:
     PluginInstance* node;
     const Type type;
 
-private:
-    float getDesktopScaleFactor() const override     { return 1.0f; }
-
-    static AudioProcessorEditor* createProcessorEditor (AudioProcessor& processor,
-                                                        PluginWindow::Type type)
+    static AudioProcessorEditor* createProcessorEditor(AudioProcessor& processor, PluginWindow::Type type)
     {
         if (type == PluginWindow::Type::normal)
         {
@@ -178,13 +172,16 @@ private:
             type = PluginWindow::Type::generic;
         }
 
-        if (type == PluginWindow::Type::generic)  return new GenericAudioProcessorEditor (processor);
-        if (type == PluginWindow::Type::programs) return new ProgramAudioProcessorEditor (processor);
-        if (type == PluginWindow::Type::debug)    return new PluginDebugWindow (processor);
+        if (type == PluginWindow::Type::generic)  return new GenericAudioProcessorEditor(processor);
+        if (type == PluginWindow::Type::programs) return new ProgramAudioProcessorEditor(processor);
+        if (type == PluginWindow::Type::debug)    return new PluginDebugWindow(processor);
 
         jassertfalse;
         return {};
     }
+
+private:
+    float getDesktopScaleFactor() const override     { return 1.0f; }
 
     static String getTypeName (Type type)
     {
@@ -204,7 +201,6 @@ private:
         ProgramAudioProcessorEditor (AudioProcessor& p)  : AudioProcessorEditor (p)
         {
             setOpaque (true);
-            //setAlwaysOnTop(true);
 
             addAndMakeVisible (panel);
 

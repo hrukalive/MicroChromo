@@ -68,6 +68,7 @@ public:
 
     bool isLoading() { return _isLoading.load(); }
     bool isLoaded() { return _isLoaded.load(); }
+    bool isNewlyLoaded() { return _isNewlyLoaded.load(); }
     bool finishedLoading() { return _finishedLoading.load(); }
     bool hasError() { return _isError.load(); }
     void resetCcLearn();
@@ -78,14 +79,16 @@ public:
     PluginDescription getEmptyPluginDescription() { return _emptyPlugin; }
     PluginDescription getDefaultPluginDescription() { return _defaultPlugin; }
     bool isParameterExposed(int parameterIndex) { return linkParameterIndices.indexOf(parameterIndex) > -1; }
+    PluginInstance* getMainProcessor() { return instances[0]; }
 
     //==============================================================================
     void closeAllWindows();
-    void showRepresentativeWindow();
     void showTwoWindows();
     void showAllWindows();
     void showWindow(PluginWindow::Type type, int num = 1);
-    std::unique_ptr<PopupMenu> getPopupMenu(KnownPluginList::SortMethod pluginSortMethod, KnownPluginList& knownPluginList);
+    void bringToFront();
+    std::unique_ptr<PopupMenu> getMainPopupMenu();
+    std::unique_ptr<PopupMenu> getPluginPopupMenu(KnownPluginList::SortMethod pluginSortMethod, KnownPluginList& knownPluginList);
 
 private:
     void addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int index);
@@ -107,9 +110,7 @@ private:
     PluginDescription _emptyPlugin, _defaultPlugin;
     std::atomic<int> instanceStarted = 0;
     std::atomic<int> instanceStartedTemp = 0;
-    std::atomic<bool> _isLoading = false, _isLoaded = false, _finishedLoading = false, _isError = false, isInit = true, isLearning = false, hasLearned = false;
-    std::atomic<int> learnedCc{ -1 };
-    std::atomic<float> learnedCcMin{ FP_INFINITE }, learnedCcMax{ -FP_INFINITE };
+    std::atomic<bool> _isLoading = false, _isLoaded = false, _finishedLoading = false, _isNewlyLoaded = false, _isError = false, isInit = true;
     String errMsg;
 
     std::unique_ptr<ParameterCcLearn> ccLearn{ nullptr };

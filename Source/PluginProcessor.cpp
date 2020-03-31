@@ -73,8 +73,6 @@ MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
     knownPluginList.removeChangeListener(this);
     synthParamPtr.clear();
     psParamPtr.clear();
-    //synthBundle->removeChangeListener(this);
-    //psBundle->removeChangeListener(this);
     synthBundle = nullptr;
     psBundle = nullptr;
     bufferArrayA.clear();
