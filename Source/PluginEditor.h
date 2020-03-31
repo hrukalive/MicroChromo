@@ -166,21 +166,7 @@ private:
     std::unique_ptr<MainEditor> mainEditor;
     std::unique_ptr<MenuBarComponent> menuBar;
 
-    class EmptyTab : public Component
-    {
-    public:
-        EmptyTab();
-        ~EmptyTab() = default;
-        
-        void setText(String newText);
-
-        void paint(Graphics&) override;
-        void resized() override;
-    private:
-        Label label;
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EmptyTab)
-    };
-    std::unique_ptr<Component> synthUi{ nullptr }, effectUi{ nullptr };
+    std::unique_ptr<AudioProcessorEditor> synthUi{ nullptr }, effectUi{ nullptr };
     int synthWidth, synthHeight, effectWidth, effectHeight;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessorEditor)
