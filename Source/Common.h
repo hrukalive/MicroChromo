@@ -30,6 +30,11 @@ enum {
     SLOT_MENU_CLEAR_CC = 11 + mainMenuIdBase,
     SLOT_MENU_LOAD_EMPTY_PLUGIN = 12 + mainMenuIdBase,
     SLOT_MENU_LOAD_DEFAULT_PLUGIN = 13 + mainMenuIdBase,
+
+    PLUGIN_SORT_MANUFACTURER = 14 + mainMenuIdBase,
+    PLUGIN_SORT_CATEGORY = 15 + mainMenuIdBase,
+    PLUGIN_SORT_ALPHABETICALLY = 16 + mainMenuIdBase,
+    PLUGIN_SORT_FORMAT = 17 + mainMenuIdBase
 };
 
 class AudioParameterFloatVariant : public AudioParameterFloat

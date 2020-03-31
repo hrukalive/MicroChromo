@@ -37,7 +37,7 @@ void PluginBundle::preLoadPlugin(int numInstances)
         return;
     }
     _isLoading = true;
-    _isLoaded = false;
+    _isNewlyLoaded = false;
     _finishedLoading = false;
     _isError = false;
     instanceStartedTemp = 0;
@@ -50,6 +50,8 @@ void PluginBundle::preLoadPlugin(int numInstances)
 void PluginBundle::loadPlugin(const PluginDescription desc, int numInstances, std::function<void(PluginBundle&)> callback)
 {
     jassert(desc.name.isNotEmpty());
+    if (desc.isDuplicateOf(currentDesc) && _numInstances == numInstances)
+        return;
     preLoadPlugin(numInstances);
     for (auto i = 0; i < numInstances; i++)
     {
@@ -67,6 +69,8 @@ void PluginBundle::loadPlugin(const PluginDescription desc, int numInstances, st
 void PluginBundle::loadPluginSync(const PluginDescription desc, int numInstances)
 {
     jassert(desc.name.isNotEmpty());
+    if (desc.isDuplicateOf(currentDesc) && _numInstances == numInstances)
+        return;
     preLoadPlugin(numInstances);
     for (auto i = 0; i < numInstances; i++)
     {
@@ -117,9 +121,6 @@ void PluginBundle::checkPluginLoaded(const PluginDescription desc, int numInstan
                 "Loading Failed",
                 TRANS("Couldn't create plugin. ") + errMsg,
                 "OK");
-            _isLoaded = false;
-            if (!isInit)
-                _isLoaded = true;
         }
         else
         {
@@ -133,7 +134,6 @@ void PluginBundle::checkPluginLoaded(const PluginDescription desc, int numInstan
             instanceStarted = instanceStartedTemp.load();
             _numInstances = numInstances;
 
-            hasLearned = false;
             resetCcLearn();
             resetParameterLink();
             linkParameterIndices.clear();
@@ -152,8 +152,9 @@ void PluginBundle::checkPluginLoaded(const PluginDescription desc, int numInstan
             if (!currentDesc.isDuplicateOf(desc))
                 currentDesc = desc;
 
-            _isLoaded = true;
+            _isNewlyLoaded = true;
         }
+        _isLoaded = _isLoaded || _isNewlyLoaded;
         _finishedLoading = true;
         sendChangeMessage();
         processor.finishLoadingPlugin();
@@ -289,14 +290,6 @@ void PluginBundle::setParameterGesture(int parameterIndex, bool gestureIsStartin
 
 void PluginBundle::parameterValueChanged(int parameterIndex, float newValue)
 {
-    if (isLearning)
-    {
-        learnedCc = parameterIndex;
-        if (newValue > learnedCcMax)
-            learnedCcMax = newValue;
-        else if (newValue < learnedCcMin)
-            learnedCcMin = newValue;
-    }
     for (auto i = 1; i < instanceStarted.load(); i++)
         instances[i]->processor->getParameters()[parameterIndex]->setValue(newValue);
 }
@@ -388,11 +381,6 @@ void PluginBundle::closeAllWindows()
     activePluginWindows.clear();
 }
 
-void PluginBundle::showRepresentativeWindow()
-{
-    showWindow(PluginWindow::Type::normal, 1);
-}
-
 void PluginBundle::showTwoWindows()
 {
     showWindow(PluginWindow::Type::normal, jmin(instanceStarted.load(), 2));
@@ -405,7 +393,7 @@ void PluginBundle::showAllWindows()
 
 void PluginBundle::showWindow(PluginWindow::Type type, int num)
 {
-    for (auto i = num - 1; i >= 0; i--)
+    for (auto i = num - 1; i >= 1; i--)
     {
         if (auto node = instances[i])
         {
@@ -425,12 +413,17 @@ void PluginBundle::showWindow(PluginWindow::Type type, int num)
     }
 }
 
-std::unique_ptr<PopupMenu> PluginBundle::getPopupMenu(KnownPluginList::SortMethod pluginSortMethod, KnownPluginList& knownPluginList)
+void PluginBundle::bringToFront()
+{
+    for (auto* w : activePluginWindows)
+        w->toFront(false);
+}
+
+std::unique_ptr<PopupMenu> PluginBundle::getMainPopupMenu()
 {
     std::unique_ptr<PopupMenu> floatMenu = std::make_unique<PopupMenu>();
 
-    floatMenu->addItem(SLOT_MENU_SHOW_MAIN_GUI, "Show main plugin GUI");
-    floatMenu->addItem(SLOT_MENU_SHOW_TWO_GUI, "Show two plugin GUI", processor.getNumInstances() > 1);
+    floatMenu->addItem(SLOT_MENU_SHOW_TWO_GUI, "Show second plugin GUI", processor.getNumInstances() > 1);
     floatMenu->addItem(SLOT_MENU_SHOW_ALL_GUI, "Show all plugin GUI", processor.getNumInstances() > 2);
     floatMenu->addItem(SLOT_MENU_CLOSE_ALL_GUI, "Close all window");
     floatMenu->addItem(SLOT_MENU_SHOW_PROGRAMS, "Show programs");
@@ -442,11 +435,16 @@ std::unique_ptr<PopupMenu> PluginBundle::getPopupMenu(KnownPluginList::SortMetho
     floatMenu->addItem(SLOT_MENU_START_CC, "Start CC Learn", !ccLearn->isLearning());
     floatMenu->addItem(SLOT_MENU_SHOW_CC, "Show CC Status");
     floatMenu->addItem(SLOT_MENU_CLEAR_CC, "Clear CC Learn");
-    floatMenu->addSeparator();
+
+    return floatMenu;
+}
+
+std::unique_ptr<PopupMenu> PluginBundle::getPluginPopupMenu(KnownPluginList::SortMethod pluginSortMethod, KnownPluginList& knownPluginList)
+{
+    std::unique_ptr<PopupMenu> floatMenu = std::make_unique<PopupMenu>();
     floatMenu->addItem(SLOT_MENU_LOAD_EMPTY_PLUGIN, _emptyPlugin.name, true, currentDesc.isDuplicateOf(_emptyPlugin));
     floatMenu->addItem(SLOT_MENU_LOAD_DEFAULT_PLUGIN, _defaultPlugin.name, true, currentDesc.isDuplicateOf(_defaultPlugin));
     floatMenu->addSeparator();
     KnownPluginList::addToMenu(*floatMenu, knownPluginList.getTypes(), pluginSortMethod, currentDesc.createIdentifierString());
-
     return floatMenu;
 }
