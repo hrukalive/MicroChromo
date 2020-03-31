@@ -235,7 +235,10 @@ void MicroChromoAudioProcessorEditor::MainEditor::resized()
     auto spaceHeightSmall = jmax(1.0f, (b.getHeight() - 170) / 32.0f * 6);
     auto spaceHeightLarge = jmax(1.0f, (b.getHeight() - 170) / 32.0f * 10);
 
-    dragButton->setBounds(b.removeFromBottom(30));
+    auto tmp = b.removeFromBottom(30);
+    dragButton->setBounds(tmp.removeFromLeft(tmp.proportionOfWidth(0.7)));
+    tmp.removeFromLeft(6);
+    noteBtn->setBounds(tmp);
     b.removeFromBottom(spaceHeightLarge);
 
     auto leftPanel = b.removeFromLeft(b.proportionOfWidth(0.3));
@@ -258,28 +261,6 @@ void MicroChromoAudioProcessorEditor::MainEditor::resized()
     synthLabel->setBounds(rightPanel.removeFromTop(40));
     rightPanel.removeFromTop(spaceHeightSmall);
     effectLabel->setBounds(rightPanel.removeFromTop(40));
-}
-
-
-//==============================================================================
-MicroChromoAudioProcessorEditor::EmptyTab::EmptyTab()
-{
-    addAndMakeVisible(label);
-}
-
-void MicroChromoAudioProcessorEditor::EmptyTab::setText(String newText)
-{
-    label.setText(newText, dontSendNotification);
-}
-
-void MicroChromoAudioProcessorEditor::EmptyTab::paint(Graphics& g)
-{
-    g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
-}
-
-void MicroChromoAudioProcessorEditor::EmptyTab::resized()
-{
-    label.setBounds(getLocalBounds().withSizeKeepingCentre(6 + label.getFont().getStringWidth(label.getText()), 16));
 }
 
 //==============================================================================
@@ -306,18 +287,12 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     menuBar->setVisible(true);
 
     mainEditor.reset(new MainEditor(p, *this));
-    auto tab1 = new EmptyTab();
-    tab1->setText("No synth loaded");
-    auto tab2 = new EmptyTab();
-    tab2->setText("No effect loaded");
-    synthUi.reset(tab1);
-    effectUi.reset(tab2);
 
     mainComp.reset(new CustomTabbedComponent(*this, TabbedButtonBar::Orientation::TabsAtTop));
     addAndMakeVisible(mainComp.get());
     mainComp->addTab("Main", Colours::lightgrey, mainEditor.get(), false);
-    mainComp->addTab("Synth - Empty", Colours::lightgrey, synthUi.get(), false);
-    mainComp->addTab("Effect - Empty", Colours::lightgrey, effectUi.get(), false);
+    mainComp->addTab("Synth - Empty", Colours::lightgrey, nullptr, false);
+    mainComp->addTab("Effect - Empty", Colours::lightgrey, nullptr, false);
     mainComp->setCurrentTabIndex(0);
 
     commandManager.setFirstCommandTarget(this);
@@ -330,8 +305,6 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 
     synthBundle->addChangeListener(this);
     psBundle->addChangeListener(this);
-    synthBundle->sendChangeMessage();
-    psBundle->sendChangeMessage();
 
     changeListenerCallback(synthBundle.get());
     changeListenerCallback(psBundle.get());
@@ -373,18 +346,17 @@ void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* 
             if (synthBundle->isLoading())
             {
                 mainComp->removeTab(1);
-                auto tab = new EmptyTab();
-                tab->setText("Loading...");
-                synthUi.reset(tab);
-                mainComp->addTab("Synth - Loading", Colours::lightgrey, synthUi.get(), false);
+                synthBundle->getMainProcessor()->processor->editorBeingDeleted(synthUi.get());
+                synthUi = nullptr;
+                mainComp->addTab("Synth - Loading", Colours::lightgrey, nullptr, false);
                 mainComp->moveTab(2, 1);
             }
             else if (synthBundle->isLoaded())
             {
                 mainComp->removeTab(1);
                 synthUi.reset(PluginWindow::createProcessorEditor(*synthBundle->getMainProcessor()->processor, PluginWindow::Type::normal));
-                synthWidth = synthUi->getWidth();
-                synthHeight = synthUi->getHeight();
+                synthWidth = synthUi->getConstrainer()->getMinimumWidth();
+                synthHeight = synthUi->getConstrainer()->getMinimumHeight();
                 mainComp->addTab("Synth - " + synthBundle->getName(), Colours::lightgrey, synthUi.get(), false);
                 mainComp->moveTab(2, 1);
             }
@@ -394,17 +366,16 @@ void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* 
             if (psBundle->isLoading())
             {
                 mainComp->removeTab(2);
-                auto tab = new EmptyTab();
-                tab->setText("Loading...");
-                effectUi.reset(tab);
-                mainComp->addTab("Effect - Loading", Colours::lightgrey, effectUi.get(), false);
+                psBundle->getMainProcessor()->processor->editorBeingDeleted(effectUi.get());
+                effectUi = nullptr;
+                mainComp->addTab("Effect - Loading", Colours::lightgrey, nullptr, false);
             }
             else if (psBundle->isLoaded())
             {
                 mainComp->removeTab(2);
                 effectUi.reset(PluginWindow::createProcessorEditor(*psBundle->getMainProcessor()->processor, PluginWindow::Type::normal));
-                effectWidth = effectUi->getWidth();
-                effectHeight = effectUi->getHeight();
+                effectWidth = effectUi->getConstrainer()->getMinimumWidth();
+                effectHeight = effectUi->getConstrainer()->getMinimumHeight();
                 mainComp->addTab("Effect - " + psBundle->getName(), Colours::lightgrey, effectUi.get(), false);
             }
         }
@@ -559,11 +530,13 @@ void MicroChromoAudioProcessorEditor::currentTabChanged(int newCurrentTabIndex)
     else if (newCurrentTabIndex == 1 && synthUi != nullptr)
     {
         synthUi->setSize(synthWidth, synthHeight);
+        synthUi->repaint();
         setSize(synthWidth, synthHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + mainComp->getTabBarDepth() + 4);
     }
     else if (newCurrentTabIndex == 2 && effectUi != nullptr)
     {
         effectUi->setSize(effectWidth, effectHeight);
+        effectUi->repaint();
         setSize(effectWidth, effectHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + mainComp->getTabBarDepth() + 4);
     }
 }
