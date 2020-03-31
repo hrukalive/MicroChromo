@@ -20,6 +20,11 @@ public:
     {
         jassert(processor != nullptr);
     }
+    ~PluginInstance()
+    {
+        if (auto* w = processor->getActiveEditor())
+            processor->editorBeingDeleted(w);
+    }
 
     void prepare(double newSampleRate, int newBlockSize)
     {
