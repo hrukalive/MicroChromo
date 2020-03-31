@@ -111,6 +111,7 @@ MicroChromoAudioProcessorEditor::MainEditor::MainEditor(MicroChromoAudioProcesso
     changeListenerCallback(synthBundle.get());
     changeListenerCallback(psBundle.get());
 
+    setResizable(true, false);
     setSize(400, 230);
 }
 
@@ -264,10 +265,10 @@ void MicroChromoAudioProcessorEditor::MainEditor::resized()
 }
 
 //==============================================================================
-MicroChromoAudioProcessorEditor::CustomTabbedComponent::CustomTabbedComponent(MicroChromoAudioProcessorEditor& parent, TabbedButtonBar::Orientation orientation) :
-    TabbedComponent(orientation), _parent(parent) {}
+MicroChromoAudioProcessorEditor::CustomTabbedButtonComponent::CustomTabbedButtonComponent(MicroChromoAudioProcessorEditor& parent, TabbedButtonBar::Orientation orientation) :
+    TabbedButtonBar(orientation), _parent(parent) {}
 
-void MicroChromoAudioProcessorEditor::CustomTabbedComponent::currentTabChanged(int newCurrentTabIndex, const String&)
+void MicroChromoAudioProcessorEditor::CustomTabbedButtonComponent::currentTabChanged(int newCurrentTabIndex, const String&)
 {
     _parent.currentTabChanged(newCurrentTabIndex);
 }
@@ -282,19 +283,6 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     synthBundle(p.getSynthBundlePtr()),
     psBundle(p.getPSBundlePtr())
 {
-    menuBar.reset(new MenuBarComponent(this));
-    addAndMakeVisible(menuBar.get());
-    menuBar->setVisible(true);
-
-    mainEditor.reset(new MainEditor(p, *this));
-
-    mainComp.reset(new CustomTabbedComponent(*this, TabbedButtonBar::Orientation::TabsAtTop));
-    addAndMakeVisible(mainComp.get());
-    mainComp->addTab("Main", Colours::lightgrey, mainEditor.get(), false);
-    mainComp->addTab("Synth - Empty", Colours::lightgrey, nullptr, false);
-    mainComp->addTab("Effect - Empty", Colours::lightgrey, nullptr, false);
-    mainComp->setCurrentTabIndex(0);
-
     commandManager.setFirstCommandTarget(this);
     setApplicationCommandManagerToWatch(&commandManager);
     commandManager.registerAllCommandsForTarget(this);
@@ -303,13 +291,37 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
     knownPluginList.addChangeListener(this);
 
+    mainEditor.reset(new MainEditor(p, *this));
+
+    menuBar.reset(new MenuBarComponent(this));
+    addAndMakeVisible(menuBar.get());
+    menuBar->setVisible(true);
+
+    tabbedButtons.reset(new CustomTabbedButtonComponent(*this, TabbedButtonBar::Orientation::TabsAtTop));
+    addAndMakeVisible(tabbedButtons.get());
+
+    centerMessageLabel.reset(new Label());
+    addAndMakeVisible(centerMessageLabel.get());
+    centerMessageLabel->setText("MicroChromo", dontSendNotification);
+    centerMessageLabel->setVisible(true);
+
+    mainComp.reset(new MainViewport(3));
+    addAndMakeVisible(mainComp.get());
+    mainComp->setUI(0, mainEditor.get());
+
+    tabbedButtons->addTab("Main", Colours::lightgrey, 0);
+    tabbedButtons->addTab("Synth - Empty", Colours::lightgrey, 1);
+    tabbedButtons->addTab("Effect - Empty", Colours::lightgrey, 2);
+
     synthBundle->addChangeListener(this);
     psBundle->addChangeListener(this);
 
     changeListenerCallback(synthBundle.get());
     changeListenerCallback(psBundle.get());
 
+    setResizable(true, true);
     setSize(400, 300);
+    tabbedButtons->setCurrentTabIndex(0);
 }
 
 MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
@@ -319,11 +331,12 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
     synthBundle->removeChangeListener(this);
     psBundle->removeChangeListener(this);
 
-    mainComp = nullptr;
+    menuBar = nullptr;
+    tabbedButtons = nullptr;
     synthUi = nullptr;
     effectUi = nullptr;
     mainEditor = nullptr;
-    menuBar = nullptr;
+    mainComp = nullptr;
 }
 
 //==============================================================================
@@ -340,43 +353,72 @@ void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* 
     }
     else
     {
-        ScopedLock lock();
         if (changed == synthBundle.get())
         {
             if (synthBundle->isLoading())
             {
-                mainComp->removeTab(1);
+                centerMessageLabel->setText("Loading", dontSendNotification);
+                mainComp->setUI(1, nullptr);
                 synthBundle->getMainProcessor()->processor->editorBeingDeleted(synthUi.get());
                 synthUi = nullptr;
-                mainComp->addTab("Synth - Loading", Colours::lightgrey, nullptr, false);
-                mainComp->moveTab(2, 1);
+                tabbedButtons->setTabName(1, "Synth - Loading");
             }
             else if (synthBundle->isLoaded())
             {
-                mainComp->removeTab(1);
-                synthUi.reset(PluginWindow::createProcessorEditor(*synthBundle->getMainProcessor()->processor, PluginWindow::Type::normal));
-                synthWidth = synthUi->getConstrainer()->getMinimumWidth();
-                synthHeight = synthUi->getConstrainer()->getMinimumHeight();
-                mainComp->addTab("Synth - " + synthBundle->getName(), Colours::lightgrey, synthUi.get(), false);
-                mainComp->moveTab(2, 1);
+                if (auto* ui = PluginWindow::createProcessorEditor(*synthBundle->getMainProcessor()->processor, PluginWindow::Type::normal))
+                {
+                    centerMessageLabel->setText("Done", dontSendNotification);
+                    synthUi.reset(ui);
+                    mainComp->setUI(1, synthUi.get());
+                    synthWidth = synthUi->getConstrainer()->getMinimumWidth();
+                    synthHeight = synthUi->getConstrainer()->getMinimumHeight();
+                    tabbedButtons->setTabName(1, "Synth - " + synthBundle->getName());
+                }
+                else
+                {
+                    centerMessageLabel->setText("No synth loaded", dontSendNotification);
+                    tabbedButtons->setTabName(1, "Synth - Failed");
+                }
+            }
+            else
+            {
+                mainComp->setUI(1, nullptr);
+                centerMessageLabel->setText("No synth loaded", dontSendNotification);
+                tabbedButtons->setTabName(1, "Synth - Empty");
             }
         }
         else if (changed == psBundle.get())
         {
             if (psBundle->isLoading())
             {
-                mainComp->removeTab(2);
+                centerMessageLabel->setText("Loading", dontSendNotification);
+                mainComp->setUI(2, nullptr);
                 psBundle->getMainProcessor()->processor->editorBeingDeleted(effectUi.get());
                 effectUi = nullptr;
-                mainComp->addTab("Effect - Loading", Colours::lightgrey, nullptr, false);
+                tabbedButtons->setTabName(2, "Effect - Loading");
             }
             else if (psBundle->isLoaded())
             {
-                mainComp->removeTab(2);
-                effectUi.reset(PluginWindow::createProcessorEditor(*psBundle->getMainProcessor()->processor, PluginWindow::Type::normal));
-                effectWidth = effectUi->getConstrainer()->getMinimumWidth();
-                effectHeight = effectUi->getConstrainer()->getMinimumHeight();
-                mainComp->addTab("Effect - " + psBundle->getName(), Colours::lightgrey, effectUi.get(), false);
+                if (auto* ui = PluginWindow::createProcessorEditor(*psBundle->getMainProcessor()->processor, PluginWindow::Type::normal))
+                {
+                    centerMessageLabel->setText("Done", dontSendNotification);
+                    effectUi.reset(ui);
+                    mainComp->setUI(2, effectUi.get());
+                    effectWidth = effectUi->getConstrainer()->getMinimumWidth();
+                    effectHeight = effectUi->getConstrainer()->getMinimumHeight();
+                    tabbedButtons->setTabName(2, "Effect - " + psBundle->getName());
+                }
+                else
+                {
+                    centerMessageLabel->setText("No effect loaded", dontSendNotification);
+                    tabbedButtons->setTabName(2, "Effect - Failed");
+                }
+            }
+            else
+            {
+                mainComp->setUI(2, nullptr);
+                centerMessageLabel->setText("No effect loaded", dontSendNotification);
+                tabbedButtons->setTabName(2, "Effect - Empty");
             }
         }
     }
@@ -520,23 +562,35 @@ void MicroChromoAudioProcessorEditor::resized()
 {
     auto b = getLocalBounds();
     menuBar->setBounds(b.removeFromTop(LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight()));
+    tabbedButtons->setBounds(b.removeFromTop(30));
     mainComp->setBounds(b);
+    centerMessageLabel->setBounds(b.withSizeKeepingCentre(6 + centerMessageLabel->getFont().getStringWidth(centerMessageLabel->getText()), 16));
 }
 
 void MicroChromoAudioProcessorEditor::currentTabChanged(int newCurrentTabIndex)
 {
     if (newCurrentTabIndex == 0)
+    {
+        mainComp->showUI(0);
+        setResizable(true, true);
         setSize(400, 300);
-    else if (newCurrentTabIndex == 1 && synthUi != nullptr)
-    {
-        synthUi->setSize(synthWidth, synthHeight);
-        synthUi->repaint();
-        setSize(synthWidth, synthHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + mainComp->getTabBarDepth() + 4);
     }
-    else if (newCurrentTabIndex == 2 && effectUi != nullptr)
+    else if (newCurrentTabIndex == 1)
     {
-        effectUi->setSize(effectWidth, effectHeight);
-        effectUi->repaint();
-        setSize(effectWidth, effectHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + mainComp->getTabBarDepth() + 4);
+        mainComp->showUI(1);
+        setSize(synthWidth, synthHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + 30 + 4);
+        mainComp->showUI(2);
+        setSize(effectWidth, effectHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + 30 + 4);
+        mainComp->showUI(1);
+        setSize(synthWidth, synthHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + 30 + 4);
+    }
+    else if (newCurrentTabIndex == 2)
+    {
+        mainComp->showUI(2);
+        setSize(effectWidth, effectHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + 30 + 4);
+        mainComp->showUI(1);
+        setSize(synthWidth, synthHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + 30 + 4);
+        mainComp->showUI(2);
+        setSize(effectWidth, effectHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + 30 + 4);
     }
 }
