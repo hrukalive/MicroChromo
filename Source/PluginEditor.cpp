@@ -12,214 +12,149 @@
 #include "PluginEditor.h"
 
 //==============================================================================
-class MicroChromoAudioProcessorEditor::PluginListWindow : public DocumentWindow
+MicroChromoAudioProcessorEditor::PluginListWindow::PluginListWindow(MicroChromoAudioProcessorEditor &mw, AudioPluginFormatManager& pluginFormatManager)
+    : DocumentWindow("Available Plugins",
+        LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId),
+        DocumentWindow::minimiseButton | DocumentWindow::closeButton),
+    owner(mw)
 {
-public:
-    PluginListWindow(MicroChromoAudioProcessorEditor &mw, AudioPluginFormatManager& pluginFormatManager)
-        : DocumentWindow("Available Plugins",
-            LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId),
-            DocumentWindow::minimiseButton | DocumentWindow::closeButton),
-        owner(mw)
-    {
-        auto deadMansPedalFile = owner.appProperties.getUserSettings()->getFile().getSiblingFile("RecentlyCrashedPluginsList");
+    auto deadMansPedalFile = owner.appProperties.getUserSettings()->getFile().getSiblingFile("RecentlyCrashedPluginsList");
 
-        setContentOwned(new PluginListComponent(pluginFormatManager, owner.knownPluginList, deadMansPedalFile, owner.appProperties.getUserSettings(), true), true);
+    setContentOwned(new PluginListComponent(pluginFormatManager, owner.knownPluginList, deadMansPedalFile, owner.appProperties.getUserSettings(), true), true);
 
-        setResizable(true, false);
-        setResizeLimits(300, 400, 800, 1500);
-        setTopLeftPosition(60, 60);
+    setResizable(true, false);
+    setResizeLimits(300, 400, 800, 1500);
+    setTopLeftPosition(60, 60);
 
-        setVisible(true);
-    }
+    setVisible(true);
+}
 
-    ~PluginListWindow()
-    {
-        clearContentComponent();
-    }
+MicroChromoAudioProcessorEditor::PluginListWindow::~PluginListWindow()
+{
+    clearContentComponent();
+}
 
-    void closeButtonPressed()
-    {
-        owner.pluginListWindow = nullptr;
-    }
-
-private:
-    MicroChromoAudioProcessorEditor& owner;
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginListWindow)
-};
+void MicroChromoAudioProcessorEditor::PluginListWindow::closeButtonPressed()
+{
+    owner.pluginListWindow = nullptr;
+}
 
 //==============================================================================
-MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor& p)
-    : AudioProcessorEditor (&p), 
-    processor (p), 
+MicroChromoAudioProcessorEditor::MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEditor& parent)
+    : AudioProcessorEditor(&p), 
+    _parent(parent),
+    processor(p),
     appProperties(p.getApplicationProperties()),
-    knownPluginList(p.getKnownPluginList()),
-    formatManager(p.getAudioPluginFormatManager()),
     synthBundle(p.getSynthBundlePtr()),
     psBundle(p.getPSBundlePtr())
 {
-    menuBar.reset(new MenuBarComponent(this));
-    menuBar->setVisible(true);
-
-    synthBtn.reset(new TextButton("Synth"));
-    psBtn.reset(new TextButton("PitchShift"));
-    noteButton.reset(new TextButton("Note"));
-    dragBtn.reset(new TextButton("Drop"));
+    synthButton.reset(new TextButton("Synth"));
+    addAndMakeVisible(synthButton.get());
+    synthButton->addMouseListener(this, true);
     synthLabel.reset(new Label("SynthLabel", "<empty>"));
-    psLabel.reset(new Label("PitchShiftLabel", "<empty>"));
-    synthBtn->addMouseListener(this, true);
-    psBtn->addMouseListener(this, true);
-    noteButton->addMouseListener(this, true);
-    dragBtn->addMouseListener(this, true);
+    addAndMakeVisible(synthLabel.get());
 
-    addAndMakeVisible(numParameterSlot);
-    numParameterSlot.setMultiLine(false);
-    numParameterSlot.setReturnKeyStartsNewLine(false);
-    numParameterSlot.setReadOnly(false);
-    numParameterSlot.setInputRestrictions(4, "0123456789");
-    numParameterSlot.setScrollbarsShown(false);
-    numParameterSlot.setCaretVisible(true);
-    numParameterSlot.setPopupMenuEnabled(false);
-    numParameterSlot.setText(String(p.getParameterSlotNumber()));
-    numParameterSlot.onTextChange = [&]()
+    effectButton.reset(new TextButton("Effect"));
+    addAndMakeVisible(effectButton.get());
+    effectButton->addMouseListener(this, true);
+    effectLabel.reset(new Label("EffectLabel", "<empty>"));
+    addAndMakeVisible(effectLabel.get());
+
+    dragButton.reset(new TextButton("Drop"));
+    addAndMakeVisible(dragButton.get());
+    dragButton->addMouseListener(this, true);
+
+    noteBtn.reset(new TextButton("Note"));
+    noteBtn->addMouseListener(this, true);
+    addAndMakeVisible(noteBtn.get());
+
+    numParameterSlot.reset(new TextEditor());
+    addAndMakeVisible(numParameterSlot.get());
+    numParameterSlot->setMultiLine(false);
+    numParameterSlot->setReturnKeyStartsNewLine(false);
+    numParameterSlot->setReadOnly(false);
+    numParameterSlot->setInputRestrictions(4, "0123456789");
+    numParameterSlot->setScrollbarsShown(false);
+    numParameterSlot->setCaretVisible(true);
+    numParameterSlot->setPopupMenuEnabled(false);
+    numParameterSlot->setText(String(p.getParameterSlotNumber()));
+    numParameterSlot->onTextChange = [&]()
     {
-        appProperties.getUserSettings()->setValue("parameterSlotNumber", numParameterSlot.getText().getIntValue());
+        appProperties.getUserSettings()->setValue("parameterSlotNumber", numParameterSlot->getText().getIntValue());
         appProperties.saveIfNeeded();
     };
+    numParameterLabel.reset(new Label());
+    addAndMakeVisible(numParameterLabel.get());
+    numParameterLabel->setText("# Parameter Slots", dontSendNotification);
 
-    transportLabel.setText("PlayHead", dontSendNotification);
-    addAndMakeVisible(transportLabel);
-
-    numInstancesLabel.setText("NumInst", dontSendNotification);
-    addAndMakeVisible(numInstancesLabel);
-    addAndMakeVisible(numInstancesBox);
+    numInstancesBox.reset(new ComboBox());
+    addAndMakeVisible(numInstancesBox.get());
     for (int i = 1; i <= MicroChromoAudioProcessor::MAX_INSTANCES; i++)
-        numInstancesBox.addItem(String(i), i);
-    numInstancesBox.setSelectedId(processor.getNumInstances());
-    numInstancesBox.onChange = [&]() {
+        numInstancesBox->addItem(String(i), i);
+    numInstancesBox->setSelectedId(processor.getNumInstances());
+    numInstancesBox->onChange = [&]() {
         if (!ignoreInitialChange)
         {
             synthBundle->closeAllWindows();
             psBundle->closeAllWindows();
-            processor.adjustInstanceNumber(numInstancesBox.getSelectedId());
+            processor.adjustInstanceNumber(numInstancesBox->getSelectedId());
         }
         ignoreInitialChange = false;
     };
-
-    commandManager.setFirstCommandTarget(this);
-    setApplicationCommandManagerToWatch(&commandManager);
-    commandManager.registerAllCommandsForTarget(this);
-    addKeyListener(commandManager.getKeyMappings());
-
-    pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
-    knownPluginList.addChangeListener(this);
+    numInstancesLabel.reset(new Label());
+    addAndMakeVisible(numInstancesLabel.get());
+    numInstancesLabel->setText("# Instance", dontSendNotification);
 
     synthBundle->addChangeListener(this);
     psBundle->addChangeListener(this);
     synthBundle->sendChangeMessage();
     psBundle->sendChangeMessage();
 
-    //lnf.setColour(foleys::LevelMeter::lmMeterGradientLowColour, juce::Colours::green);
-    //meterInput.setLookAndFeel(&lnf);
-    //meterInput.setMeterSource(&processor.getInputMeterSource());
-    //meterOutput.setLookAndFeel(&lnf);
-    //meterOutput.setMeterSource(&processor.getOutputMeterSource());
-
-    addAndMakeVisible(menuBar.get());
-    addAndMakeVisible(synthBtn.get());
-    addAndMakeVisible(psBtn.get());
-    addAndMakeVisible(dragBtn.get());
-    addAndMakeVisible(noteButton.get());
-    addAndMakeVisible(synthLabel.get());
-    addAndMakeVisible(psLabel.get());
-    //addAndMakeVisible(meterInput);
-    //addAndMakeVisible(meterOutput);
-
     changeListenerCallback(synthBundle.get());
     changeListenerCallback(psBundle.get());
 
-    setSize(400, 300);
+    setSize(400, 230);
 }
 
-MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
+MicroChromoAudioProcessorEditor::MainEditor::~MainEditor()
 {
-    knownPluginList.removeChangeListener(this);
-    synthBtn->removeMouseListener(this);
-    psBtn->removeMouseListener(this);
-    noteButton->removeMouseListener(this);
-    dragBtn->removeMouseListener(this);
-
-    synthBundle->removeChangeListener(this);
-    psBundle->removeChangeListener(this);
-
-#if JUCE_MAC
-    MenuBarModel::setMacMainMenu(nullptr);
-#endif
-    menuBar = nullptr;
-
-    synthBtn = nullptr;
-    psBtn = nullptr;
-    synthLabel = nullptr;
-    psLabel = nullptr;
-
-    //meterInput.setLookAndFeel(nullptr);
-    //meterOutput.setLookAndFeel(nullptr);
+    synthButton->removeMouseListener(this);
+    effectButton->removeMouseListener(this);
+    dragButton->removeMouseListener(this);
+    noteBtn->removeMouseListener(this);
 }
 
-//==============================================================================
-void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
+void MicroChromoAudioProcessorEditor::MainEditor::changeListenerCallback(ChangeBroadcaster* changed)
 {
-    auto common = [this](int r, bool isSynth) {
-        auto bundle = isSynth ? this->synthBundle : this->psBundle;
-        switch (r)
-        {
-        case SLOT_MENU_SHOW_MAIN_GUI:  bundle->showRepresentativeWindow(); break;
-        case SLOT_MENU_SHOW_TWO_GUI:  bundle->showTwoWindows(); break;
-        case SLOT_MENU_SHOW_ALL_GUI:  bundle->showAllWindows(); break;
-        case SLOT_MENU_CLOSE_ALL_GUI:  bundle->closeAllWindows(); break;
-        case SLOT_MENU_SHOW_PROGRAMS:  bundle->showWindow(PluginWindow::Type::programs); break;
-        case SLOT_MENU_SHOW_PARAMETERS:  bundle->showWindow(PluginWindow::Type::generic); break;
-        case SLOT_MENU_SHOW_DEBUG_LOG:  bundle->showWindow(PluginWindow::Type::debug); break;
-        case SLOT_MENU_PROPAGATE_STATE:  bundle->propagateState(); break;
-        case SLOT_MENU_EXPOSE_PARAMETER:  bundle->openParameterLinkEditor(); break;
-        case SLOT_MENU_START_CC: bundle->getCcLearnModule().startLearning(); break;
-        case SLOT_MENU_SHOW_CC: bundle->getCcLearnModule().showStatus(); break;
-        case SLOT_MENU_CLEAR_CC: bundle->getCcLearnModule().reset(); break;
-        case SLOT_MENU_LOAD_EMPTY_PLUGIN:
-        {
-            bundle->closeAllWindows();
-            processor.addPlugin(bundle->getEmptyPluginDescription(), isSynth);
-            break;
-        }
-        case SLOT_MENU_LOAD_DEFAULT_PLUGIN:
-        {
-            bundle->closeAllWindows();
-            processor.addPlugin(bundle->getDefaultPluginDescription(), isSynth);
-            break;
-        }
-        default:
-        {
-            if (r >= pluginMenuIdBase)
-            {
-                bundle->closeAllWindows();
-                auto types = (isSynth ? processor.getSynthKnownPluginList() : processor.getPsKnownPluginList()).getTypes();
-                int result = KnownPluginList::getIndexChosenByMenu(types, r);
-                auto& desc = types.getReference(result);
-                processor.addPlugin(desc, isSynth);
-            }
-        }
-        }
-    };
-    if (e.eventComponent == synthBtn.get())
+    if (changed == synthBundle.get())
     {
-        floatMenu = synthBundle->getPopupMenu(pluginSortMethod, processor.getSynthKnownPluginList());
-        floatMenu->showMenuAsync({}, ModalCallbackFunction::create([common](int r) { common(r, true); }));
+        if (synthBundle->isLoading())
+            synthLabel->setText("Loading...", NotificationType::dontSendNotification);
+        else if (synthBundle->isLoaded())
+            synthLabel->setText(synthBundle->getName(), NotificationType::dontSendNotification);
     }
-    else if (e.eventComponent == psBtn.get())
+    else if (changed == psBundle.get())
     {
-        floatMenu = psBundle->getPopupMenu(pluginSortMethod, processor.getPsKnownPluginList());
-        floatMenu->showMenuAsync({}, ModalCallbackFunction::create([common](int r) { common(r, false); }));
+        if (psBundle->isLoading())
+            effectLabel->setText("Loading...", NotificationType::dontSendNotification);
+        else if (psBundle->isLoaded())
+            effectLabel->setText(psBundle->getName(), NotificationType::dontSendNotification);
     }
-    else if (e.eventComponent == noteButton.get())
+}
+
+void MicroChromoAudioProcessorEditor::MainEditor::mouseDown(const MouseEvent& e)
+{
+    if (e.eventComponent == synthButton.get())
+    {
+        floatMenu = synthBundle->getPluginPopupMenu(_parent.getPluginSortMethod(), processor.getSynthKnownPluginList());
+        floatMenu->showMenuAsync({}, ModalCallbackFunction::create([this](int r) { bundlePopupMenuSelected(r, true); }));
+    }
+    else if (e.eventComponent == effectButton.get())
+    {
+        floatMenu = psBundle->getPluginPopupMenu(_parent.getPluginSortMethod(), processor.getPsKnownPluginList());
+        floatMenu->showMenuAsync({}, ModalCallbackFunction::create([this](int r) { bundlePopupMenuSelected(r, false); }));
+    }
+    else if (e.eventComponent == noteBtn.get())
     {
         if (isTimerRunning())
             stopTimer();
@@ -228,11 +163,11 @@ void MicroChromoAudioProcessorEditor::mouseDown(const MouseEvent& e)
     }
 }
 
-void MicroChromoAudioProcessorEditor::mouseDrag(const MouseEvent& e)
+void MicroChromoAudioProcessorEditor::MainEditor::mouseDrag(const MouseEvent& e)
 {
-    if (e.eventComponent == dragBtn.get())
+    if (e.eventComponent == dragButton.get())
     {
-        DragAndDropContainer* dragContainer = DragAndDropContainer::findParentDragContainerFor(dragBtn.get());
+        DragAndDropContainer* dragContainer = DragAndDropContainer::findParentDragContainerFor(dragButton.get());
         if (!dragContainer->isDragAndDropActive())
         {
             std::shared_ptr<TemporaryFile> outf = std::make_shared<TemporaryFile>();
@@ -250,7 +185,7 @@ void MicroChromoAudioProcessorEditor::mouseDrag(const MouseEvent& e)
     }
 }
 
-void MicroChromoAudioProcessorEditor::timerCallback()
+void MicroChromoAudioProcessorEditor::MainEditor::timerCallback()
 {
     if (test)
     {
@@ -289,9 +224,135 @@ void MicroChromoAudioProcessorEditor::timerCallback()
         }
     }
     test = !test;
-
-    transportLabel.setText(String(processor.getInfo().timeInSeconds, 15), dontSendNotification);
 }
+void MicroChromoAudioProcessorEditor::MainEditor::paint(Graphics& g)
+{
+    g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
+}
+
+void MicroChromoAudioProcessorEditor::MainEditor::resized()
+{
+    auto b = getLocalBounds();
+    b.reduce(10, 10);
+    auto spaceHeightSmall = jmax(1.0f, (b.getHeight() - 170) / 32.0f * 6);
+    auto spaceHeightLarge = jmax(1.0f, (b.getHeight() - 170) / 32.0f * 10);
+
+    dragButton->setBounds(b.removeFromBottom(30));
+    b.removeFromBottom(spaceHeightLarge);
+
+    auto leftPanel = b.removeFromLeft(b.proportionOfWidth(0.3));
+    auto rightPanel = b.withTrimmedLeft(10);
+
+    numInstancesLabel->setBounds(leftPanel.removeFromTop(30));
+    leftPanel.removeFromTop(spaceHeightSmall);
+    numParameterLabel->setBounds(leftPanel.removeFromTop(30));
+    leftPanel.removeFromTop(spaceHeightLarge);
+
+    synthButton->setBounds(leftPanel.removeFromTop(40));
+    leftPanel.removeFromTop(spaceHeightSmall);
+    effectButton->setBounds(leftPanel.removeFromTop(40));
+
+    numInstancesBox->setBounds(rightPanel.removeFromTop(30));
+    rightPanel.removeFromTop(spaceHeightSmall);
+    numParameterSlot->setBounds(rightPanel.removeFromTop(30));
+    rightPanel.removeFromTop(spaceHeightLarge);
+
+    synthLabel->setBounds(rightPanel.removeFromTop(40));
+    rightPanel.removeFromTop(spaceHeightSmall);
+    effectLabel->setBounds(rightPanel.removeFromTop(40));
+}
+
+
+//==============================================================================
+MicroChromoAudioProcessorEditor::EmptyTab::EmptyTab()
+{
+    addAndMakeVisible(label);
+}
+
+void MicroChromoAudioProcessorEditor::EmptyTab::setText(String newText)
+{
+    label.setText(newText, dontSendNotification);
+}
+
+void MicroChromoAudioProcessorEditor::EmptyTab::paint(Graphics& g)
+{
+    g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
+}
+
+void MicroChromoAudioProcessorEditor::EmptyTab::resized()
+{
+    label.setBounds(getLocalBounds().withSizeKeepingCentre(6 + label.getFont().getStringWidth(label.getText()), 16));
+}
+
+//==============================================================================
+MicroChromoAudioProcessorEditor::CustomTabbedComponent::CustomTabbedComponent(MicroChromoAudioProcessorEditor& parent, TabbedButtonBar::Orientation orientation) :
+    TabbedComponent(orientation), _parent(parent) {}
+
+void MicroChromoAudioProcessorEditor::CustomTabbedComponent::currentTabChanged(int newCurrentTabIndex, const String&)
+{
+    _parent.currentTabChanged(newCurrentTabIndex);
+}
+
+//==============================================================================
+MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor& p)
+    : AudioProcessorEditor (&p), 
+    processor (p), 
+    appProperties(p.getApplicationProperties()),
+    knownPluginList(p.getKnownPluginList()),
+    formatManager(p.getAudioPluginFormatManager()),
+    synthBundle(p.getSynthBundlePtr()),
+    psBundle(p.getPSBundlePtr())
+{
+    menuBar.reset(new MenuBarComponent(this));
+    addAndMakeVisible(menuBar.get());
+    menuBar->setVisible(true);
+
+    mainEditor.reset(new MainEditor(p, *this));
+    emptyTab1.reset(new EmptyTab());
+    emptyTab1->setText("No synth loaded");
+    emptyTab2.reset(new EmptyTab());
+    emptyTab2->setText("No effect loaded");
+    synthTabComp = emptyTab1.get();
+    effectTabComp = emptyTab2.get();
+
+    mainComp.reset(new CustomTabbedComponent(*this, TabbedButtonBar::Orientation::TabsAtTop));
+    addAndMakeVisible(mainComp.get());
+    mainComp->addTab("Main", Colours::lightgrey, mainEditor.get(), false);
+    mainComp->addTab("Synth - Empty", Colours::lightgrey, synthTabComp, false);
+    mainComp->addTab("Effect - Empty", Colours::lightgrey, effectTabComp, false);
+    mainComp->setCurrentTabIndex(0);
+
+    commandManager.setFirstCommandTarget(this);
+    setApplicationCommandManagerToWatch(&commandManager);
+    commandManager.registerAllCommandsForTarget(this);
+    addKeyListener(commandManager.getKeyMappings());
+
+    pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
+    knownPluginList.addChangeListener(this);
+
+    synthBundle->addChangeListener(this);
+    psBundle->addChangeListener(this);
+
+    setSize(400, 300);
+}
+
+MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
+{
+    knownPluginList.removeChangeListener(this);
+
+    synthBundle->removeChangeListener(this);
+    psBundle->removeChangeListener(this);
+
+    mainComp = nullptr;
+    emptyTab1 = nullptr;
+    emptyTab2 = nullptr;
+    delete synthUi;
+    delete effectUi;
+    mainEditor = nullptr;
+    menuBar = nullptr;
+}
+
+//==============================================================================
 
 void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* changed)
 {
@@ -303,26 +364,71 @@ void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* 
             appProperties.saveIfNeeded();
         }
     }
-    else if (changed == synthBundle.get())
+    else
     {
-        if (synthBundle->isLoading())
-            synthLabel->setText("Loading...", NotificationType::dontSendNotification);
-        else if (synthBundle->isLoaded())
-            synthLabel->setText(synthBundle->getName(), NotificationType::dontSendNotification);
+        ScopedLock lock();
+        if (changed == synthBundle.get())
+        {
+            if (synthBundle->isLoading())
+            {
+                emptyTab1->setText("Loading...");
+                synthTabComp = emptyTab1.get();
+                mainComp->removeTab(1);
+                mainComp->addTab("Synth - Loading", Colours::lightgrey, synthTabComp, false);
+                mainComp->moveTab(2, 1);
+
+                delete synthUi;
+                synthUi = nullptr;
+            }
+            else if (synthBundle->isLoaded())
+            {
+                synthUi = PluginWindow::createProcessorEditor(*synthBundle->getMainProcessor()->processor, PluginWindow::Type::normal);
+                synthTabComp = synthUi;
+                synthWidth = synthUi->getWidth();
+                synthHeight = synthUi->getHeight();
+                mainComp->removeTab(1);
+                mainComp->addTab("Synth - " + synthBundle->getName(), Colours::lightgrey, synthTabComp, false);
+                mainComp->moveTab(2, 1);
+            }
+        }
+        else if (changed == psBundle.get())
+        {
+            if (psBundle->isLoading())
+            {
+                emptyTab2->setText("Loading...");
+                effectTabComp = emptyTab2.get();
+                mainComp->removeTab(2);
+                mainComp->addTab("Effect - Loading", Colours::lightgrey, effectTabComp, false);
+
+                delete effectUi;
+                effectUi = nullptr;
+            }
+            else if (psBundle->isLoaded())
+            {
+                effectUi = PluginWindow::createProcessorEditor(*psBundle->getMainProcessor()->processor, PluginWindow::Type::normal);
+                effectTabComp = effectUi;
+                effectWidth = effectUi->getWidth();
+                effectHeight = effectUi->getHeight();
+                mainComp->removeTab(2);
+                mainComp->addTab("Effect - " + psBundle->getName(), Colours::lightgrey, effectTabComp, false);
+            }
+        }
     }
-    else if (changed == psBundle.get())
+}
+
+void MicroChromoAudioProcessorEditor::focusGained(FocusChangeType cause)
+{
+    if (cause == FocusChangeType::focusChangedByMouseClick)
     {
-        if (psBundle->isLoading())
-            psLabel->setText("Loading...", NotificationType::dontSendNotification);
-        else if (psBundle->isLoaded())
-            psLabel->setText(psBundle->getName(), NotificationType::dontSendNotification);
+        synthBundle->bringToFront();
+        psBundle->bringToFront();
     }
 }
 
 //==============================================================================
 StringArray MicroChromoAudioProcessorEditor::getMenuBarNames()
 {
-    return { "File" };
+    return { "File", "Synth", "Effect" };
 }
 
 PopupMenu MicroChromoAudioProcessorEditor::getMenuForIndex(int menuIndex, const String& /*menuName*/)
@@ -332,13 +438,63 @@ PopupMenu MicroChromoAudioProcessorEditor::getMenuForIndex(int menuIndex, const 
     if (menuIndex == 0)
     {
         menu.addCommandItem(&commandManager, CommandIDs::openPluginScanner);
+        menu.addSeparator();
+        menu.addItem(PLUGIN_SORT_MANUFACTURER, "Sort by Manufacturer", true, pluginSortMethod == KnownPluginList::SortMethod::sortByManufacturer);
+        menu.addItem(PLUGIN_SORT_CATEGORY, "Sort by Category", true, pluginSortMethod == KnownPluginList::SortMethod::sortByCategory);
+        menu.addItem(PLUGIN_SORT_ALPHABETICALLY, "Sort Alphabetically", true, pluginSortMethod == KnownPluginList::SortMethod::sortAlphabetically);
     }
+    else if (menuIndex == 1)
+        menu = *synthBundle->getMainPopupMenu();
+    else if (menuIndex == 2)
+        menu = *psBundle->getMainPopupMenu();
 
     return menu;
 }
 
 void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLevelMenuIndex)
 {
+    if (topLevelMenuIndex == 0)
+    {
+        switch (menuItemID)
+        {
+        case PLUGIN_SORT_MANUFACTURER: pluginSortMethod = KnownPluginList::SortMethod::sortByManufacturer; break;
+        case PLUGIN_SORT_CATEGORY: pluginSortMethod = KnownPluginList::SortMethod::sortByCategory; break;
+        case PLUGIN_SORT_ALPHABETICALLY: pluginSortMethod = KnownPluginList::SortMethod::sortAlphabetically; break;
+        default: break;
+        }
+    }
+    else if (topLevelMenuIndex == 1 || topLevelMenuIndex == 2)
+    {
+        bool isSynth = topLevelMenuIndex == 1;
+        auto bundle = isSynth ? this->synthBundle : this->psBundle;
+        switch (menuItemID)
+        {
+        case SLOT_MENU_SHOW_TWO_GUI:  bundle->showTwoWindows(); break;
+        case SLOT_MENU_SHOW_ALL_GUI:  bundle->showAllWindows(); break;
+        case SLOT_MENU_CLOSE_ALL_GUI:  bundle->closeAllWindows(); break;
+        case SLOT_MENU_SHOW_PROGRAMS:  bundle->showWindow(PluginWindow::Type::programs); break;
+        case SLOT_MENU_SHOW_PARAMETERS:  bundle->showWindow(PluginWindow::Type::generic); break;
+        case SLOT_MENU_SHOW_DEBUG_LOG:  bundle->showWindow(PluginWindow::Type::debug); break;
+        case SLOT_MENU_PROPAGATE_STATE:  bundle->propagateState(); break;
+        case SLOT_MENU_EXPOSE_PARAMETER:  bundle->openParameterLinkEditor(); break;
+        case SLOT_MENU_START_CC: bundle->getCcLearnModule().startLearning(); break;
+        case SLOT_MENU_SHOW_CC: bundle->getCcLearnModule().showStatus(); break;
+        case SLOT_MENU_CLEAR_CC: bundle->getCcLearnModule().reset(); break;
+        case SLOT_MENU_LOAD_EMPTY_PLUGIN:
+        {
+            bundle->closeAllWindows();
+            processor.addPlugin(bundle->getEmptyPluginDescription(), isSynth);
+            break;
+        }
+        case SLOT_MENU_LOAD_DEFAULT_PLUGIN:
+        {
+            bundle->closeAllWindows();
+            processor.addPlugin(bundle->getDefaultPluginDescription(), isSynth);
+            break;
+        }
+        default: break;
+        }
+    }
 }
 
 //==============================================================================
@@ -397,42 +553,22 @@ void MicroChromoAudioProcessorEditor::paint (Graphics& g)
 void MicroChromoAudioProcessorEditor::resized()
 {
     auto b = getLocalBounds();
-#if !JUCE_MAC
     menuBar->setBounds(b.removeFromTop(LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight()));
-#endif
-    b.reduce(10, 10);
-
-    auto tmp = b.removeFromTop(40);
-    synthBtn->setBounds(tmp.removeFromLeft(100));
-    tmp.removeFromLeft(10);
-    synthLabel->setBounds(tmp.removeFromLeft(100));
-
-    noteButton->setBounds(tmp.withTrimmedLeft(50).removeFromLeft(100));
-
-    b.removeFromTop(10);
-
-    tmp = b.removeFromTop(40);
-    psBtn->setBounds(tmp.removeFromLeft(100));
-    tmp.removeFromLeft(10);
-    psLabel->setBounds(tmp.removeFromLeft(100));
-
-    b.removeFromTop(10);
-    numParameterSlot.setBounds(b.removeFromLeft(100));
-    //meterInput.setBounds(b.removeFromLeft(100));
-    b.removeFromLeft(10);
-    b.removeFromLeft(100);
-    //meterOutput.setBounds(b.removeFromLeft(100));
-
-    b.removeFromLeft(10);
-    dragBtn->setBounds(b.removeFromTop(40));
-    b.removeFromTop(10);
-    tmp = b.removeFromTop(30);
-    numInstancesLabel.setBounds(tmp.removeFromLeft(60));
-    numInstancesBox.setBounds(tmp);
-
-    transportLabel.setBounds(b);
+    mainComp->setBounds(b);
 }
 
-void MicroChromoAudioProcessorEditor::buttonClicked(Button* btn)
+void MicroChromoAudioProcessorEditor::currentTabChanged(int newCurrentTabIndex)
 {
+    if (newCurrentTabIndex == 0)
+        setSize(400, 300);
+    else if (newCurrentTabIndex == 1 && synthUi != nullptr)
+    {
+        synthUi->setSize(synthWidth, synthHeight);
+        setSize(synthWidth, synthHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + mainComp->getTabBarDepth() + 4);
+    }
+    else if (newCurrentTabIndex == 2 && effectUi != nullptr)
+    {
+        effectUi->setSize(effectWidth, effectHeight);
+        setSize(effectWidth, effectHeight + LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight() + mainComp->getTabBarDepth() + 4);
+    }
 }
