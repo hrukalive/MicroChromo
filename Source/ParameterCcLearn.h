@@ -33,7 +33,10 @@ private:
 		ProgressWindow(ParameterCcLearn& parent, Colour backgroundColor);
 		~ProgressWindow();
 
-		void updateText(String newText);
+		ParameterCcLearn& getParent() { return _parent; }
+
+		void updateText(const String& newText);
+		void updateCc(int ccNumber);
 		void closeButtonPressed() override;
 
 	private:
@@ -47,11 +50,12 @@ private:
 			void paint(Graphics& g) override;
 			void resized() override;
 
-			void updateText(String newText);
+			void updateText(const String& newText);
+			void updateCc(int ccNumber);
 
 		private:
 			String text;
-			TextEditor textBlock;
+			TextEditor textBlock, ccNumberTextBox;
 			TextButton btn{ "Done" };
 			ProgressWindow& _parent;
 

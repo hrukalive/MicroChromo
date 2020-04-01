@@ -10,16 +10,36 @@ ParameterCcLearn::ProgressWindow::ProgressComponent::ProgressComponent(ProgressW
 	textBlock.setFont(getLookAndFeel().getAlertWindowMessageFont());
 	addAndMakeVisible(textBlock);
 
+	ccNumberTextBox.setMultiLine(false, false);
+	ccNumberTextBox.setTextToShowWhenEmpty("Enter or move CC", Colour::greyLevel(0.5));
+	ccNumberTextBox.setCaretVisible(true);
+	ccNumberTextBox.setInputRestrictions(3, "0123456789");
+	ccNumberTextBox.onTextChange = [&]() {
+		auto val = jlimit(0, 127, ccNumberTextBox.getText().getIntValue());
+		_parent.getParent().processCc(-1, val, -1, -1);
+		ccNumberTextBox.setText(String(val), false);
+	};
+	addAndMakeVisible(ccNumberTextBox);
+
 	btn.onClick = [this]() {
 		_parent.closeButtonPressed();
 	};
 	addAndMakeVisible(btn);
 }
 
-void ParameterCcLearn::ProgressWindow::ProgressComponent::updateText(const String newText)
+void ParameterCcLearn::ProgressWindow::ProgressComponent::updateText(const String& newText)
 {
 	MessageManagerLock lock;
 	textBlock.setText(newText, false);
+}
+
+void ParameterCcLearn::ProgressWindow::ProgressComponent::updateCc(int ccNumber)
+{
+	MessageManagerLock lock;
+	if (ccNumber == -1)
+		ccNumberTextBox.setText("", false);
+	else
+		ccNumberTextBox.setText(String(ccNumber), false);
 }
 
 void ParameterCcLearn::ProgressWindow::ProgressComponent::paint(Graphics& g)
@@ -31,6 +51,7 @@ void ParameterCcLearn::ProgressWindow::ProgressComponent::resized()
 {
 	auto b = getLocalBounds();
 	b.reduce(10, 10);
+	ccNumberTextBox.setBounds(b.removeFromTop(24));
 	btn.setBounds(b.removeFromBottom(24));
 	b.removeFromBottom(4);
 	textBlock.setBounds(b);
@@ -42,7 +63,7 @@ ParameterCcLearn::ProgressWindow::ProgressWindow(ParameterCcLearn& parent, Colou
 {
 	component = std::make_unique<ProgressComponent>(*this);
 
-	setSize(300, 200);
+	setSize(300, 230);
 
 	setUsingNativeTitleBar(false);
 	setAlwaysOnTop(true);
@@ -57,9 +78,14 @@ ParameterCcLearn::ProgressWindow::~ProgressWindow()
 	component = nullptr;
 }
 
-void ParameterCcLearn::ProgressWindow::updateText(const String newText)
+void ParameterCcLearn::ProgressWindow::updateText(const String& newText)
 {
 	component->updateText(newText);
+}
+
+void ParameterCcLearn::ProgressWindow::updateCc(int ccNumber)
+{
+	component->updateCc(ccNumber);
 }
 
 void ParameterCcLearn::ProgressWindow::closeButtonPressed()
@@ -88,6 +114,7 @@ void ParameterCcLearn::processCc(int instanceIndex, int ccNumber, int ccValue, f
 	{
 		tmpCcSource = ccNumber;
 		progressWindow->updateText(updateProgressNote());
+		progressWindow->updateCc(tmpCcSource);
 	}
 	else if (hasLearned && ccSource == ccNumber)
 		_bundle->getParameters(instanceIndex)[paramIndex]->setValueAt(ccValue / 127.0f * (learnedCcMax - learnedCcMin) + learnedCcMin, sampleOffset);
@@ -107,6 +134,7 @@ void ParameterCcLearn::reset()
 	learnedCcMin = FP_INFINITE;
 	learnedCcMax = -FP_INFINITE;
 	progressWindow->updateText(updateProgressNote());
+	progressWindow->updateCc(tmpCcSource);
 }
 
 void ParameterCcLearn::resetTempValues()
@@ -116,6 +144,7 @@ void ParameterCcLearn::resetTempValues()
 	tmpLearnedCcMin = FP_INFINITE;
 	tmpLearnedCcMax = -FP_INFINITE;
 	progressWindow->updateText(updateProgressNote());
+	progressWindow->updateCc(tmpCcSource);
 }
 
 void ParameterCcLearn::startLearning()
@@ -195,6 +224,7 @@ void ParameterCcLearn::parameterValueChanged(int parameterIndex, float newValue)
 			if (_bundle->isParameterExposed(parameterIndex))
 			{
 				progressWindow->updateText(updateProgressNote("Parameter moved cannot be learned because it is exposed to host."));
+				progressWindow->updateCc(tmpCcSource);
 				return;
 			}
 			tmpLearnedCcMin = FP_INFINITE;
@@ -206,6 +236,7 @@ void ParameterCcLearn::parameterValueChanged(int parameterIndex, float newValue)
 		else if (newValue < tmpLearnedCcMin)
 			tmpLearnedCcMin = newValue;
 		progressWindow->updateText(updateProgressNote());
+		progressWindow->updateCc(tmpCcSource);
 	}
 }
 

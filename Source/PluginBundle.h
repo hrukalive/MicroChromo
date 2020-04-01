@@ -79,13 +79,11 @@ public:
     PluginDescription getEmptyPluginDescription() { return _emptyPlugin; }
     PluginDescription getDefaultPluginDescription() { return _defaultPlugin; }
     bool isParameterExposed(int parameterIndex) { return linkParameterIndicesSet.contains(parameterIndex); }
-    PluginInstance* getMainProcessor() { return instances[0]; }
+    PluginInstance* getMainInstance() { return instances[0]; }
 
     //==============================================================================
     void closeAllWindows();
-    void showTwoWindows();
-    void showAllWindows();
-    void showWindow(PluginWindow::Type type, int num = 1);
+    void showWindow(int num = 1, PluginWindow::Type type = PluginWindow::Type::normal);
     void bringToFront();
     std::unique_ptr<PopupMenu> getMainPopupMenu();
     std::unique_ptr<PopupMenu> getPluginPopupMenu(KnownPluginList::SortMethod pluginSortMethod, KnownPluginList& knownPluginList);

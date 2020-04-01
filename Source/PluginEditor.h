@@ -36,7 +36,6 @@ public:
 
     //==============================================================================
     void changeListenerCallback(ChangeBroadcaster*) override;
-    void focusGained(FocusChangeType cause) override;
 
     //==============================================================================
     StringArray getMenuBarNames() override;
@@ -54,7 +53,6 @@ public:
     //==============================================================================
     void paint (Graphics&) override;
     void resized() override;
-    void currentTabChanged(int newCurrentTabIndex);
 
 private:
     class MainEditor : 
@@ -140,77 +138,8 @@ private:
     KnownPluginList& knownPluginList;
     KnownPluginList::SortMethod pluginSortMethod;
 
-    std::unique_ptr<Label> centerMessageLabel;
-
-    class CustomTabbedButtonComponent : public TabbedButtonBar
-    {
-    public:
-        CustomTabbedButtonComponent(MicroChromoAudioProcessorEditor& parent, TabbedButtonBar::Orientation orientation);
-        ~CustomTabbedButtonComponent() = default;
-
-        void currentTabChanged(int newCurrentTabIndex, const String&) override;
-    private:
-        MicroChromoAudioProcessorEditor& _parent;
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CustomTabbedButtonComponent)
-    };
-    std::unique_ptr<CustomTabbedButtonComponent> tabbedButtons;
     std::unique_ptr<MainEditor> mainEditor;
     std::unique_ptr<MenuBarComponent> menuBar;
-
-    std::unique_ptr<AudioProcessorEditor> synthUi{ nullptr }, effectUi{ nullptr };
-    int synthWidth, synthHeight, effectWidth, effectHeight;
-    bool synthBeforeEffect = false, effectBeforeSynth = false;
-
-    class MainViewport : public Component
-    {
-    public:
-        MainViewport(int size)
-        {
-            comps.resize(size);
-            comps.fill(nullptr);
-        }
-        ~MainViewport() = default;
-
-        void setUI(int i, Component* ui)
-        {
-            if (comps[i])
-                removeChildComponent(comps[i]);
-            if (ui == nullptr)
-            {
-                comps.set(i, nullptr);
-                return;
-            }
-            comps.set(i, ui);
-            addChildComponent(ui);
-            ui->setVisible(false);
-        }
-
-        void showUI(int i)
-        {
-            for (auto* w : comps)
-                if (w)
-                    w->setVisible(false);
-            comps[i]->setVisible(true);
-            comps[i]->toFront(true);
-        }
-
-        void paint(Graphics& g) override
-        {
-            g.fillAll(Colour::fromRGBA(220, 50, 200, 100));
-        }
-        void resized() override
-        {
-            auto b = getLocalBounds();
-            for (auto* w : comps)
-                if (w)
-                    w->setBounds(b);
-        }
-
-    private:
-        Array<Component*> comps;
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainViewport)
-    };
-    std::unique_ptr<MainViewport> mainComp;
 
     class PluginListWindow : public DocumentWindow
     {

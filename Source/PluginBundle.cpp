@@ -81,13 +81,6 @@ void PluginBundle::loadPluginSync(const PluginDescription desc, int numInstances
     checkPluginLoaded(desc, numInstances);
 }
 
-//PluginInstance* PluginBundle::getInstanceAt(size_t index)
-//{
-//    if (index >= instanceStarted.load())
-//        return nullptr;
-//    return instances[index];
-//}
-
 MidiMessageCollector* PluginBundle::getCollectorAt(int index)
 {
     if (index >= instanceStarted.load())
@@ -472,19 +465,10 @@ void PluginBundle::closeAllWindows()
     activePluginWindows.clear();
 }
 
-void PluginBundle::showTwoWindows()
+void PluginBundle::showWindow(int num, PluginWindow::Type type)
 {
-    showWindow(PluginWindow::Type::normal, jmin(instanceStarted.load(), 2));
-}
-
-void PluginBundle::showAllWindows()
-{
-    showWindow(PluginWindow::Type::normal, instanceStarted.load());
-}
-
-void PluginBundle::showWindow(PluginWindow::Type type, int num)
-{
-    for (auto i = num - 1; i >= 1; i--)
+    num = jmin(instanceStarted.load(), num);
+    for (auto i = num - 1; i >= 0; i--)
     {
         if (auto node = instances[i])
         {
@@ -498,7 +482,8 @@ void PluginBundle::showWindow(PluginWindow::Type type, int num)
             }
             if (node->processor != nullptr)
             {
-                activePluginWindows.add(new PluginWindow(node, type, activePluginWindows))->toFront(true);
+                auto w = new PluginWindow(node, type, activePluginWindows, i == 0);
+                activePluginWindows.add(w)->toFront(true);
             }
         }
     }
@@ -514,15 +499,18 @@ std::unique_ptr<PopupMenu> PluginBundle::getMainPopupMenu()
 {
     std::unique_ptr<PopupMenu> floatMenu = std::make_unique<PopupMenu>();
 
-    floatMenu->addItem(SLOT_MENU_SHOW_TWO_GUI, "Show second plugin GUI", processor.getNumInstances() > 1);
+    floatMenu->addItem(SLOT_MENU_SHOW_MAIN_GUI, "Show representative plugin GUI");
+    floatMenu->addItem(SLOT_MENU_SHOW_TWO_GUI, "Show two plugin GUI", processor.getNumInstances() > 1);
     floatMenu->addItem(SLOT_MENU_SHOW_ALL_GUI, "Show all plugin GUI", processor.getNumInstances() > 2);
     floatMenu->addItem(SLOT_MENU_CLOSE_ALL_GUI, "Close all window");
+    floatMenu->addSeparator();
     floatMenu->addItem(SLOT_MENU_SHOW_PROGRAMS, "Show programs");
     floatMenu->addItem(SLOT_MENU_SHOW_PARAMETERS, "Show parameters");
     floatMenu->addItem(SLOT_MENU_SHOW_DEBUG_LOG, "Show debug log");
     floatMenu->addSeparator();
     floatMenu->addItem(SLOT_MENU_PROPAGATE_STATE, "Propagate state to duplicates");
     floatMenu->addItem(SLOT_MENU_EXPOSE_PARAMETER, "Expose parameters");
+    floatMenu->addSeparator();
     floatMenu->addItem(SLOT_MENU_START_CC, "Start CC Learn", !ccLearn->isLearning());
     floatMenu->addItem(SLOT_MENU_SHOW_CC, "Show CC Status");
     floatMenu->addItem(SLOT_MENU_CLEAR_CC, "Clear CC Learn");
