@@ -15,6 +15,7 @@ public:
         : AudioProcessorEditor (proc), audioProc (proc)
     {
         setSize (500, 200);
+        setAlwaysOnTop(true);
 
         addAndMakeVisible (list);
 
@@ -118,7 +119,7 @@ public:
         numTypes
     };
 
-    PluginWindow (PluginInstance* n, Type t, OwnedArray<PluginWindow>& windowList)
+    PluginWindow (PluginInstance* n, Type t, OwnedArray<PluginWindow>& windowList, bool shouldOnTop = false)
        : DocumentWindow (n->processor->getName(),
                          LookAndFeel::getDefaultLookAndFeel().findColour (ResizableWindow::backgroundColourId),
                          DocumentWindow::minimiseButton | DocumentWindow::closeButton),
@@ -126,6 +127,7 @@ public:
          node(n), type (t)
     {
         setSize (400, 300);
+        setAlwaysOnTop(shouldOnTop);
 
         if (auto* ui = createProcessorEditor (*node->processor, type))
             setContentOwned (ui, true);
@@ -162,6 +164,7 @@ public:
     PluginInstance* node;
     const Type type;
 
+private:
     static AudioProcessorEditor* createProcessorEditor(AudioProcessor& processor, PluginWindow::Type type)
     {
         if (type == PluginWindow::Type::normal)
@@ -180,7 +183,6 @@ public:
         return {};
     }
 
-private:
     float getDesktopScaleFactor() const override     { return 1.0f; }
 
     static String getTypeName (Type type)
@@ -203,6 +205,7 @@ private:
             setOpaque (true);
 
             addAndMakeVisible (panel);
+            setAlwaysOnTop(true);
 
             Array<PropertyComponent*> programs;
 
