@@ -9,7 +9,7 @@ class ParameterLinkEditor  : public Component, public ListBoxModel
 public:
     //==============================================================================
     ParameterLinkEditor (PluginBundle& bundle);
-    ~ParameterLinkEditor() override;
+    ~ParameterLinkEditor() = default;
 
     //==============================================================================
     void paint (Graphics& g) override;
@@ -21,16 +21,16 @@ public:
     void listBoxItemClicked(int row, const MouseEvent& e) override;
 
 private:
-
     //==============================================================================
+    PluginBundle& _bundle;
+    Array<std::pair<AudioProcessorParameter*, int>> parameters;
+
+    const int numParameterSlot;
+    std::unordered_set<int> selectedSet;
+
     ListBox parameterList;
     Label statusLabel;
     TextButton okBtn{ "OK" };
-    PluginBundle& _bundle;
-
-    const int numParameterSlot;
-    Array<std::pair<AudioProcessorParameter*, int>> parameters;
-    std::unordered_set<int> selectedSet;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ParameterLinkEditor)

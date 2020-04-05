@@ -59,6 +59,8 @@ public:
 
     //==============================================================================
     void adjustInstanceNumber(int newNumInstances, std::function<void(void)> callback = nullptr);
+    void clearMidiCollectorBuffer();
+    void sendAllNotesOff();
 
     //==============================================================================
     void openParameterLinkEditor();
@@ -94,7 +96,7 @@ private:
 
     MicroChromoAudioProcessor& processor;
     AudioPluginFormatManager& formatManager;
-    std::atomic<double> _sampleRate;
+    std::atomic<double> _sampleRate{ -1 };
     std::atomic<int> _samplesPerBlock;
 
     int _numInstances = 1, _maxInstances = 8;

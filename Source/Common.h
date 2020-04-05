@@ -14,8 +14,14 @@
 
 class PluginBundle;
 
-enum { mainMenuIdBase = 0x2717, pluginMenuIdBase = 0x324503f4 };
-enum {
+enum
+{
+    mainMenuIdBase = 0x2717,
+    pluginMenuIdBase = 0x324503f4
+};
+
+enum
+{
     SLOT_MENU_SHOW_MAIN_GUI = 0 + mainMenuIdBase,
     SLOT_MENU_SHOW_TWO_GUI = 1 + mainMenuIdBase,
     SLOT_MENU_SHOW_ALL_GUI = 2 + mainMenuIdBase,
@@ -35,6 +41,13 @@ enum {
     PLUGIN_SORT_CATEGORY = 15 + mainMenuIdBase,
     PLUGIN_SORT_ALPHABETICALLY = 16 + mainMenuIdBase,
     PLUGIN_SORT_FORMAT = 17 + mainMenuIdBase
+};
+
+enum CommandIDs
+{
+    openPluginScanner = 1,
+    openMidiScanner,
+    testCommand
 };
 
 class AudioParameterFloatVariant : public AudioParameterFloat

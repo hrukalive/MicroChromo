@@ -1,6 +1,7 @@
 #include "ParameterCcLearn.h"
 #include "PluginBundle.h"
 
+//==============================================================================
 ParameterCcLearn::ProgressWindow::ProgressComponent::ProgressComponent(ProgressWindow& parent) : _parent(parent)
 {
 	textBlock.setReadOnly(true);
@@ -27,21 +28,6 @@ ParameterCcLearn::ProgressWindow::ProgressComponent::ProgressComponent(ProgressW
 	addAndMakeVisible(btn);
 }
 
-void ParameterCcLearn::ProgressWindow::ProgressComponent::updateText(const String& newText)
-{
-	MessageManagerLock lock;
-	textBlock.setText(newText, false);
-}
-
-void ParameterCcLearn::ProgressWindow::ProgressComponent::updateCc(int ccNumber)
-{
-	MessageManagerLock lock;
-	if (ccNumber == -1)
-		ccNumberTextBox.setText("", false);
-	else
-		ccNumberTextBox.setText(String(ccNumber), false);
-}
-
 void ParameterCcLearn::ProgressWindow::ProgressComponent::paint(Graphics& g)
 {
 	g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
@@ -57,6 +43,23 @@ void ParameterCcLearn::ProgressWindow::ProgressComponent::resized()
 	textBlock.setBounds(b);
 }
 
+void ParameterCcLearn::ProgressWindow::ProgressComponent::updateText(const String& newText)
+{
+	MessageManagerLock lock;
+	textBlock.setText(newText, false);
+}
+
+void ParameterCcLearn::ProgressWindow::ProgressComponent::updateCc(int ccNumber)
+{
+	MessageManagerLock lock;
+	if (ccNumber == -1)
+		ccNumberTextBox.setText("", false);
+	else
+		ccNumberTextBox.setText(String(ccNumber), false);
+}
+
+
+//==============================================================================
 ParameterCcLearn::ProgressWindow::ProgressWindow(ParameterCcLearn& parent, Colour backgroundColor) :
 	DocumentWindow("CC Learn", backgroundColor, 0),
 	_parent(parent)
@@ -94,6 +97,7 @@ void ParameterCcLearn::ProgressWindow::closeButtonPressed()
 	setVisible(false);
 }
 
+//==============================================================================
 ParameterCcLearn::ParameterCcLearn(PluginBundle* bundle) :
 	_bundle(bundle)
 {
@@ -120,6 +124,53 @@ void ParameterCcLearn::processCc(int instanceIndex, int ccNumber, int ccValue, f
 		_bundle->getParameters(instanceIndex)[paramIndex]->setValueAt(ccValue / 127.0f * (learnedCcMax - learnedCcMin) + learnedCcMin, sampleOffset);
 }
 
+bool ParameterCcLearn::validLearn()
+{
+	return tmpParamIndex >= 0 && tmpParamIndex < (*_parameters).size()
+		&& tmpCcSource >= 0 && tmpCcSource < 128
+		&& tmpLearnedCcMin != FP_INFINITE && tmpLearnedCcMax != -FP_INFINITE
+		&& tmpLearnedCcMin < tmpLearnedCcMax;
+}
+
+void ParameterCcLearn::setCcLearn(int ccNumber, int parameterIndex, float min, float max)
+{
+	_isLearning = false;
+	if (_parameters)
+		for (auto* p : *_parameters)
+			p->removeListener(this);
+
+	tmpCcSource = ccNumber;
+	tmpParamIndex = parameterIndex;
+	tmpLearnedCcMin = min;
+	tmpLearnedCcMax = max;
+	_parameters = &(_bundle->getParameters());
+
+	if (validLearn())
+	{
+		if (hasLearned)
+			(*_parameters)[paramIndex]->addListener(_bundle);
+
+		paramIndex = tmpParamIndex.load();
+		ccSource = tmpCcSource.load();
+		learnedCcMin = tmpLearnedCcMin.load();
+		learnedCcMax = tmpLearnedCcMax.load();
+		resetTempValues();
+
+		(*_parameters)[paramIndex]->removeListener(_bundle);
+		hasLearned = true;
+	}
+}
+
+void ParameterCcLearn::resetTempValues()
+{
+	tmpCcSource = -1;
+	tmpParamIndex = -1;
+	tmpLearnedCcMin = FP_INFINITE;
+	tmpLearnedCcMax = -FP_INFINITE;
+	progressWindow->updateText(updateProgressNote());
+	progressWindow->updateCc(tmpCcSource);
+}
+
 void ParameterCcLearn::reset()
 {
 	hasLearned = false;
@@ -133,16 +184,6 @@ void ParameterCcLearn::reset()
 	paramIndex = -1;
 	learnedCcMin = FP_INFINITE;
 	learnedCcMax = -FP_INFINITE;
-	progressWindow->updateText(updateProgressNote());
-	progressWindow->updateCc(tmpCcSource);
-}
-
-void ParameterCcLearn::resetTempValues()
-{
-	tmpCcSource = -1;
-	tmpParamIndex = -1;
-	tmpLearnedCcMin = FP_INFINITE;
-	tmpLearnedCcMax = -FP_INFINITE;
 	progressWindow->updateText(updateProgressNote());
 	progressWindow->updateCc(tmpCcSource);
 }
@@ -184,35 +225,6 @@ void ParameterCcLearn::stopLearning()
 	}
 	else
 		AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "CC Learn", "CC Learn status not changed.");
-}
-
-void ParameterCcLearn::setCcLearn(int ccNumber, int parameterIndex, float min, float max)
-{
-	_isLearning = false;
-	if (_parameters)
-		for (auto* p : *_parameters)
-			p->removeListener(this);
-
-	tmpCcSource = ccNumber;
-	tmpParamIndex = parameterIndex;
-	tmpLearnedCcMin = min;
-	tmpLearnedCcMax = max;
-	_parameters = &(_bundle->getParameters());
-	
-	if (validLearn())
-	{
-		if (hasLearned)
-			(*_parameters)[paramIndex]->addListener(_bundle);
-
-		paramIndex = tmpParamIndex.load();
-		ccSource = tmpCcSource.load();
-		learnedCcMin = tmpLearnedCcMin.load();
-		learnedCcMax = tmpLearnedCcMax.load();
-		resetTempValues();
-
-		(*_parameters)[paramIndex]->removeListener(_bundle);
-		hasLearned = true;
-	}
 }
 
 void ParameterCcLearn::parameterValueChanged(int parameterIndex, float newValue)
@@ -263,14 +275,6 @@ void ParameterCcLearn::setStateInformation(const void* data, int sizeInBytes)
 				xml->getDoubleAttribute("learnedCcMax", -FP_INFINITE));
 		}
 	}
-}
-
-bool ParameterCcLearn::validLearn()
-{
-	return tmpParamIndex >= 0 && tmpParamIndex < (*_parameters).size()
-		&& tmpCcSource >= 0 && tmpCcSource < 128
-		&& tmpLearnedCcMin != FP_INFINITE && tmpLearnedCcMax != -FP_INFINITE
-		&& tmpLearnedCcMin < tmpLearnedCcMax;
 }
 
 String ParameterCcLearn::updateProgressNote(String otherMsg)

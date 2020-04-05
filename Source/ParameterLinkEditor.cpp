@@ -59,10 +59,24 @@ ParameterLinkEditor::ParameterLinkEditor (PluginBundle& bundle) :
     setSize (300, 400);
 }
 
-ParameterLinkEditor::~ParameterLinkEditor()
+//==============================================================================
+void ParameterLinkEditor::paint(Graphics& g)
 {
+    g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
 }
 
+void ParameterLinkEditor::resized()
+{
+    auto b = getLocalBounds();
+    b.reduce(10, 10);
+    okBtn.setBounds(b.removeFromBottom(40));
+    b.removeFromBottom(10);
+    statusLabel.setBounds(b.removeFromBottom(24));
+    b.removeFromBottom(10);
+    parameterList.setBounds(b);
+}
+
+//==============================================================================
 void ParameterLinkEditor::paintListBoxItem(int rowNumber, Graphics& g, int width, int height, bool /*rowIsSelected*/)
 {
     if (selectedSet.contains(parameters[rowNumber].second))
@@ -87,21 +101,3 @@ void ParameterLinkEditor::listBoxItemClicked(int row, const MouseEvent&)
     parameterList.repaintRow(row);
     statusLabel.setText(String(selectedSet.size()) + " of " + String(parameters.size()) + " selected", dontSendNotification);
 }
-
-//==============================================================================
-void ParameterLinkEditor::paint (Graphics& g)
-{
-    g.fillAll (getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
-}
-
-void ParameterLinkEditor::resized()
-{
-    auto b = getLocalBounds();
-    b.reduce(10, 10);
-    okBtn.setBounds(b.removeFromBottom(40));
-    b.removeFromBottom(10);
-    statusLabel.setBounds(b.removeFromBottom(24));
-    b.removeFromBottom(10);
-    parameterList.setBounds(b);
-}
-

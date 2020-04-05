@@ -67,6 +67,9 @@ public:
     void changeListenerCallback(ChangeBroadcaster* changed) override;
     void adjustInstanceNumber(int newNumInstances);
 
+    void updateMidiSequence(MidiMessageSequence seq);
+    void sendAllNotesOff(MidiBuffer& midiMessages);
+
     //==============================================================================
     ApplicationProperties& getApplicationProperties() { return appProperties; }
     AudioPluginFormatManager& getAudioPluginFormatManager() { return formatManager; }
@@ -80,7 +83,6 @@ public:
     int getNumInstances() { return numInstancesParameter; }
     AudioProcessorValueTreeState& getValueTreeState() { return parameters; }
     UndoManager* getUndoManager() noexcept { return &undoManager; }
-    AudioPlayHead::CurrentPositionInfo& getInfo() { return info; }
     OwnedArray<ParameterLinker>& getSynthParameterLinker() { return synthParamPtr; }
     OwnedArray<ParameterLinker>& getPSParameterLinker() { return psParamPtr; }
     int getParameterSlotNumber() { return parameterSlotNumber; }
@@ -93,8 +95,9 @@ private:
     AudioPluginFormatManager formatManager;
     Array<PluginDescription> internalTypes;
 
-    AudioPlayHead::CurrentPositionInfo info;
+    AudioPlayHead::CurrentPositionInfo posInfo;
     int parameterSlotNumber = 16;
+    std::atomic<bool> isPlayingNote{ false };
 
     std::atomic<int> numInstancesParameter{ 1 };
     int synthBundleTotalNumInputChannels, synthBundleMainBusNumInputChannels, synthBundleMainBusNumOutputChannels,
@@ -106,6 +109,9 @@ private:
     UndoManager undoManager;
     AudioProcessorValueTreeState parameters;
     OwnedArray<ParameterLinker> synthParamPtr, psParamPtr;
+
+    MidiMessageSequence midiSeq;
+    double nextStartTime = -1.0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessor)
 };

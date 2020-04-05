@@ -8,6 +8,8 @@
               pluginAAXCategory="2048" pluginRTASCategory="2048" headerPath="../../soundtouch/include">
   <MAINGROUP id="YsAiD7" name="MicroChromo">
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
+      <FILE id="NEWLjE" name="ChromoMidiEditor.h" compile="0" resource="0"
+            file="Source/ChromoMidiEditor.h"/>
       <FILE id="AUEOJz" name="ParameterCcLearn.cpp" compile="1" resource="0"
             file="Source/ParameterCcLearn.cpp"/>
       <FILE id="Si3N2C" name="ParameterCcLearn.h" compile="0" resource="0"

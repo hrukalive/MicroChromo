@@ -10,6 +10,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "ChromoMidiEditor.h"
 
 //==============================================================================
 MicroChromoAudioProcessorEditor::PluginListWindow::PluginListWindow(MicroChromoAudioProcessorEditor &mw, AudioPluginFormatManager& pluginFormatManager)
@@ -37,6 +38,34 @@ MicroChromoAudioProcessorEditor::PluginListWindow::~PluginListWindow()
 void MicroChromoAudioProcessorEditor::PluginListWindow::closeButtonPressed()
 {
     owner.pluginListWindow = nullptr;
+}
+
+//==============================================================================
+MicroChromoAudioProcessorEditor::MidiEditorWindow::MidiEditorWindow(MicroChromoAudioProcessorEditor& mw)
+    : DocumentWindow("Available Plugins",
+        LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId),
+        DocumentWindow::minimiseButton | DocumentWindow::closeButton),
+    owner(mw)
+{
+    auto deadMansPedalFile = owner.appProperties.getUserSettings()->getFile().getSiblingFile("RecentlyCrashedPluginsList");
+
+    setContentOwned(new ChromoMidiEditor(mw), true);
+
+    setResizable(true, false);
+    setResizeLimits(300, 400, 800, 1500);
+    setTopLeftPosition(60, 60);
+
+    setVisible(true);
+}
+
+MicroChromoAudioProcessorEditor::MidiEditorWindow::~MidiEditorWindow()
+{
+    clearContentComponent();
+}
+
+void MicroChromoAudioProcessorEditor::MidiEditorWindow::closeButtonPressed()
+{
+    owner.midiEditorWindow = nullptr;
 }
 
 //==============================================================================
@@ -341,6 +370,7 @@ PopupMenu MicroChromoAudioProcessorEditor::getMenuForIndex(int menuIndex, const 
     if (menuIndex == 0)
     {
         menu.addCommandItem(&commandManager, CommandIDs::openPluginScanner);
+        menu.addCommandItem(&commandManager, CommandIDs::openMidiScanner);
         menu.addSeparator();
         menu.addItem(PLUGIN_SORT_MANUFACTURER, "Sort by Manufacturer", true, pluginSortMethod == KnownPluginList::SortMethod::sortByManufacturer);
         menu.addItem(PLUGIN_SORT_CATEGORY, "Sort by Category", true, pluginSortMethod == KnownPluginList::SortMethod::sortByCategory);
@@ -410,7 +440,8 @@ ApplicationCommandTarget* MicroChromoAudioProcessorEditor::getNextCommandTarget(
 void MicroChromoAudioProcessorEditor::getAllCommands(Array<CommandID>& c)
 {
     Array<CommandID> commands{
-        CommandIDs::openPluginScanner
+        CommandIDs::openPluginScanner,
+        CommandIDs::openMidiScanner
     };
     c.addArray(commands);
 }
@@ -427,6 +458,9 @@ void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, Applic
         result.addDefaultKeypress('q', ModifierKeys::ctrlModifier);
 #endif
         break;
+    case CommandIDs::openMidiScanner:
+        result.setInfo("Open MIDI Editor", "Open MIDI Editor", "File", 0);
+        break;
     default:
         break;
     }
@@ -440,6 +474,13 @@ bool MicroChromoAudioProcessorEditor::perform(const InvocationInfo& info)
         if (pluginListWindow == nullptr)
             pluginListWindow.reset(new PluginListWindow(*this, formatManager));
         pluginListWindow->toFront(true);
+        break;
+    }
+    case CommandIDs::openMidiScanner:
+    {
+        if (midiEditorWindow == nullptr)
+            midiEditorWindow.reset(new MidiEditorWindow(*this));
+        midiEditorWindow->toFront(true);
         break;
     }
     default:

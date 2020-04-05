@@ -168,6 +168,36 @@ void PluginBundle::adjustInstanceNumber(int newNumInstances, std::function<void(
         });
 }
 
+void PluginBundle::clearMidiCollectorBuffer()
+{
+    if (isLoaded())
+        for (int i = 0; i < instanceStarted.load(); i++)
+            collectors[i]->reset(_sampleRate);
+}
+
+void PluginBundle::sendAllNotesOff()
+{
+    if (isLoaded())
+    {
+        for (int i = 0; i < instanceStarted.load(); i++)
+        {
+            collectors[i]->reset(_sampleRate);
+            for (auto j = 1; j <= 16; j++)
+            {
+                MidiMessage msg1(MidiMessage::allNotesOff(j));
+                MidiMessage msg2(MidiMessage::allSoundOff(j));
+                MidiMessage msg3(MidiMessage::allControllersOff(j));
+                msg1.setTimeStamp(0.001);
+                msg2.setTimeStamp(0.001);
+                msg3.setTimeStamp(0.001);
+                collectors[i]->addMessageToQueue(msg1);
+                collectors[i]->addMessageToQueue(msg2);
+                collectors[i]->addMessageToQueue(msg3);
+            }
+        }
+    }
+}
+
 void PluginBundle::openParameterLinkEditor()
 {
     DialogWindow::LaunchOptions dialogOption;
@@ -284,13 +314,13 @@ void PluginBundle::prepareToPlay(double sampleRate, int samplesPerBlock)
     }
 }
 
-void PluginBundle::processBlock(OwnedArray<AudioBuffer<float>>& bufferArray, MidiBuffer& midiMessages)
+void PluginBundle::processBlock(OwnedArray<AudioBuffer<float>>& bufferArray, MidiBuffer& /*midiMessages*/)
 {
     if (isLoaded())
     {
         for (auto i = 0; i < instanceStarted.load(); i++)
         {
-            MidiBuffer midiBuffer(midiMessages);
+            MidiBuffer midiBuffer;
             collectors[i]->removeNextBlockOfMessages(midiBuffer, _samplesPerBlock.load());
             MidiMessage midi_message;
             int sample_offset;
