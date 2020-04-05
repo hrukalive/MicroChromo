@@ -24,23 +24,14 @@ class MicroChromoAudioProcessorEditor  :
     public ChangeListener
 {
 public:
-    enum CommandIDs
-    {
-        openPluginScanner = 1,
-        testCommand
-    };
 
     //==============================================================================
     MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor&);
     ~MicroChromoAudioProcessorEditor();
 
     //==============================================================================
-    void changeListenerCallback(ChangeBroadcaster*) override;
-
-    //==============================================================================
-    StringArray getMenuBarNames() override;
-    PopupMenu getMenuForIndex(int menuIndex, const String& /*menuName*/) override;
-    void menuItemSelected(int menuItemID, int topLevelMenuIndex) override;
+    void paint(Graphics&) override;
+    void resized() override;
 
     //==============================================================================
     ApplicationCommandTarget* getNextCommandTarget() override;
@@ -51,11 +42,25 @@ public:
     KnownPluginList::SortMethod getPluginSortMethod() { return pluginSortMethod; }
 
     //==============================================================================
-    void paint (Graphics&) override;
-    void resized() override;
+    StringArray getMenuBarNames() override;
+    PopupMenu getMenuForIndex(int menuIndex, const String& /*menuName*/) override;
+    void menuItemSelected(int menuItemID, int topLevelMenuIndex) override;
+
+    //==============================================================================
+    void changeListenerCallback(ChangeBroadcaster*) override;
 
 private:
-    class MainEditor : 
+
+    MicroChromoAudioProcessor& processor;
+    ApplicationProperties& appProperties;
+    AudioPluginFormatManager& formatManager;
+    ApplicationCommandManager commandManager;
+    std::shared_ptr<PluginBundle> synthBundle, psBundle;
+
+    KnownPluginList& knownPluginList;
+    KnownPluginList::SortMethod pluginSortMethod;
+
+    class MainEditor :
         public AudioProcessorEditor,
         public ChangeListener,
         public Timer,
@@ -66,13 +71,14 @@ private:
         ~MainEditor();
 
         //==============================================================================
-        void changeListenerCallback(ChangeBroadcaster*) override;
+        void paint(Graphics&) override;
+        void resized() override;
+
         void mouseDown(const MouseEvent&) override;
         void mouseDrag(const MouseEvent&) override;
 
         //==============================================================================
-        void paint(Graphics&) override;
-        void resized() override;
+        void changeListenerCallback(ChangeBroadcaster*) override;
 
         //==============================================================================
         void timerCallback() override;
@@ -128,16 +134,6 @@ private:
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainEditor)
     };
-
-    MicroChromoAudioProcessor& processor;
-    ApplicationProperties& appProperties;
-    AudioPluginFormatManager& formatManager;
-    ApplicationCommandManager commandManager;
-    std::shared_ptr<PluginBundle> synthBundle, psBundle;
-
-    KnownPluginList& knownPluginList;
-    KnownPluginList::SortMethod pluginSortMethod;
-
     std::unique_ptr<MainEditor> mainEditor;
     std::unique_ptr<MenuBarComponent> menuBar;
 
@@ -152,6 +148,18 @@ private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginListWindow)
     };
     std::unique_ptr<PluginListWindow> pluginListWindow;
+
+    class MidiEditorWindow : public DocumentWindow
+    {
+    public:
+        MidiEditorWindow(MicroChromoAudioProcessorEditor& mw);
+        ~MidiEditorWindow();
+        void closeButtonPressed();
+    private:
+        MicroChromoAudioProcessorEditor& owner;
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiEditorWindow)
+    };
+    std::unique_ptr<MidiEditorWindow> midiEditorWindow;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessorEditor)
 };

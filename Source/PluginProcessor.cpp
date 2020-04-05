@@ -194,6 +194,58 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 {
     ScopedNoDenormals noDenormals;
 
+    auto sampleLength = 1.0 / getSampleRate();
+
+    if (getPlayHead())
+        getPlayHead()->getCurrentPosition(posInfo);
+    else
+        posInfo.isPlaying = false;
+    MidiBuffer midiBuffer;
+    if (!posInfo.isPlaying)
+    {
+        if (isPlayingNote)
+        {
+            midiMessages.clear();
+            sendAllNotesOff(midiMessages);
+        }
+        else
+        {
+            MidiMessage midiMessage;
+            int sampleOffset;
+            for (MidiBuffer::Iterator it(midiMessages); it.getNextEvent(midiMessage, sampleOffset);)
+            {
+                midiMessage.setTimeStamp(sampleOffset * sampleLength + sampleLength);
+                synthBundle->getCollectorAt(0)->addMessageToQueue(midiMessage);
+            }
+            midiMessages.clear();
+        }
+    }
+
+    auto startTime = posInfo.timeInSeconds;
+    auto bufferLength = buffer.getNumSamples() / getSampleRate();
+    auto endTime = startTime + bufferLength;
+    if (nextStartTime > 0.0 && std::abs(startTime - nextStartTime) > bufferLength)
+        sendAllNotesOff(midiMessages);
+    nextStartTime = endTime;
+    if (isPlayingNote && startTime >= midiSeq.getEndTime())
+        sendAllNotesOff(midiMessages);
+
+    if (posInfo.isPlaying)
+    {
+        for (int i = midiSeq.getNextIndexAtTime(startTime); i < midiSeq.getNumEvents(); i++)
+        {
+            MidiMessageSequence::MidiEventHolder* event = midiSeq.getEventPointer(i);
+
+            if (event->message.getTimeStamp() >= startTime && event->message.getTimeStamp() < endTime)
+            {
+                synthBundle->getCollectorAt(0)->addMessageToQueue(event->message);
+                isPlayingNote = true;
+            }
+            if (event->message.getTimeStamp() >= endTime)
+                break;
+        }
+    }
+
     for (auto i = 0; i < numInstancesParameter; i++)
     {
         int splitPoint = jmin(synthBundleMainBusNumInputChannels, 2, buffer.getNumChannels());
@@ -202,7 +254,7 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
         for (int j = splitPoint; j < synthBundleTotalNumInputChannels; j++)
             bufferArrayA[i]->clear(j, 0, bufferArrayA[i]->getNumSamples());
     }
-    synthBundle->processBlock(bufferArrayA, midiMessages);
+    synthBundle->processBlock(bufferArrayA, midiBuffer);
 
     for (auto i = 0; i < numInstancesParameter; i++)
     {
@@ -214,7 +266,7 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
         for (int j = splitPoint; j < psBundleTotalNumInputChannels; j++)
             bufferArrayB[i]->clear(j, 0, bufferArrayB[i]->getNumSamples());
     }
-    psBundle->processBlock(bufferArrayB, midiMessages);
+    psBundle->processBlock(bufferArrayB, midiBuffer);
 
     for (auto i = 0; i < buffer.getNumChannels(); ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
@@ -224,8 +276,6 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 
     for (auto i = getMainBusNumOutputChannels(); i < getTotalNumOutputChannels(); ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
-
-    midiMessages.clear();
 }
 
 void MicroChromoAudioProcessor::adjustInstanceNumber(int newNumInstances)
@@ -235,6 +285,21 @@ void MicroChromoAudioProcessor::adjustInstanceNumber(int newNumInstances)
         {
             this->numInstancesParameter = newNumInstances;
         });
+}
+
+void MicroChromoAudioProcessor::updateMidiSequence(MidiMessageSequence seq)
+{
+    midiSeq.swapWith(seq);
+    midiSeq.sort();
+}
+
+void MicroChromoAudioProcessor::sendAllNotesOff(MidiBuffer& midiMessages)
+{
+    synthBundle->sendAllNotesOff();
+    psBundle->sendAllNotesOff();
+    isPlayingNote = false;
+
+    DBG("All note off");
 }
 
 //==============================================================================
@@ -368,28 +433,6 @@ void MicroChromoAudioProcessor::changeListenerCallback(ChangeBroadcaster* change
                 psKnownPluginList.addType(type);
         }
     }
-    //if (changed == synthBundle.get())
-    //{
-    //    suspendProcessing(true);
-    //    if (synthBundle->isLoaded())
-    //    {
-    //        prepareToPlay(getSampleRate(), getBlockSize());
-    //        suspendProcessing(false);
-    //    }
-    //    else if (synthBundle->isError())
-    //        suspendProcessing(false);
-    //}
-    //else if (changed == psBundle.get())
-    //{
-    //    suspendProcessing(true);
-    //    if (psBundle->isLoaded())
-    //    {
-    //        prepareToPlay(getSampleRate(), getBlockSize());
-    //        suspendProcessing(false);
-    //    }
-    //    else if (synthBundle->isError())
-    //        suspendProcessing(false);
-    //}
 }
 
 void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool isSynth, std::function<void(PluginBundle&)> callback)
