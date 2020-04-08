@@ -24,12 +24,29 @@ public:
         table.getHeader().addColumn("End", 3, 100, 100, 200, TableHeaderComponent::defaultFlags);
         table.getHeader().addColumn("Color", 4, 100, 100, 200, TableHeaderComponent::defaultFlags);
 
-        Random rand;
-        for (int i = 0; i < 50; i++)
-        {
-            float sv = rand.nextFloat() + i;
-            notes.add(new NoteRow(60 - 12 + i % 24, sv, sv + 0.5 + 2 * rand.nextFloat(), rand.nextInt(6)));
-        }
+        notes.add(new NoteRow(60, 2, 4, 0));
+        notes.add(new NoteRow(63, 2, 4, -2));
+        notes.add(new NoteRow(67, 2, 4, 0));
+        notes.add(new NoteRow(60 + 12, 2, 4, 0));
+        notes.add(new NoteRow(63 + 12, 2, 4, -2));
+        notes.add(new NoteRow(67 + 12, 2, 4, 0));
+
+        notes.add(new NoteRow(60, 5, 7, 0));
+        notes.add(new NoteRow(63, 5, 7, 5));
+        notes.add(new NoteRow(67, 5, 7, 0));
+
+        notes.add(new NoteRow(60, 8, 11, 0));
+        notes.add(new NoteRow(64, 8, 11, 3));
+        notes.add(new NoteRow(67, 8, 11, 0));
+
+        //notes.add(new NoteRow(60, 2, 10, -5));
+        //notes.add(new NoteRow(61, 3, 10, -4));
+        //notes.add(new NoteRow(62, 4, 10, -3));
+        //notes.add(new NoteRow(63, 5, 10, -2));
+        //notes.add(new NoteRow(64, 6, 10, -1));
+        //notes.add(new NoteRow(65, 7, 10, 0));
+        //notes.add(new NoteRow(66, 8, 10, 1));
+        //notes.add(new NoteRow(67, 9, 10, 2));
 
         addAndMakeVisible(table);
         table.setColour(ListBox::outlineColourId, Colours::grey);
@@ -53,18 +70,19 @@ public:
 
     void updateMidi()
     {
-        MidiMessageSequence seq;
+        processor.clearNotes();
         for (auto& note : notes)
         {
-            MidiMessage msg1 = MidiMessage::noteOn(1, note->notenum, (uint8)80);
-            msg1.setTimeStamp(note->start);
-            MidiMessage msg2 = MidiMessage::noteOff(1, note->notenum, (uint8)80);
-            msg2.setTimeStamp(note->end);
-            seq.addEvent(msg1);
-            seq.addEvent(msg2);
+            auto pitchbend = note->color / 10.0 * 100;
+            if (pitchbend > 50)
+                processor.addNote(Note(note->notenum + 1, note->start, note->end - note->start, 0.7f, pitchbend - 100));
+            else if (pitchbend < -50)
+                processor.addNote(Note(note->notenum - 1, note->start, note->end - note->start, 0.7f, pitchbend + 100));
+            else
+                processor.addNote(Note(note->notenum, note->start, note->end - note->start, 0.7f, pitchbend));
         }
-        processor.updateMidiSequence(seq);
-        AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon, "Done", String(seq.getNumEvents()));
+        AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon, "Done", "Done");
+        processor.updateMidiSequence();
     }
 
     int getNumRows() override

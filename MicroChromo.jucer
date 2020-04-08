@@ -29,6 +29,8 @@
             file="Source/InternalPlugins.cpp"/>
       <FILE id="NnANeP" name="InternalPlugins.h" compile="0" resource="0"
             file="Source/InternalPlugins.h"/>
+      <FILE id="qJC4tX" name="Note.cpp" compile="1" resource="0" file="Source/Note.cpp"/>
+      <FILE id="wHjlDr" name="Note.h" compile="0" resource="0" file="Source/Note.h"/>
       <FILE id="WcOkwD" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="bbuHO5" name="PluginProcessor.h" compile="0" resource="0"

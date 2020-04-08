@@ -120,8 +120,8 @@ void ParameterCcLearn::processCc(int instanceIndex, int ccNumber, int ccValue, f
 		progressWindow->updateText(updateProgressNote());
 		progressWindow->updateCc(tmpCcSource);
 	}
-	else if (hasLearned && ccSource == ccNumber)
-		_bundle->getParameters(instanceIndex)[paramIndex]->setValueAt(ccValue / 127.0f * (learnedCcMax - learnedCcMin) + learnedCcMin, sampleOffset);
+	else if (_hasLearned && ccSource == ccNumber)
+		_bundle->getParameters(instanceIndex)[paramIndex]->setValueAt(ccValue / 100.0f * (learnedCcMax - learnedCcMin) + learnedCcMin, sampleOffset);
 }
 
 bool ParameterCcLearn::validLearn()
@@ -147,7 +147,7 @@ void ParameterCcLearn::setCcLearn(int ccNumber, int parameterIndex, float min, f
 
 	if (validLearn())
 	{
-		if (hasLearned)
+		if (_hasLearned)
 			(*_parameters)[paramIndex]->addListener(_bundle);
 
 		paramIndex = tmpParamIndex.load();
@@ -157,7 +157,7 @@ void ParameterCcLearn::setCcLearn(int ccNumber, int parameterIndex, float min, f
 		resetTempValues();
 
 		(*_parameters)[paramIndex]->removeListener(_bundle);
-		hasLearned = true;
+		_hasLearned = true;
 	}
 }
 
@@ -173,7 +173,7 @@ void ParameterCcLearn::resetTempValues()
 
 void ParameterCcLearn::reset()
 {
-	hasLearned = false;
+	_hasLearned = false;
 	_isLearning = false;
 	if (_parameters)
 		for (auto* p : *_parameters)
@@ -209,7 +209,7 @@ void ParameterCcLearn::stopLearning()
 	}
 	if (validLearn())
 	{
-		if (hasLearned)
+		if (_hasLearned)
 			(*_parameters)[paramIndex]->addListener(_bundle);
 
 		paramIndex = tmpParamIndex.load();
@@ -219,7 +219,7 @@ void ParameterCcLearn::stopLearning()
 		resetTempValues();
 
 		(*_parameters)[paramIndex]->removeListener(_bundle);
-		hasLearned = true;
+		_hasLearned = true;
 
 		AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon, "CC Learn", "CC Learn successful.");
 	}
@@ -302,7 +302,7 @@ String ParameterCcLearn::updateProgressNote(String otherMsg)
 
 void ParameterCcLearn::showStatus()
 {
-	if (!hasLearned)
+	if (!_hasLearned)
 		AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon, "CC Learn Status", "No learned parameter.");
 	else
 		AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon, "CC Learn Status",

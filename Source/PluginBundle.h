@@ -21,7 +21,11 @@ class MicroChromoAudioProcessor;
 class PluginBundle : public ChangeBroadcaster, public AudioProcessorParameter::Listener
 {
 public:
-    PluginBundle(MicroChromoAudioProcessor& p, int maxInstances, OwnedArray<ParameterLinker>& linker, PluginDescription emptyPlugin, PluginDescription defaultPlugin);
+    PluginBundle(MicroChromoAudioProcessor& p, 
+        int maxInstances, 
+        OwnedArray<ParameterLinker>& linker, 
+        PluginDescription emptyPlugin, 
+        PluginDescription defaultPlugin);
     ~PluginBundle();
 
     //==============================================================================
@@ -60,6 +64,7 @@ public:
     //==============================================================================
     void adjustInstanceNumber(int newNumInstances, std::function<void(void)> callback = nullptr);
     void clearMidiCollectorBuffer();
+    void addMessageToAllQueue(MidiMessage& msg);
     void sendAllNotesOff();
 
     //==============================================================================
@@ -75,13 +80,17 @@ public:
     bool hasError() { return _isError.load(); }
     void resetCcLearn();
     void startCcLearn();
+    bool hasCcLearned();
     void setCcLearn(int ccNum, int index, float min, float max);
-    int getLearnedCc() { return ccLearn->getCcLearnedParameterIndex(); }
+    int getLearnedCcSource() { return ccLearn->getCcSource(); }
+    int getLearnedCcParameterIndex() { return ccLearn->getCcLearnedParameterIndex(); }
     ParameterCcLearn& getCcLearnModule() { return *ccLearn; }
     PluginDescription getEmptyPluginDescription() { return _emptyPlugin; }
     PluginDescription getDefaultPluginDescription() { return _defaultPlugin; }
     bool isParameterExposed(int parameterIndex) { return linkParameterIndicesSet.contains(parameterIndex); }
     PluginInstance* getMainInstance() { return instances[0]; }
+
+    bool isKontakt();
 
     //==============================================================================
     void closeAllWindows();

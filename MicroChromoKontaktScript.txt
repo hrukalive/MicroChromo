@@ -1,0 +1,80 @@
+{***********************************************
+MicroChromo Tuning
+Author : Dachun Sun (adapted by Microtuning script from NI)
+Modified: April 5, 2020
+*************************************************}
+
+on init
+	
+	set_script_title("Microtuning Custom")
+	
+	message("")
+	
+	declare const $ECO_MODE := 0
+	declare const $TUNE_RANGE := 50
+
+	declare $count
+	declare !note_class[12]
+	!note_class[0] := "C"
+	!note_class[1] := "Db"
+	!note_class[2] := "D"
+	!note_class[3] := "Eb"
+	!note_class[4] := "E"
+	!note_class[5] := "F"
+	!note_class[6] := "Gb"
+	!note_class[7] := "G"
+	!note_class[8] := "Ab"
+	!note_class[9] := "A"
+	!note_class[10] := "Bb"
+	!note_class[11] := "B"
+	declare !note_names [128]
+	$count := 0
+	while ($count < 128)
+		!note_names[$count] := !note_class[$count mod 12] & (($count/12)-2)
+		inc ($count)
+	end while
+
+	declare $a
+	declare $b
+	
+	declare %helper_tune[12]
+	make_persistent(%helper_tune)
+	
+	{--------UI Elements--------}
+	
+	declare ui_label $label (4,1)	
+	set_text ($label, "  C       Db       D       Eb        E        F       Gb       G       Ab       A       Bb       B")
+	
+	declare ui_table %tune_ui[12](4,5,-$TUNE_RANGE)
+	make_persistent (%tune_ui)
+	set_control_help (%tune_ui,"Tuning Table: Adjust the detuning for each of the twelve notes.") 
+	
+	declare $helper_tune
+
+	{---------Layout---------}
+	move_control ($label, 1,1)
+	move_control (%tune_ui, 1,2)
+end on
+
+on controller
+	if (in_range($CC_NUM, 102, 113))
+        if (%CC[$CC_NUM] > 100)
+            %tune_ui[$CC_NUM - 102] := 50
+        else
+            %tune_ui[$CC_NUM - 102] := %CC[$CC_NUM] - 50
+        end if
+	end if
+end on
+
+on note
+	if ($ECO_MODE = 1)
+		$helper_tune := %tune_ui[$EVENT_NOTE mod 12]*1000
+		change_tune($EVENT_ID,$helper_tune,0)
+	else
+		while($NOTE_HELD = 1)
+			$helper_tune := %tune_ui[$EVENT_NOTE mod 12]*1000
+			change_tune($EVENT_ID,$helper_tune,0)
+			wait(15000)
+		end while
+	end if
+end on
