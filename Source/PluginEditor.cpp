@@ -413,9 +413,9 @@ void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLe
         case SLOT_MENU_EXPOSE_PARAMETER:  bundle->openParameterLinkEditor(); break;
         case SLOT_MENU_START_CC: bundle->getCcLearnModule().startLearning(); break;
         case SLOT_MENU_SHOW_CC: bundle->getCcLearnModule().showStatus(); break;
-        case SLOT_MENU_CLEAR_CC: bundle->getCcLearnModule().reset(); break;
-        case SLOT_MENU_USE_KONTAKT: processor.useKontakt(); break;
-        case SLOT_MENU_KONTAKT_CC: break;
+        case SLOT_MENU_CLEAR_CC: bundle->getCcLearnModule().reset(true); break;
+        case SLOT_MENU_USE_KONTAKT: processor.toggleUseKontakt(processor.getPitchShiftModulationSource() != USE_KONTAKT); break;
+        case SLOT_MENU_COPY_KONTAKT_SCRIPT: SystemClipboard::copyTextToClipboard(String(BinaryData::MicroChromoKontaktScript_txt).replace("@CC_START@", String(processor.getCcBase())).replace("@CC_END@", String(processor.getCcBase() + 11))); break;
         case SLOT_MENU_LOAD_EMPTY_PLUGIN:
         {
             bundle->closeAllWindows();

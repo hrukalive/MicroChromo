@@ -7,6 +7,10 @@
               aaxIdentifier="com.nylp.MicroChromo" pluginVSTCategory="kPlugCategSynth"
               pluginAAXCategory="2048" pluginRTASCategory="2048" headerPath="../../soundtouch/include">
   <MAINGROUP id="YsAiD7" name="MicroChromo">
+    <GROUP id="{32A9BA9B-4C0F-B1C1-2CB7-430912355187}" name="Resources">
+      <FILE id="Oe9g92" name="MicroChromoKontaktScript.txt" compile="0" resource="1"
+            file="Resources/MicroChromoKontaktScript.txt"/>
+    </GROUP>
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
       <FILE id="NEWLjE" name="ChromoMidiEditor.h" compile="0" resource="0"
             file="Source/ChromoMidiEditor.h"/>

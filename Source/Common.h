@@ -37,7 +37,7 @@ enum
     SLOT_MENU_LOAD_EMPTY_PLUGIN = 12 + mainMenuIdBase,
     SLOT_MENU_LOAD_DEFAULT_PLUGIN = 13 + mainMenuIdBase,
     SLOT_MENU_USE_KONTAKT = 14 + mainMenuIdBase,
-    SLOT_MENU_KONTAKT_CC = 15 + mainMenuIdBase,
+    SLOT_MENU_COPY_KONTAKT_SCRIPT = 15 + mainMenuIdBase,
 
     PLUGIN_SORT_MANUFACTURER = 16 + mainMenuIdBase,
     PLUGIN_SORT_CATEGORY = 17 + mainMenuIdBase,

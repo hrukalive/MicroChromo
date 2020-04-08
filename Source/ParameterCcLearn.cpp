@@ -1,4 +1,5 @@
 #include "ParameterCcLearn.h"
+#include "PluginProcessor.h"
 #include "PluginBundle.h"
 
 //==============================================================================
@@ -158,6 +159,8 @@ void ParameterCcLearn::setCcLearn(int ccNumber, int parameterIndex, float min, f
 
 		(*_parameters)[paramIndex]->removeListener(_bundle);
 		_hasLearned = true;
+
+		_bundle->getProcessor().updatePitchShiftModulationSource();
 	}
 }
 
@@ -171,7 +174,7 @@ void ParameterCcLearn::resetTempValues()
 	progressWindow->updateCc(tmpCcSource);
 }
 
-void ParameterCcLearn::reset()
+void ParameterCcLearn::reset(bool notify)
 {
 	_hasLearned = false;
 	_isLearning = false;
@@ -186,6 +189,9 @@ void ParameterCcLearn::reset()
 	learnedCcMax = -FP_INFINITE;
 	progressWindow->updateText(updateProgressNote());
 	progressWindow->updateCc(tmpCcSource);
+
+	if (notify)
+		_bundle->getProcessor().updatePitchShiftModulationSource();
 }
 
 void ParameterCcLearn::startLearning()
@@ -220,6 +226,8 @@ void ParameterCcLearn::stopLearning()
 
 		(*_parameters)[paramIndex]->removeListener(_bundle);
 		_hasLearned = true;
+
+		_bundle->getProcessor().updatePitchShiftModulationSource();
 
 		AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon, "CC Learn", "CC Learn successful.");
 	}
