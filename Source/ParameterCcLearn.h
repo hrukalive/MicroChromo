@@ -14,7 +14,7 @@ public:
 	//==============================================================================
 	void processCc(int instanceIndex, int ccNumber, int ccValue, float sampleOffset);
 	void setCcLearn(int ccNumber, int parameterIndex, float min, float max);
-	void reset();
+	void reset(bool notify = false);
 	void startLearning();
 
 	//==============================================================================

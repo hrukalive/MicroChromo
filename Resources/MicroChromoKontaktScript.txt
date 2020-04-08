@@ -57,11 +57,11 @@ on init
 end on
 
 on controller
-	if (in_range($CC_NUM, 102, 113))
+	if (in_range($CC_NUM, @CC_START@, @CC_END@))
         if (%CC[$CC_NUM] > 100)
-            %tune_ui[$CC_NUM - 102] := 50
+            %tune_ui[$CC_NUM - @CC_START@] := 50
         else
-            %tune_ui[$CC_NUM - 102] := %CC[$CC_NUM] - 50
+            %tune_ui[$CC_NUM - @CC_START@] := %CC[$CC_NUM] - 50
         end if
 	end if
 end on

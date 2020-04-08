@@ -71,8 +71,6 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
     synthBundle->loadPluginSync(internalTypes[1], numInstancesParameter);
     psBundle->loadPluginSync(internalTypes[2], numInstancesParameter);
 
-    psBundle->setCcLearn(100, 0, 0.25f, 0.75f);
-
     controllerStateMessage.ensureStorageAllocated(128);
 }
 
@@ -231,14 +229,17 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 
     auto ensureCcValue = [&]()
     {
-        for (int i = 0; i < numInstancesParameter; i++)
+        if (ccBundle)
         {
-            controllerStateMessage.clear();
-            ccMidiSeq[i]->createControllerUpdatesForTime(midiChannel, startTime, controllerStateMessage);
-            for (auto& msg : controllerStateMessage)
+            for (int i = 0; i < numInstancesParameter; i++)
             {
-                ccBundle->getCollectorAt(i)->addMessageToQueue(msg.withTimeStamp(sampleLength));
-                DBG("Recovering CC: " << msg.getControllerNumber() << ": " << msg.getControllerValue());
+                controllerStateMessage.clear();
+                ccMidiSeq[i]->createControllerUpdatesForTime(midiChannel, startTime, controllerStateMessage);
+                for (auto& msg : controllerStateMessage)
+                {
+                    ccBundle->getCollectorAt(i)->addMessageToQueue(msg.withTimeStamp(sampleLength));
+                    DBG("Recovering CC: " << msg.getControllerNumber() << ": " << msg.getControllerValue());
+                }
             }
         }
     };
@@ -340,22 +341,25 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
                     if (event->message.getTimeStamp() >= endTime)
                         break;
                 }
-                const auto ccEvtIndex = ccMidiSeq[i]->getNextIndexAtTime(startTime);
-                if (ccEvtIndex - 1 > 0)
+                if (ccBundle)
                 {
-                    MidiMessageSequence::MidiEventHolder* event = ccMidiSeq[i]->getEventPointer(ccEvtIndex - 1);
-                    ccBundle->getCollectorAt(i)->addMessageToQueue(event->message.withTimeStamp(Time::getMillisecondCounterHiRes() / 1000));
-                }
-                for (int j = ccEvtIndex; j < ccMidiSeq[i]->getNumEvents(); j++)
-                {
-                    MidiMessageSequence::MidiEventHolder* event = ccMidiSeq[i]->getEventPointer(j);
-
-                    if (event->message.getTimeStamp() >= startTime && event->message.getTimeStamp() < endTime)
+                    const auto ccEvtIndex = ccMidiSeq[i]->getNextIndexAtTime(startTime);
+                    if (ccEvtIndex - 1 > 0)
                     {
-                        ccBundle->getCollectorAt(i)->addMessageToQueue(event->message);
+                        MidiMessageSequence::MidiEventHolder* event = ccMidiSeq[i]->getEventPointer(ccEvtIndex - 1);
+                        ccBundle->getCollectorAt(i)->addMessageToQueue(event->message.withTimeStamp(Time::getMillisecondCounterHiRes() / 1000));
                     }
-                    if (event->message.getTimeStamp() >= endTime)
-                        break;
+                    for (int j = ccEvtIndex; j < ccMidiSeq[i]->getNumEvents(); j++)
+                    {
+                        MidiMessageSequence::MidiEventHolder* event = ccMidiSeq[i]->getEventPointer(j);
+
+                        if (event->message.getTimeStamp() >= startTime && event->message.getTimeStamp() < endTime)
+                        {
+                            ccBundle->getCollectorAt(i)->addMessageToQueue(event->message);
+                        }
+                        if (event->message.getTimeStamp() >= endTime)
+                            break;
+                    }
                 }
             }
             
@@ -402,18 +406,21 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 
 void MicroChromoAudioProcessor::adjustInstanceNumber(int newNumInstances)
 {
-    suspendProcessing(true);
-    synthBundle->adjustInstanceNumber(newNumInstances);
-    psBundle->adjustInstanceNumber(newNumInstances, [newNumInstances, this]()
+    psBundle->adjustInstanceNumber(newNumInstances);
+    synthBundle->adjustInstanceNumber(newNumInstances, [newNumInstances, this]()
         {
             this->numInstancesParameter = newNumInstances;
             updateMidiSequence();
         });
 }
 
-void MicroChromoAudioProcessor::updateMidiSequence()
+void MicroChromoAudioProcessor::updateMidiSequence(int newBase)
 {
-    suspendProcessing(true);
+    updateMidSeqSus = true;
+    suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus);
+
+    if (newBase != -1 && ccBase != newBase)
+        ccBase = newBase;
 
     notes.sort(NoteComparator(), true);
 
@@ -439,7 +446,9 @@ void MicroChromoAudioProcessor::updateMidiSequence()
         if (rangeEndTime < seq->getEndTime())
             rangeEndTime = seq->getEndTime();
     }
-    suspendProcessing(false);
+
+    updateMidSeqSus = false;
+    suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus);
 }
 
 void MicroChromoAudioProcessor::updateMidiSequenceGeneral()
@@ -561,6 +570,8 @@ void MicroChromoAudioProcessor::updateMidiSequenceGeneral()
         seq->sort();
         seq->updateMatchedPairs();
     }
+
+    isCurrentModSrcKontakt = false;
 }
 
 void MicroChromoAudioProcessor::updateMidiSequenceKontakt()
@@ -685,10 +696,15 @@ void MicroChromoAudioProcessor::updateMidiSequenceKontakt()
         seq->sort();
         seq->updateMatchedPairs();
     }
+
+    isCurrentModSrcKontakt = true;
 }
 
 void MicroChromoAudioProcessor::updateCcMidiSequenceWithNewBase(int newBase)
 {
+    if (ccBase == newBase)
+        return;
+
     for (int i = 0; i < numInstancesParameter; i++)
     {
         auto* oldCcSeq = ccMidiSeq[i];
@@ -733,6 +749,8 @@ void MicroChromoAudioProcessor::getStateInformation (MemoryBlock& destData)
     std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>("root");
     xml->setAttribute("numInstances", numInstancesParameter);
     xml->setAttribute("midiChannel", midiChannel);
+    xml->setAttribute("ccBase", ccBase);
+    xml->setAttribute("isModSrcKontakt", psModSource == USE_KONTAKT ? 1 : 0);
 
     auto stateXml = state.createXml();
     auto synthDescXml = synthBundle->getDescription().createXml();
@@ -788,14 +806,8 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
         if (xml->hasTagName("root"))
         {
             numInstancesParameter = xml->getIntAttribute("numInstances", 1);
-            notesMidiSeq.clear();
-            ccMidiSeq.clear();
-            for (int i = 0; i < numInstancesParameter; i++)
-            {
-                notesMidiSeq.add(new MidiMessageSequence());
-                ccMidiSeq.add(new MidiMessageSequence());
-            }
             updateMidiChannel(xml->getIntAttribute("midiChannel", 1));
+            updateCcMidiSequenceWithNewBase(xml->getIntAttribute("ccBase", 102));
             forEachXmlChildElement(*xml, child)
             {
                 if (child->hasTagName(parameters.state.getType()))
@@ -810,7 +822,15 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
                         {
                             MemoryBlock proc_data;
                             proc_data.fromBase64Encoding(xml->getStringAttribute("synthStateData"));
-                            this->addPlugin(desc, true, [proc_data](PluginBundle& bundle) {bundle.setStateInformation(proc_data.getData(), proc_data.getSize()); });
+                            if (xml->getIntAttribute("isModSrcKontakt", 0))
+                            {
+                                this->addPlugin(desc, true, [proc_data, this](PluginBundle& bundle) {
+                                        bundle.setStateInformation(proc_data.getData(), proc_data.getSize());
+                                        this->toggleUseKontakt(true);
+                                    });
+                            }
+                            else
+                                this->addPlugin(desc, true, [proc_data](PluginBundle& bundle) {bundle.setStateInformation(proc_data.getData(), proc_data.getSize()); });
                         }
                         else
                             this->addPlugin(desc, true);
@@ -865,19 +885,18 @@ void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool is
     }
     else
     {
-        psBundle->loadPlugin(desc, numInstancesParameter, [desc, callback, this](PluginBundle& bundle)
+        psBundle->loadPlugin(desc, numInstancesParameter, [callback, this](PluginBundle& bundle)
             {
                 if (callback)
                     callback(bundle);
-                if (desc.isDuplicateOf(this->internalTypes[2]))
-                    bundle.setCcLearn(100, 0, 0.25f, 0.75f);
             });
     }
 }
 
 void MicroChromoAudioProcessor::startLoadingPlugin()
 {
-    suspendProcessing(true);
+    pluginLoadSus = true;
+    suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus);
 }
 
 void MicroChromoAudioProcessor::finishLoadingPlugin()
@@ -890,10 +909,13 @@ void MicroChromoAudioProcessor::finishLoadingPlugin()
             updateHostDisplay();
         }
 
-        if (psBundle->hasCcLearned())
-            synthBundle->resetCcLearn();
+        if (psBundle->getDescription().isDuplicateOf(this->internalTypes[2]))
+            psBundle->setCcLearn(100, 0, 0.25f, 0.75f);
 
-        suspendProcessing(false);
+        updatePitchShiftModulationSource();
+
+        pluginLoadSus = false;
+        suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus);
     }
 }
 
@@ -913,31 +935,113 @@ void MicroChromoAudioProcessor::insertNote(int index, const Note& note)
 
 void MicroChromoAudioProcessor::updatePitchShiftModulationSource()
 {
-    suspendProcessing(true);
-    if (psBundle->hasCcLearned())
+    updateModSrcSus = true;
+    suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus);
+
+    auto& synthCcLearnModule = synthBundle->getCcLearnModule();
+    auto& psCcLearnModule = psBundle->getCcLearnModule();
+
+    if (psModSource == USE_KONTAKT)
     {
-        psModSource = USE_PS;
-        ccBundle = psBundle;
-        updateMidiSequence();
+        if (synthBundle->isKontakt())
+        {
+            if (synthCcLearnModule.hasLearned())
+                synthCcLearnModule.reset();
+            if (psCcLearnModule.hasLearned())
+                psCcLearnModule.reset();
+            ccBundle = synthBundle;
+            if (!isCurrentModSrcKontakt)
+                updateMidiSequence(jlimit(0, 116, ccBase.load()));
+            DBG("Mod src now is: Kontakt");
+        }
+        else
+        {
+            AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Error", "Kontakt is not detected.");
+            psModSource = USE_NONE;
+            ccBundle = nullptr;
+        }
     }
-    else if (synthBundle->hasCcLearned())
+    else if (psModSource == USE_NONE)
     {
-        psModSource = USE_SYNTH;
-        ccBundle = synthBundle;
-        updateMidiSequence();
+        if (synthCcLearnModule.hasLearned() && !psCcLearnModule.hasLearned())
+        {
+            psModSource = USE_SYNTH;
+            ccBundle = synthBundle;
+            if (isCurrentModSrcKontakt)
+                updateMidiSequence(synthCcLearnModule.getCcSource());
+            else
+                updateCcMidiSequenceWithNewBase(synthCcLearnModule.getCcSource());
+            DBG("Mod src now is: Synth " << ccBase);
+        }
+        else if (!synthCcLearnModule.hasLearned() && psCcLearnModule.hasLearned())
+        {
+            psModSource = USE_PS;
+            ccBundle = psBundle;
+            if (isCurrentModSrcKontakt)
+                updateMidiSequence(psCcLearnModule.getCcSource());
+            else
+                updateCcMidiSequenceWithNewBase(psCcLearnModule.getCcSource());
+            DBG("Mod src now is: Ps " << ccBase);
+        }
+        else if (synthCcLearnModule.hasLearned() && psCcLearnModule.hasLearned())
+        {
+            synthCcLearnModule.reset();
+            psModSource = USE_PS;
+            ccBundle = psBundle;
+            if (isCurrentModSrcKontakt)
+                updateMidiSequence(psCcLearnModule.getCcSource());
+            else
+                updateCcMidiSequenceWithNewBase(psCcLearnModule.getCcSource());
+            DBG("Mod src now is: Ps " << ccBase);
+        }
+        else
+        {
+            psModSource = USE_NONE;
+            ccBundle = nullptr;
+            DBG("Mod src now is: None");
+        }
     }
-    else if (synthBundle->isKontakt())
+    else if (psModSource == USE_SYNTH)
     {
-        psModSource = USE_KONTAKT;
-        ccBundle = synthBundle;
-        updateMidiSequence();
+        if (!synthCcLearnModule.hasLearned())
+        {
+            psModSource = USE_NONE;
+            ccBundle = nullptr;
+            DBG("Mod src synth is None");
+        }
+        else
+        {
+            if (synthCcLearnModule.getCcSource() != ccBase)
+            {
+                updateCcMidiSequenceWithNewBase(synthCcLearnModule.getCcSource());
+                DBG("Mod src update: Synth " << ccBase);
+            }
+            if (psCcLearnModule.hasLearned())
+                psCcLearnModule.reset();
+        }
     }
-    else
+    else if (psModSource == USE_PS)
     {
-        psModSource = USE_NONE;
-        ccBundle = psBundle;
+        if (!psCcLearnModule.hasLearned())
+        {
+            psModSource = USE_NONE;
+            ccBundle = nullptr;
+            DBG("Mod src ps is None");
+        }
+        else
+        {
+            if (psCcLearnModule.getCcSource() != ccBase)
+            {
+                updateCcMidiSequenceWithNewBase(psCcLearnModule.getCcSource());
+                DBG("Mod src update: Ps " << ccBase);
+            }
+            if (synthCcLearnModule.hasLearned())
+                synthCcLearnModule.reset();
+        }
     }
-    suspendProcessing(false);
+
+    updateModSrcSus = false;
+    suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus);
 }
 
 bool MicroChromoAudioProcessor::canLearnCc(const PluginBundle* bundle)
@@ -958,10 +1062,13 @@ bool MicroChromoAudioProcessor::canChooseKontakt()
     return false;
 }
 
-void MicroChromoAudioProcessor::useKontakt()
+void MicroChromoAudioProcessor::toggleUseKontakt(bool isOn)
 {
-    psModSource = USE_KONTAKT;
-    ccBundle = synthBundle;
+    if (isOn)
+        psModSource = USE_KONTAKT;
+    else
+        psModSource = USE_NONE;
+    updatePitchShiftModulationSource();
 }
 
 int MicroChromoAudioProcessor::getPitchShiftModulationSource()

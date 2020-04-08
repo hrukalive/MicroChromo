@@ -68,7 +68,7 @@ public:
     void changeListenerCallback(ChangeBroadcaster* changed) override;
     void adjustInstanceNumber(int newNumInstances);
 
-    void updateMidiSequence();
+    void updateMidiSequence(int newBase = -1);
     void updateMidiSequenceGeneral();
     void updateMidiSequenceKontakt();
     void updateCcMidiSequenceWithNewBase(int newBase);
@@ -101,7 +101,7 @@ public:
     int getPitchShiftModulationSource();
     bool canLearnCc(const PluginBundle* bundle);
     bool canChooseKontakt();
-    void useKontakt();
+    void toggleUseKontakt(bool isOn);
 
     void updateMidiChannel(int newMidiChannel);
     void updateKontaktCcBase(int newCcBase);
@@ -128,7 +128,7 @@ private:
     Array<Note> notes;
     OwnedArray<MidiMessageSequence> notesMidiSeq, ccMidiSeq;
 
-    std::atomic<int> ccBase{ 102 }, psModSource{ -1 }, midiChannel{ 1 };
+    std::atomic<int> ccBase{ 102 }, psModSource{ USE_NONE }, midiChannel{ 1 };
 
     //==============================================================================
     AudioPlayHead::CurrentPositionInfo posInfo;
@@ -144,6 +144,10 @@ private:
     int synthBundleTotalNumInputChannels, synthBundleMainBusNumInputChannels, synthBundleMainBusNumOutputChannels,
         psBundleTotalNumInputChannels, psBundleTotalNumOutputChannels, psBundleMainBusNumInputChannels, psBundleMainBusNumOutputChannels;
     float sampleLength{ -1 }, bufferLength{ -1 };
+
+    bool isCurrentModSrcKontakt = false;
+
+    bool updateMidSeqSus = false, updateModSrcSus = false, pluginLoadSus = false;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessor)

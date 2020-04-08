@@ -151,11 +151,11 @@ void PluginBundle::checkPluginLoaded(const PluginDescription desc, int numInstan
             for (auto* p : instances[0]->processor->getParameters())
                 p->addListener(this);
 
-            if (callback)
-                callback(*this);
-
             if (!currentDesc.isDuplicateOf(desc))
                 currentDesc = desc;
+
+            if (callback)
+                callback(*this);
 
             _isNewlyLoaded = true;
         }
@@ -567,19 +567,19 @@ std::unique_ptr<PopupMenu> PluginBundle::getMainPopupMenu()
     floatMenu->addItem(SLOT_MENU_PROPAGATE_STATE, "Propagate state to duplicates");
     floatMenu->addItem(SLOT_MENU_EXPOSE_PARAMETER, "Expose parameters");
     floatMenu->addSeparator();
-    floatMenu->addItem(SLOT_MENU_START_CC, "Start CC Learn", !ccLearn->isLearning() && canLearnCc);
-    floatMenu->addItem(SLOT_MENU_SHOW_CC, "Show CC Status", canLearnCc);
+    floatMenu->addItem(SLOT_MENU_START_CC, "Start CC Learn", canLearnCc && !ccLearn->isLearning());
+    floatMenu->addItem(SLOT_MENU_SHOW_CC, "Show CC Status", ccLearn->hasLearned());
     floatMenu->addItem(SLOT_MENU_CLEAR_CC, "Clear CC Learn", ccLearn->hasLearned());
-    //if (isKontakt())
+    if (this == processor.getSynthBundlePtr().get() && isKontakt())
     {
         floatMenu->addSeparator();
         floatMenu->addItem(SLOT_MENU_USE_KONTAKT, "Kontakt Specific", canChooseKontakt, processor.getPitchShiftModulationSource() == USE_KONTAKT);
-        //floatMenu->addItem(SLOT_MENU_KONTAKT_CC, "Starting CC Number", canChooseKontakt, processor.getPitchShiftModulationSource() == USE_KONTAKT);
+        floatMenu->addItem(SLOT_MENU_COPY_KONTAKT_SCRIPT, "Copy Kontakt Script", canChooseKontakt);
 
         PopupMenu subMenu;
         for (int i = 0; i < 128 - 12 + 1; i++)
             subMenu.addItem(CC_VALUE_BASE + i, "CC " + String(i), true, ccBase == i);
-        floatMenu->addSubMenu("Kontakt CC Number", subMenu, canChooseKontakt);
+        floatMenu->addSubMenu("Kontakt CC Number", subMenu, processor.getPitchShiftModulationSource() == USE_KONTAKT);
     }
 
     return floatMenu;
