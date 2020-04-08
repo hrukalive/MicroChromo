@@ -90,17 +90,14 @@ private:
         std::shared_ptr<PluginBundle> synthBundle, psBundle;
 
         std::unique_ptr<TextButton> synthButton, effectButton, dragButton;
-        std::unique_ptr<TextButton> noteBtn;
         std::unique_ptr<Label> synthLabel, effectLabel;
-        std::unique_ptr<Label> numInstancesLabel, numParameterLabel;
-        std::unique_ptr<ComboBox> numInstancesBox;
+        std::unique_ptr<Label> numInstancesLabel, numParameterLabel, midiChannelLabel;
+        std::unique_ptr<ComboBox> numInstancesBox, midiChannelComboBox;
         std::unique_ptr<TextEditor> numParameterSlot;
         std::unique_ptr<PopupMenu> floatMenu;
 
-        std::atomic<bool> ignoreInitialChange{ true };
-        bool test = true;
-        int lastNote = 60;
-        int lastNote2 = 60;
+        std::atomic<bool> ignoreInitialChange1{ true }, ignoreInitialChange2{ true };
+        bool canDrop = true;
 
         std::function<void(int, bool)> bundlePopupMenuSelected = [this](int r, bool isSynth) {
             auto bundle = isSynth ? this->synthBundle : this->psBundle;

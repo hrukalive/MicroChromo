@@ -174,3 +174,25 @@ void ParameterLinker::OneToManyListener::parameterGestureChanged(int /*parameter
     else
         _thisLockGesture = true;
 }
+
+SimpleMidiMessage::SimpleMidiMessage(int channel, int key, float timestamp, float velocity, int pitchbend, int cc, bool isNoteOn, float adjustment)
+{
+    if (isNoteOn)
+    {
+        noteMsg = MidiMessage::noteOn(channel, key, velocity).withTimeStamp(timestamp);
+        ccMsg = MidiMessage::controllerEvent(channel, cc, pitchbend + 50).withTimeStamp(jmax(0.0f, timestamp - adjustment));
+    }
+    else
+    {
+        noteMsg = MidiMessage::noteOff(channel, key, velocity).withTimeStamp(timestamp);
+    }
+    noteOn = isNoteOn;
+}
+
+String SimpleMidiMessage::toString() const
+{
+    return (noteOn ? " ON " : " OFF ") + ("key: " + String(noteMsg.getNoteNumber())) + 
+        " time: " + String(noteMsg.getTimeStamp(), 2) + 
+        " vel: " + String(noteMsg.getVelocity()) +
+        (noteOn ? (" pit: " + String(ccMsg.getControllerValue() - 50) + " cc: " + String(ccMsg.getControllerNumber())) : "");
+}

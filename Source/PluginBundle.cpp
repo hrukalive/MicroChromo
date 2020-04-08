@@ -11,8 +11,18 @@
 #include "PluginBundle.h"
 #include "PluginProcessor.h"
 
-PluginBundle::PluginBundle(MicroChromoAudioProcessor& p, int maxInstances, OwnedArray<ParameterLinker>& linker, PluginDescription emptyPlugin, PluginDescription defaultPlugin)
-    : _maxInstances(maxInstances), _numInstances(1), processor(p), formatManager(p.getAudioPluginFormatManager()), parameterLinker(linker), _emptyPlugin(emptyPlugin), _defaultPlugin(defaultPlugin)
+PluginBundle::PluginBundle(MicroChromoAudioProcessor& p, 
+    int maxInstances, 
+    OwnedArray<ParameterLinker>& linker, 
+    PluginDescription emptyPlugin, 
+    PluginDescription defaultPlugin)
+    : _maxInstances(maxInstances), 
+    _numInstances(1), 
+    processor(p), 
+    formatManager(p.getAudioPluginFormatManager()), 
+    parameterLinker(linker), 
+    _emptyPlugin(emptyPlugin), 
+    _defaultPlugin(defaultPlugin)
 {
     for (auto i = 0; i < maxInstances; i++)
         collectors.set(i, new MidiMessageCollector());
@@ -175,6 +185,13 @@ void PluginBundle::clearMidiCollectorBuffer()
             collectors[i]->reset(_sampleRate);
 }
 
+void PluginBundle::addMessageToAllQueue(MidiMessage& msg)
+{
+    if (isLoaded())
+        for (int i = 0; i < instanceStarted.load(); i++)
+            collectors[i]->addMessageToQueue(msg);
+}
+
 void PluginBundle::sendAllNotesOff()
 {
     if (isLoaded())
@@ -234,7 +251,7 @@ void PluginBundle::linkParameters()
 {
     auto& parameters = instances[0]->processor->getParameters();
     linkParameterIndices.sort();
-    auto learnedCc = getLearnedCc();
+    auto learnedCc = getLearnedCcParameterIndex();
     linkParameterIndices.removeIf([&parameters, learnedCc](int v) { return v >= parameters.size() || v == learnedCc; });
     linkParameterIndicesSet.clear();
     for (auto index : linkParameterIndices)
@@ -398,6 +415,11 @@ void PluginBundle::startCcLearn()
     ccLearn->startLearning();
 }
 
+bool PluginBundle::hasCcLearned()
+{
+    return ccLearn->hasLearned();
+}
+
 void PluginBundle::setCcLearn(int ccNum, int index, float min, float max)
 {
     ccLearn->setCcLearn(ccNum, index, min, max);
@@ -529,6 +551,10 @@ std::unique_ptr<PopupMenu> PluginBundle::getMainPopupMenu()
 {
     std::unique_ptr<PopupMenu> floatMenu = std::make_unique<PopupMenu>();
 
+    auto canLearnCc = processor.canLearnCc(this);
+    auto canChooseKontakt = processor.canChooseKontakt();
+    auto ccBase = processor.getCcBase();
+
     floatMenu->addItem(SLOT_MENU_SHOW_MAIN_GUI, "Show representative plugin GUI");
     floatMenu->addItem(SLOT_MENU_SHOW_TWO_GUI, "Show two plugin GUI", processor.getNumInstances() > 1);
     floatMenu->addItem(SLOT_MENU_SHOW_ALL_GUI, "Show all plugin GUI", processor.getNumInstances() > 2);
@@ -541,9 +567,20 @@ std::unique_ptr<PopupMenu> PluginBundle::getMainPopupMenu()
     floatMenu->addItem(SLOT_MENU_PROPAGATE_STATE, "Propagate state to duplicates");
     floatMenu->addItem(SLOT_MENU_EXPOSE_PARAMETER, "Expose parameters");
     floatMenu->addSeparator();
-    floatMenu->addItem(SLOT_MENU_START_CC, "Start CC Learn", !ccLearn->isLearning());
-    floatMenu->addItem(SLOT_MENU_SHOW_CC, "Show CC Status");
-    floatMenu->addItem(SLOT_MENU_CLEAR_CC, "Clear CC Learn");
+    floatMenu->addItem(SLOT_MENU_START_CC, "Start CC Learn", !ccLearn->isLearning() && canLearnCc);
+    floatMenu->addItem(SLOT_MENU_SHOW_CC, "Show CC Status", canLearnCc);
+    floatMenu->addItem(SLOT_MENU_CLEAR_CC, "Clear CC Learn", ccLearn->hasLearned());
+    //if (isKontakt())
+    {
+        floatMenu->addSeparator();
+        floatMenu->addItem(SLOT_MENU_USE_KONTAKT, "Kontakt Specific", canChooseKontakt, processor.getPitchShiftModulationSource() == USE_KONTAKT);
+        //floatMenu->addItem(SLOT_MENU_KONTAKT_CC, "Starting CC Number", canChooseKontakt, processor.getPitchShiftModulationSource() == USE_KONTAKT);
+
+        PopupMenu subMenu;
+        for (int i = 0; i < 128 - 12 + 1; i++)
+            subMenu.addItem(CC_VALUE_BASE + i, "CC " + String(i), true, ccBase == i);
+        floatMenu->addSubMenu("Kontakt CC Number", subMenu, canChooseKontakt);
+    }
 
     return floatMenu;
 }
@@ -556,4 +593,11 @@ std::unique_ptr<PopupMenu> PluginBundle::getPluginPopupMenu(KnownPluginList::Sor
     floatMenu->addSeparator();
     KnownPluginList::addToMenu(*floatMenu, knownPluginList.getTypes(), pluginSortMethod, currentDesc.createIdentifierString());
     return floatMenu;
+}
+
+bool PluginBundle::isKontakt()
+{
+    if (currentDesc.name.toLowerCase().indexOf("kontakt") > -1)
+        return true;
+    return false;
 }

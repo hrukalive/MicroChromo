@@ -93,10 +93,6 @@ MicroChromoAudioProcessorEditor::MainEditor::MainEditor(MicroChromoAudioProcesso
     addAndMakeVisible(dragButton.get());
     dragButton->addMouseListener(this, true);
 
-    noteBtn.reset(new TextButton("Note"));
-    noteBtn->addMouseListener(this, true);
-    addAndMakeVisible(noteBtn.get());
-
     numParameterSlot.reset(new TextEditor());
     addAndMakeVisible(numParameterSlot.get());
     numParameterSlot->setMultiLine(false);
@@ -122,17 +118,33 @@ MicroChromoAudioProcessorEditor::MainEditor::MainEditor(MicroChromoAudioProcesso
         numInstancesBox->addItem(String(i), i);
     numInstancesBox->setSelectedId(processor.getNumInstances());
     numInstancesBox->onChange = [&]() {
-        if (!ignoreInitialChange)
+        if (!ignoreInitialChange1)
         {
             synthBundle->closeAllWindows();
             psBundle->closeAllWindows();
             processor.adjustInstanceNumber(numInstancesBox->getSelectedId());
         }
-        ignoreInitialChange = false;
+        ignoreInitialChange1 = false;
     };
     numInstancesLabel.reset(new Label());
     addAndMakeVisible(numInstancesLabel.get());
     numInstancesLabel->setText("# Instance", dontSendNotification);
+
+    midiChannelComboBox.reset(new ComboBox());
+    addAndMakeVisible(midiChannelComboBox.get());
+    for (int i = 1; i <= 16; i++)
+        midiChannelComboBox->addItem(String(i), i);
+    midiChannelComboBox->setSelectedId(processor.getMidiChannel());
+    midiChannelComboBox->onChange = [&]() {
+        if (!ignoreInitialChange2)
+        {
+            processor.updateMidiChannel(midiChannelComboBox->getSelectedId());
+        }
+        ignoreInitialChange2 = false;
+    };
+    midiChannelLabel.reset(new Label());
+    addAndMakeVisible(midiChannelLabel.get());
+    midiChannelLabel->setText("MIDI Channel", dontSendNotification);
 
     synthBundle->addChangeListener(this);
     psBundle->addChangeListener(this);
@@ -149,7 +161,6 @@ MicroChromoAudioProcessorEditor::MainEditor::~MainEditor()
     synthButton->removeMouseListener(this);
     effectButton->removeMouseListener(this);
     dragButton->removeMouseListener(this);
-    noteBtn->removeMouseListener(this);
 }
 
 void MicroChromoAudioProcessorEditor::MainEditor::changeListenerCallback(ChangeBroadcaster* changed)
@@ -186,77 +197,65 @@ void MicroChromoAudioProcessorEditor::MainEditor::mouseDown(const MouseEvent& e)
         floatMenu->showMenuAsync(options.withTargetComponent(effectButton.get()).withMaximumNumColumns(1), 
             ModalCallbackFunction::create([this](int r) { bundlePopupMenuSelected(r, false); }));
     }
-    else if (e.eventComponent == noteBtn.get())
-    {
-        if (isTimerRunning())
-            stopTimer();
-        else
-            startTimerHz(10);
-    }
 }
 
 void MicroChromoAudioProcessorEditor::MainEditor::mouseDrag(const MouseEvent& e)
 {
-    if (e.eventComponent == dragButton.get())
+    if (e.eventComponent == dragButton.get() && canDrop)
     {
         DragAndDropContainer* dragContainer = DragAndDropContainer::findParentDragContainerFor(dragButton.get());
         if (!dragContainer->isDragAndDropActive())
         {
-            std::shared_ptr<TemporaryFile> outf = std::make_shared<TemporaryFile>();
-            if (std::unique_ptr<FileOutputStream> p_os{ outf->getFile().createOutputStream() })
+            Array<std::shared_ptr<TemporaryFile>> files;
+            StringArray filenames;
+
+            auto& notesMidiSeq = processor.getNoteMidiSequence();
+            auto& ccMidiSeq = processor.getCcMidiSequence();
+
+            for (int i = 0; i < notesMidiSeq.size(); i++)
             {
-                p_os->writeString("This is a test.");
-                DBG("drag clip name " << outf->getFile().getFullPathName());
-                DragAndDropContainer::performExternalDragDropOfFiles({ outf->getFile().getFullPathName() }, false, nullptr,
-                    [=]() {
-                        DBG("Dropped");
-                        outf->deleteTemporaryFile();
-                    });
+                if (notesMidiSeq[i]->getNumEvents() == 0)
+                    continue;
+
+                MidiMessageSequence copy;
+                for (auto& evt : *notesMidiSeq[i])
+                    copy.addEvent(MidiMessage(evt->message).withTimeStamp(evt->message.getTimeStamp() * 48000));
+                for (auto& evt : *ccMidiSeq[i])
+                    copy.addEvent(MidiMessage(evt->message).withTimeStamp(evt->message.getTimeStamp() * 48000));
+                copy.sort();
+                copy.updateMatchedPairs();
+
+                MidiFile file;
+                file.addTrack(copy);
+
+                std::shared_ptr<TemporaryFile> outf = std::make_shared<TemporaryFile>(".mid");
+                if (std::unique_ptr<FileOutputStream> p_os{ outf->getFile().createOutputStream() })
+                {
+                    file.writeTo(*p_os, 1);
+                    files.add(outf);
+                    filenames.add(outf->getFile().getFullPathName());
+                }
             }
+
+            canDrop = false;
+            startTimer(1000);
+
+            DragAndDropContainer::performExternalDragDropOfFiles(filenames, false, nullptr,
+                [=]() {
+                    for (auto& outf : files)
+                        outf->deleteTemporaryFile();
+                    DBG("Dropped");
+                });
         }
     }
 }
 
 void MicroChromoAudioProcessorEditor::MainEditor::timerCallback()
 {
-    if (test)
-    {
-        MidiMessage controlNote = MidiMessage::controllerEvent(1, 100, Random().nextInt(101) - 50);
-        controlNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-        lastNote = Random().nextInt(40) + 40;
-        MidiMessage startNote = MidiMessage::noteOn(1, lastNote, (uint8)90);
-        startNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-        psBundle->getCollectorAt(0)->addMessageToQueue(controlNote);
-        synthBundle->getCollectorAt(0)->addMessageToQueue(controlNote);
-        synthBundle->getCollectorAt(0)->addMessageToQueue(startNote);
-
-        if (processor.getNumInstances() > 1)
-        {
-            controlNote = MidiMessage::controllerEvent(1, 100, Random().nextInt(101) - 50);
-            controlNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-            lastNote2 = Random().nextInt(40) + 40;
-            startNote = MidiMessage::noteOn(1, lastNote2, (uint8)90);
-            startNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-            psBundle->getCollectorAt(1)->addMessageToQueue(controlNote);
-            synthBundle->getCollectorAt(1)->addMessageToQueue(controlNote);
-            synthBundle->getCollectorAt(1)->addMessageToQueue(startNote);
-        }
-    }
-    else
-    {
-        MidiMessage stopNote = MidiMessage::noteOff(1, lastNote);
-        stopNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-        synthBundle->getCollectorAt(0)->addMessageToQueue(stopNote);
-
-        if (processor.getNumInstances() > 1)
-        {
-            stopNote = MidiMessage::noteOff(1, lastNote2);
-            stopNote.setTimeStamp(Time::getMillisecondCounterHiRes() * 0.001);
-            synthBundle->getCollectorAt(1)->addMessageToQueue(stopNote);
-        }
-    }
-    test = !test;
+    canDrop = true;
+    stopTimer();
 }
+
 void MicroChromoAudioProcessorEditor::MainEditor::paint(Graphics& g)
 {
     g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
@@ -266,14 +265,12 @@ void MicroChromoAudioProcessorEditor::MainEditor::resized()
 {
     auto b = getLocalBounds();
     b.reduce(10, 10);
-    auto spaceHeightSmall = jmax(1.0f, (b.getHeight() - 170) / 32.0f * 6);
-    auto spaceHeightLarge = jmax(1.0f, (b.getHeight() - 170) / 32.0f * 10);
+    auto spaceHeightSmall = jmax(1.0f, (b.getHeight() - 200) / 30.0f * 4);
+    auto spaceHeightLarge = jmax(1.0f, (b.getHeight() - 200) / 30.0f * 9);
 
     auto tmp = b.removeFromBottom(30);
     dragButton->setBounds(tmp.removeFromLeft(tmp.proportionOfWidth(0.7)));
     tmp.removeFromLeft(6);
-    noteBtn->setBounds(tmp);
-    b.removeFromBottom(spaceHeightLarge);
 
     auto leftPanel = b.removeFromLeft(b.proportionOfWidth(0.3));
     auto rightPanel = b.withTrimmedLeft(10);
@@ -281,6 +278,8 @@ void MicroChromoAudioProcessorEditor::MainEditor::resized()
     numInstancesLabel->setBounds(leftPanel.removeFromTop(30));
     leftPanel.removeFromTop(spaceHeightSmall);
     numParameterLabel->setBounds(leftPanel.removeFromTop(30));
+    leftPanel.removeFromTop(spaceHeightSmall);
+    midiChannelLabel->setBounds(leftPanel.removeFromTop(30));
     leftPanel.removeFromTop(spaceHeightLarge);
 
     synthButton->setBounds(leftPanel.removeFromTop(40));
@@ -290,6 +289,8 @@ void MicroChromoAudioProcessorEditor::MainEditor::resized()
     numInstancesBox->setBounds(rightPanel.removeFromTop(30));
     rightPanel.removeFromTop(spaceHeightSmall);
     numParameterSlot->setBounds(rightPanel.removeFromTop(30));
+    rightPanel.removeFromTop(spaceHeightSmall);
+    midiChannelComboBox->setBounds(rightPanel.removeFromTop(30));
     rightPanel.removeFromTop(spaceHeightLarge);
 
     synthLabel->setBounds(rightPanel.removeFromTop(40));
@@ -314,7 +315,6 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 
     pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
     knownPluginList.addChangeListener(this);
-
 
     menuBar.reset(new MenuBarComponent(this));
     addAndMakeVisible(menuBar.get());
@@ -414,6 +414,8 @@ void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLe
         case SLOT_MENU_START_CC: bundle->getCcLearnModule().startLearning(); break;
         case SLOT_MENU_SHOW_CC: bundle->getCcLearnModule().showStatus(); break;
         case SLOT_MENU_CLEAR_CC: bundle->getCcLearnModule().reset(); break;
+        case SLOT_MENU_USE_KONTAKT: processor.useKontakt(); break;
+        case SLOT_MENU_KONTAKT_CC: break;
         case SLOT_MENU_LOAD_EMPTY_PLUGIN:
         {
             bundle->closeAllWindows();
@@ -426,7 +428,12 @@ void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLe
             processor.addPlugin(bundle->getDefaultPluginDescription(), isSynth);
             break;
         }
-        default: break;
+        default:
+        {
+            if (menuItemID >= CC_VALUE_BASE && menuItemID < CC_VALUE_BASE + 128 - 12 + 1)
+                processor.updateKontaktCcBase(menuItemID - CC_VALUE_BASE);
+            break;
+        }
         }
     }
 }

@@ -36,11 +36,15 @@ enum
     SLOT_MENU_CLEAR_CC = 11 + mainMenuIdBase,
     SLOT_MENU_LOAD_EMPTY_PLUGIN = 12 + mainMenuIdBase,
     SLOT_MENU_LOAD_DEFAULT_PLUGIN = 13 + mainMenuIdBase,
+    SLOT_MENU_USE_KONTAKT = 14 + mainMenuIdBase,
+    SLOT_MENU_KONTAKT_CC = 15 + mainMenuIdBase,
 
-    PLUGIN_SORT_MANUFACTURER = 14 + mainMenuIdBase,
-    PLUGIN_SORT_CATEGORY = 15 + mainMenuIdBase,
-    PLUGIN_SORT_ALPHABETICALLY = 16 + mainMenuIdBase,
-    PLUGIN_SORT_FORMAT = 17 + mainMenuIdBase
+    PLUGIN_SORT_MANUFACTURER = 16 + mainMenuIdBase,
+    PLUGIN_SORT_CATEGORY = 17 + mainMenuIdBase,
+    PLUGIN_SORT_ALPHABETICALLY = 18 + mainMenuIdBase,
+    PLUGIN_SORT_FORMAT = 19 + mainMenuIdBase,
+
+    CC_VALUE_BASE = 20 + mainMenuIdBase
 };
 
 enum CommandIDs
@@ -48,6 +52,14 @@ enum CommandIDs
     openPluginScanner = 1,
     openMidiScanner,
     testCommand
+};
+
+enum
+{
+    USE_NONE = 1,
+    USE_PS,
+    USE_SYNTH,
+    USE_KONTAKT
 };
 
 class AudioParameterFloatVariant : public AudioParameterFloat
@@ -121,4 +133,25 @@ private:
     AudioProcessorParameter* _parameter;
     int _index;
     std::unique_ptr<AudioProcessorParameter::Listener> listener1{ nullptr }, listener2{ nullptr };
+};
+
+struct SimpleMidiMessage
+{
+    SimpleMidiMessage(int channel, int key, float timestamp, float velocity, int pitchbend, int cc, bool isNoteOn, float adjustment);
+
+    String toString() const;
+
+    MidiMessage noteMsg, ccMsg;
+    bool noteOn = false;
+};
+
+struct SimpleMidiMessageComparator
+{
+    SimpleMidiMessageComparator() = default;
+
+    static int compareElements(const SimpleMidiMessage& first, const SimpleMidiMessage& second)
+    {
+        const float timeDiff = first.noteMsg.getTimeStamp() - second.noteMsg.getTimeStamp();
+        return (timeDiff > 0.f) - (timeDiff < 0.f);
+    }
 };

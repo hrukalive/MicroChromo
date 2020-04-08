@@ -27,7 +27,9 @@ public:
 
 	//==============================================================================
 	int getCcLearnedParameterIndex() { return paramIndex; }
+	int getCcSource() { return ccSource; }
 	bool isLearning() { return _isLearning; }
+	bool hasLearned() { return _hasLearned; }
 
 	//==============================================================================
 	void showStatus();
@@ -45,7 +47,7 @@ private:
 	const Array<AudioProcessorParameter*>* _parameters{ nullptr };
 	std::atomic<int> paramIndex{ -1 }, ccSource{ -1 };
 	std::atomic<float> learnedCcMin{ FP_INFINITE }, learnedCcMax{ -FP_INFINITE };
-	std::atomic<bool> _isLearning = false, hasLearned = false;
+	std::atomic<bool> _isLearning = false, _hasLearned = false;
 
 	std::atomic<int> tmpParamIndex{ -1 }, tmpCcSource{ -1 };
 	std::atomic<float> tmpLearnedCcMin{ FP_INFINITE }, tmpLearnedCcMax{ -FP_INFINITE };

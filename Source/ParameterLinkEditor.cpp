@@ -26,7 +26,7 @@ ParameterLinkEditor::ParameterLinkEditor (PluginBundle& bundle) :
     _bundle(bundle), numParameterSlot(bundle.getProcessor().getParameterSlotNumber())
 {
     int j = 0;
-    auto learnedCc = bundle.getLearnedCc();
+    auto learnedCc = bundle.getLearnedCcParameterIndex();
     for (auto* p : bundle.getParameters())
     {
         if (j != learnedCc)
