@@ -18,15 +18,21 @@
 #include <JuceHeader.h>
 #include "Note.h"
 
-Note::Note() noexcept {}
+Note::Note() noexcept
+{
+    id = nidCounter++;
+}
 
 Note::Note(int keyVal, float beatVal,
-           float lengthVal, float velocityVal, int pitchBendVal) noexcept :
+    float lengthVal, float velocityVal, String pitchColorVal) noexcept :
     key(keyVal),
     beat(beatVal),
     length(lengthVal),
     velocity(velocityVal),
-    pitchBend(pitchBendVal) {}
+    pitchColor(pitchColorVal)
+{
+    id = nidCounter++;
+}
 
 #define TICKS_PER_BEAT 410
 #define MIN_LENGTH (1.f / TICKS_PER_BEAT)
@@ -89,16 +95,21 @@ Note Note::withVelocity(float newVelocity) const noexcept
     return other;
 }
 
-Note Note::withPitchBend(int pitchBend) const noexcept
+Note Note::withPitchColor(String pitchColor) const noexcept
 {
     Note other(*this);
-    other.pitchBend = pitchBend;
+    other.pitchColor = pitchColor;
     return other;
 }
 
 //===----------------------------------------------------------------------===//
 // Accessors
 //===----------------------------------------------------------------------===//
+
+uint32 Note::getId() const noexcept
+{
+    return this->id;
+}
 
 int Note::getKey() const noexcept
 {
@@ -119,9 +130,34 @@ float Note::getVelocity() const noexcept
 {
     return this->velocity;
 }
-int Note::getPitchBend() const noexcept
+String Note::getPitchColor() const noexcept
 {
-    return this->pitchBend;
+    return this->pitchColor;
+}
+
+void Note::setKey(int newKey) noexcept
+{
+    this->key = newKey;
+}
+
+void Note::setBeat(float newBeat) noexcept
+{
+    this->beat = newBeat;
+}
+
+void Note::setLength(float newLength) noexcept
+{
+    this->length = newLength;
+}
+
+void Note::setVelocity(float newVelocity) noexcept
+{
+    this->velocity = newVelocity;
+}
+
+void Note::setPitchColor(String newPitchColor) noexcept
+{
+    this->pitchColor = newPitchColor;
 }
 
 void Note::applyChanges(const Note& other) noexcept
@@ -130,5 +166,5 @@ void Note::applyChanges(const Note& other) noexcept
     this->beat = other.beat;
     this->length = other.length;
     this->velocity = other.velocity;
-    this->pitchBend = other.pitchBend;
+    this->pitchColor = other.pitchColor;
 }

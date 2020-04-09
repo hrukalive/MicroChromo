@@ -9,6 +9,8 @@
 */
 
 #include "Common.h"
+#include "PluginProcessor.h"
+#include "PluginEditor.h"
 #include "PluginBundle.h"
 
 AudioParameterFloatVariant::AudioParameterFloatVariant(const String& parameterID,
@@ -175,6 +177,85 @@ void ParameterLinker::OneToManyListener::parameterGestureChanged(int /*parameter
         _thisLockGesture = true;
 }
 
+ComponentWithTable::ComponentWithTable(MicroChromoAudioProcessorEditor& editor) : 
+    owner(editor), processor(editor.getProcessor()) {}
+
+void ComponentWithTable::selectedRowsChanged(int row)
+{
+    lastRow = row;
+}
+
+EditableTextCustomComponent::EditableTextCustomComponent(ComponentWithTable& td)
+    : owner(td)
+{
+    setEditable(false, true, false);
+}
+void EditableTextCustomComponent::mouseDown(const MouseEvent& event)
+{
+    owner.table.selectRowsBasedOnModifierKeys(rowId, event.mods, false);
+
+    Label::mouseDown(event);
+}
+void EditableTextCustomComponent::textWasEdited()
+{
+    owner.setText(rowId, columnId, getText());
+}
+void EditableTextCustomComponent::setRowAndColumn(const int newRow, const int newColumn)
+{
+    rowId = newRow;
+    columnId = newColumn;
+    setText(owner.getText(rowId, columnId), dontSendNotification);
+}
+
+ComboBoxCustomComponent::ComboBoxCustomComponent(ComponentWithTable& td)
+    : owner(td)
+{
+    addListener(this);
+}
+ComboBoxCustomComponent::~ComboBoxCustomComponent()
+{
+    removeListener(this);
+}
+void ComboBoxCustomComponent::updateList()
+{
+    clear();
+    for (auto& k : owner.itemOrder)
+        addItem(k, owner.itemTextToitemId[k]);
+}
+void ComboBoxCustomComponent::setRowAndColumn(const int newRow, const int newColumn)
+{
+    rowId = newRow;
+    columnId = newColumn;
+    setSelectedId(owner.getSelectedId(rowId, columnId), dontSendNotification);
+}
+void ComboBoxCustomComponent::comboBoxChanged(ComboBox* comboBoxThatHasChanged)
+{
+    owner.setSelectedId(rowId, columnId, getSelectedId());
+}
+
+TextButtonCustomComponent::TextButtonCustomComponent(ComponentWithTable& td)
+    : owner(td)
+{
+    addListener(this);
+}
+TextButtonCustomComponent::~TextButtonCustomComponent()
+{
+    removeListener(this);
+}
+void TextButtonCustomComponent::updateColor(Colour newColor)
+{
+    color = newColor;
+}
+void TextButtonCustomComponent::setRowAndColumn(const int newRow, const int newColumn)
+{
+    rowId = newRow;
+    columnId = newColumn;
+}
+void TextButtonCustomComponent::buttonClicked(Button* btn)
+{
+    owner.buttonClicked(rowId, columnId, color);
+}
+
 SimpleMidiMessage::SimpleMidiMessage(int channel, int key, float timestamp, float velocity, int pitchbend, int cc, bool isNoteOn, float adjustment)
 {
     if (isNoteOn)
@@ -196,3 +277,8 @@ String SimpleMidiMessage::toString() const
         " vel: " + String(noteMsg.getVelocity()) +
         (noteOn ? (" pit: " + String(ccMsg.getControllerValue() - 50) + " cc: " + String(ccMsg.getControllerNumber())) : "");
 }
+
+ColorPitchBendRecord::ColorPitchBendRecord() :
+    name("Original"), value(0), color(Colours::grey) {}
+ColorPitchBendRecord::ColorPitchBendRecord(String name, int value, Colour color) :
+    name(name), value(value), color(color) {}

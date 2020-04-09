@@ -69,15 +69,17 @@ public:
     void adjustInstanceNumber(int newNumInstances);
 
     void updateMidiSequence(int newBase = -1);
-    void updateMidiSequenceGeneral();
-    void updateMidiSequenceKontakt();
     void updateCcMidiSequenceWithNewBase(int newBase);
+    void filterNotesWithColorMap();
+    void updateNoteColorMap(Array<ColorPitchBendRecord>& colors);
+    void renameNoteColorMap(String oldName, String newName);
     void sendAllNotesOff();
 
     //==============================================================================
     void addNote(const Note& note);
     void clearNotes();
     void insertNote(int index, const Note& note);
+    void sortNotes();
 
     //==============================================================================
     ApplicationProperties& getApplicationProperties() { return appProperties; }
@@ -93,6 +95,8 @@ public:
     int getParameterSlotNumber() { return parameterSlotNumber; }
     int getMidiChannel() { return midiChannel; }
     int getCcBase() { return ccBase; }
+    Array<Note>& getNotes() { return notes; }
+    auto& getNoteColorMap() { return noteColorMap; }
 
     OwnedArray<MidiMessageSequence>& getNoteMidiSequence() { return notesMidiSeq; }
     OwnedArray<MidiMessageSequence>& getCcMidiSequence() { return ccMidiSeq; }
@@ -108,6 +112,10 @@ public:
 
     static const int MAX_INSTANCES = 8;
 private:
+
+    void updateMidiSequenceGeneral(Array<SimpleMidiMessage>& sequence);
+    void updateMidiSequenceKontakt(Array<SimpleMidiMessage>& sequence);
+
     //==============================================================================
     ApplicationProperties appProperties;
     KnownPluginList knownPluginList, synthKnownPluginList, psKnownPluginList;
@@ -126,12 +134,15 @@ private:
     OwnedArray<ParameterLinker> synthParamPtr, psParamPtr;
 
     Array<Note> notes;
+    
     OwnedArray<MidiMessageSequence> notesMidiSeq, ccMidiSeq;
-
+    HashMap<String, ColorPitchBendRecord> noteColorMap;
+    std::atomic<uint32> cid = 0;
     std::atomic<int> ccBase{ 102 }, psModSource{ USE_NONE }, midiChannel{ 1 };
 
     //==============================================================================
     AudioPlayHead::CurrentPositionInfo posInfo;
+    std::atomic<bool> hasPlayheadInfo{ false };
     Array<MidiMessage> controllerStateMessage;
 
     std::atomic<bool> properlyPrepared{ false };
@@ -146,7 +157,6 @@ private:
     float sampleLength{ -1 }, bufferLength{ -1 };
 
     bool isCurrentModSrcKontakt = false;
-
     bool updateMidSeqSus = false, updateModSrcSus = false, pluginLoadSus = false;
 
     //==============================================================================

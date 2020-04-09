@@ -31,8 +31,8 @@ public:
     Note(Note &&other) noexcept = default;
     Note &operator= (Note &&other) noexcept = default;
 
-    explicit Note(int keyVal = MIDDLE_C, float beatVal = 0.f,
-         float lengthVal = 1.f, float velocityVal = 1.f, int pitchBendVal = 0) noexcept;
+    explicit Note(int keyVal, float beatVal = 0.f,
+         float lengthVal = 1.f, float velocityVal = 1.f, String pitchColorVal = "+0") noexcept;
 
     Note withKey(int newKey) const noexcept;
     Note withBeat(float newBeat) const noexcept;
@@ -42,17 +42,24 @@ public:
     Note withLength(float newLength) const noexcept;
     Note withDeltaLength(float deltaLength) const noexcept;
     Note withVelocity(float newVelocity) const noexcept;
-    Note withPitchBend(int pitchBend) const noexcept;
+    Note withPitchColor(String pitchColor) const noexcept;
 
     //===------------------------------------------------------------------===//
     // Accessors
     //===------------------------------------------------------------------===//
 
+    uint32 getId() const noexcept;
     int getKey() const noexcept;
     float getBeat() const noexcept;
     float getLength() const noexcept;
     float getVelocity() const noexcept;
-    int getPitchBend() const noexcept;
+    String getPitchColor() const noexcept;
+
+    void setKey(int newKey) noexcept;
+    void setBeat(float newBeat) noexcept;
+    void setLength(float newLength) noexcept;
+    void setVelocity(float newVelocity) noexcept;
+    void setPitchColor(String newPitchColor) noexcept;
 
     //===------------------------------------------------------------------===//
     // Helpers
@@ -62,10 +69,14 @@ public:
 
 protected:
 
-    int key = MIDDLE_C, pitchBend = 0;
+    uint32 id;
+    int key = MIDDLE_C;
+    String pitchColor = "+0";
     float beat = 0.f, length = 1.f, velocity = 1.f;
 
 private:
+
+    static inline std::atomic<uint32> nidCounter{ 0 };
 
     JUCE_LEAK_DETECTOR(Note);
 };

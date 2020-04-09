@@ -72,6 +72,23 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
     psBundle->loadPluginSync(internalTypes[2], numInstancesParameter);
 
     controllerStateMessage.ensureStorageAllocated(128);
+
+    noteColorMap.set("0", ColorPitchBendRecord("0", 0, Colours::grey));
+
+    notes.add(Note(60, 2, 2, 0.8f, "0"));
+    notes.add(Note(63, 2, 2, 0.8f, "0"));
+    notes.add(Note(67, 2, 2, 0.8f, "0"));
+    notes.add(Note(60 + 12, 2, 2, 0.8f, "0"));
+    notes.add(Note(63 + 12, 2, 2, 0.8f, "0"));
+    notes.add(Note(67 + 12, 2, 2, 0.8f, "0"));
+
+    notes.add(Note(60, 5, 2, 0.8f, "0"));
+    notes.add(Note(63, 5, 2, 0.8f, "0"));
+    notes.add(Note(67, 5, 2, 0.8f, "0"));
+
+    notes.add(Note(60, 8, 3, 0.8f, "0"));
+    notes.add(Note(64, 8, 3, 0.8f, "0"));
+    notes.add(Note(67, 8, 3, 0.8f, "0"));
 }
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
@@ -207,9 +224,15 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 
 
     if (getPlayHead())
+    {
         getPlayHead()->getCurrentPosition(posInfo);
+        hasPlayheadInfo = true;
+    }
     else
+    {
+        hasPlayheadInfo = false;
         posInfo.isPlaying = false;
+    }
 
     auto startTime = posInfo.timeInSeconds;
     auto endTime = startTime + bufferLength;
@@ -320,7 +343,7 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
                         MidiMessageSequence::MidiEventHolder* event = notesMidiSeq[i]->getEventPointer(j);
                         if (event->message.isNoteOn() && event->noteOffObject != nullptr && event->noteOffObject->message.getTimeStamp() > startTime)
                         {
-                            synthBundle->getCollectorAt(i)->addMessageToQueue(event->message);
+                            synthBundle->getCollectorAt(i)->addMessageToQueue(event->message.withTimeStamp(event->message.getTimeStamp() - startTime + sampleLength));
                             isPlayingNote = true;
                         }
                     }
@@ -335,7 +358,7 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 
                     if (event->message.getTimeStamp() >= startTime && event->message.getTimeStamp() < endTime)
                     {
-                        synthBundle->getCollectorAt(i)->addMessageToQueue(event->message);
+                        synthBundle->getCollectorAt(i)->addMessageToQueue(event->message.withTimeStamp(event->message.getTimeStamp() - startTime + sampleLength));
                         isPlayingNote = true;
                     }
                     if (event->message.getTimeStamp() >= endTime)
@@ -347,7 +370,7 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
                     if (ccEvtIndex - 1 > 0)
                     {
                         MidiMessageSequence::MidiEventHolder* event = ccMidiSeq[i]->getEventPointer(ccEvtIndex - 1);
-                        ccBundle->getCollectorAt(i)->addMessageToQueue(event->message.withTimeStamp(Time::getMillisecondCounterHiRes() / 1000));
+                        ccBundle->getCollectorAt(i)->addMessageToQueue(event->message.withTimeStamp(sampleLength));
                     }
                     for (int j = ccEvtIndex; j < ccMidiSeq[i]->getNumEvents(); j++)
                     {
@@ -355,7 +378,7 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 
                         if (event->message.getTimeStamp() >= startTime && event->message.getTimeStamp() < endTime)
                         {
-                            ccBundle->getCollectorAt(i)->addMessageToQueue(event->message);
+                            ccBundle->getCollectorAt(i)->addMessageToQueue(event->message.withTimeStamp(event->message.getTimeStamp() - startTime + sampleLength));
                         }
                         if (event->message.getTimeStamp() >= endTime)
                             break;
@@ -422,7 +445,7 @@ void MicroChromoAudioProcessor::updateMidiSequence(int newBase)
     if (newBase != -1 && ccBase != newBase)
         ccBase = newBase;
 
-    notes.sort(NoteComparator(), true);
+    sortNotes();
 
     notesMidiSeq.clear();
     ccMidiSeq.clear();
@@ -432,10 +455,32 @@ void MicroChromoAudioProcessor::updateMidiSequence(int newBase)
         ccMidiSeq.add(new MidiMessageSequence());
     }
 
+    Array<SimpleMidiMessage> sequence;
+    for (auto& note : notes)
+    {
+        int pitchbend = 0;
+        if (noteColorMap.contains(note.getPitchColor()))
+            pitchbend = noteColorMap[note.getPitchColor()].value;
+        auto key = note.getKey();
+        while (pitchbend > 50)
+        {
+            key++;
+            pitchbend -= 100;
+        }
+        while (pitchbend < -50)
+        {
+            key--;
+            pitchbend += 100;
+        }
+        sequence.add(SimpleMidiMessage(midiChannel, key, note.getBeat(), note.getVelocity(), pitchbend, ccBase, true, 2 * sampleLength));
+        sequence.add(SimpleMidiMessage(midiChannel, key, note.getBeat() + note.getLength(), note.getVelocity(), 0, -1, false, 0));
+    }
+    sequence.sort(SimpleMidiMessageComparator(), true);
+
     if (psModSource == USE_KONTAKT)
-        updateMidiSequenceKontakt();
+        updateMidiSequenceKontakt(sequence);
     else
-        updateMidiSequenceGeneral();
+        updateMidiSequenceGeneral(sequence);
 
     rangeStartTime = FP_INFINITE;
     rangeEndTime = -FP_INFINITE;
@@ -451,7 +496,7 @@ void MicroChromoAudioProcessor::updateMidiSequence(int newBase)
     suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus);
 }
 
-void MicroChromoAudioProcessor::updateMidiSequenceGeneral()
+void MicroChromoAudioProcessor::updateMidiSequenceGeneral(Array<SimpleMidiMessage>& sequence)
 {
     std::unordered_map<int, std::unordered_set<int>> channelToNote;
     std::unordered_map<int, int> channelToCcValue;
@@ -465,14 +510,6 @@ void MicroChromoAudioProcessor::updateMidiSequenceGeneral()
         channelToCcValue[i] = -2;
         channelUseCount[i] = 0;
     }
-
-    Array<SimpleMidiMessage> sequence;
-    for (auto& note : notes)
-    {
-        sequence.add(SimpleMidiMessage(midiChannel, note.getKey(), note.getBeat(), note.getVelocity(), note.getPitchBend(), ccBase, true, 2 * sampleLength));
-        sequence.add(SimpleMidiMessage(midiChannel, note.getKey(), note.getBeat() + note.getLength(), note.getVelocity(), 0, -1, false, 0));
-    }
-    sequence.sort(SimpleMidiMessageComparator(), true);
 
     for (auto& note : sequence)
     {
@@ -574,7 +611,7 @@ void MicroChromoAudioProcessor::updateMidiSequenceGeneral()
     isCurrentModSrcKontakt = false;
 }
 
-void MicroChromoAudioProcessor::updateMidiSequenceKontakt()
+void MicroChromoAudioProcessor::updateMidiSequenceKontakt(Array<SimpleMidiMessage>& sequence)
 {
     std::unordered_map<int, std::unordered_set<int>> channelToNote;
     std::unordered_map<int, int> channelToCcValue;
@@ -588,14 +625,6 @@ void MicroChromoAudioProcessor::updateMidiSequenceKontakt()
         channelToCcValue[i] = -2;
         channelUseCount[i] = 0;
     }
-
-    Array<SimpleMidiMessage> sequence;
-    for (auto& note : notes)
-    {
-        sequence.add(SimpleMidiMessage(midiChannel, note.getKey(), note.getBeat(), note.getVelocity(), note.getPitchBend(), note.getKey() % 12 + ccBase, true, 2 * sampleLength));
-        sequence.add(SimpleMidiMessage(midiChannel, note.getKey(), note.getBeat() + note.getLength(), note.getVelocity(), 0, -1, false, 0));
-    }
-    sequence.sort(SimpleMidiMessageComparator(), true);
 
     for (auto& note : sequence)
     {
@@ -698,6 +727,41 @@ void MicroChromoAudioProcessor::updateMidiSequenceKontakt()
     }
 
     isCurrentModSrcKontakt = true;
+}
+
+void MicroChromoAudioProcessor::updateNoteColorMap(Array<ColorPitchBendRecord>& colors)
+{
+    noteColorMap.clear();
+    for (auto c : colors)
+        noteColorMap.set(c.name, c);
+    if (!noteColorMap.contains("0"))
+        noteColorMap.set("0", ColorPitchBendRecord("0", 0, Colours::grey));
+}
+
+void MicroChromoAudioProcessor::renameNoteColorMap(String oldName, String newName)
+{
+    if (noteColorMap.contains(oldName))
+    {
+        auto c = noteColorMap[oldName];
+        c.name = newName;
+        noteColorMap.remove(oldName);
+        noteColorMap.set(newName, c);
+
+        for (auto& note : notes)
+        {
+            if (note.getPitchColor() == oldName)
+                note.setPitchColor(newName);
+        }
+    }
+}
+
+void MicroChromoAudioProcessor::filterNotesWithColorMap()
+{
+    for (auto& note : notes)
+    {
+        if (!noteColorMap.contains(note.getPitchColor()))
+            note.setPitchColor("0");
+    }
 }
 
 void MicroChromoAudioProcessor::updateCcMidiSequenceWithNewBase(int newBase)
@@ -931,6 +995,10 @@ void MicroChromoAudioProcessor::clearNotes()
 void MicroChromoAudioProcessor::insertNote(int index, const Note& note)
 {
     notes.insert(index, note);
+}
+void MicroChromoAudioProcessor::sortNotes()
+{
+    notes.sort(NoteComparator(), true);
 }
 
 void MicroChromoAudioProcessor::updatePitchShiftModulationSource()
