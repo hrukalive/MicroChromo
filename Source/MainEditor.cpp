@@ -13,6 +13,20 @@
 #include "PluginEditor.h"
 
 //==============================================================================
+MainEditor::TextButtonDropTarget::TextButtonDropTarget(String text, MainEditor& owner) :
+    TextButton(text), _owner(owner) {}
+
+bool MainEditor::TextButtonDropTarget::isInterestedInFileDrag(const StringArray& files)
+{
+    return true;
+}
+
+void MainEditor::TextButtonDropTarget::filesDropped(const StringArray& files, int x, int y)
+{
+    _owner.itemDroppedCallback(files);
+}
+
+//==============================================================================
 MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEditor& parent)
     : AudioProcessorEditor(&p),
     _parent(parent),
@@ -63,9 +77,12 @@ MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEd
     effectLabel.reset(new Label("EffectLabel", "<empty>"));
     addAndMakeVisible(effectLabel.get());
 
-    dragButton.reset(new TextButton("Drop"));
+    dragButton.reset(new TextButton("Drag MIDI"));
     addAndMakeVisible(dragButton.get());
     dragButton->addMouseListener(this, true);
+
+    dropButton.reset(new TextButtonDropTarget("Drop MIDI Here", *this));
+    addAndMakeVisible(dropButton.get());
 
     numParameterSlot.reset(new TextEditor());
     addAndMakeVisible(numParameterSlot.get());
@@ -155,6 +172,11 @@ void MainEditor::changeListenerCallback(ChangeBroadcaster* changed)
     }
 }
 
+void MainEditor::itemDroppedCallback(const StringArray& files)
+{
+    DBG("Something dropped");
+}
+
 void MainEditor::mouseDown(const MouseEvent& e)
 {
     if (e.eventComponent == synthButton.get())
@@ -239,12 +261,15 @@ void MainEditor::resized()
 {
     auto b = getLocalBounds();
     b.reduce(10, 10);
+    auto halfWidth = b.proportionOfWidth(0.48);
+    auto halfWidthSpace = b.proportionOfWidth(0.04);
     auto spaceHeightSmall = jmax(1.0f, (b.getHeight() - 200) / 30.0f * 4);
     auto spaceHeightLarge = jmax(1.0f, (b.getHeight() - 200) / 30.0f * 9);
 
     auto tmp = b.removeFromBottom(30);
-    dragButton->setBounds(tmp.removeFromLeft(tmp.proportionOfWidth(0.7)));
-    tmp.removeFromLeft(6);
+    dragButton->setBounds(tmp.removeFromLeft(halfWidth));
+    tmp.removeFromLeft(halfWidthSpace);
+    dropButton->setBounds(tmp);
 
     auto leftPanel = b.removeFromLeft(b.proportionOfWidth(0.3));
     auto rightPanel = b.withTrimmedLeft(10);

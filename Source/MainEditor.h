@@ -37,6 +37,7 @@ public:
 
     //==============================================================================
     void changeListenerCallback(ChangeBroadcaster*) override;
+    void itemDroppedCallback(const StringArray& files);
 
     //==============================================================================
     void timerCallback() override;
@@ -47,7 +48,20 @@ private:
     ApplicationProperties& appProperties;
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
 
-    std::unique_ptr<TextButton> synthButton, effectButton, dragButton;
+    class TextButtonDropTarget : public TextButton, public FileDragAndDropTarget
+    {
+    public:
+        TextButtonDropTarget(String text, MainEditor& owner);
+        ~TextButtonDropTarget() = default;
+
+        bool isInterestedInFileDrag(const StringArray& files) override;
+        void filesDropped(const StringArray& files, int x, int y) override;
+
+    private:
+        MainEditor& _owner;
+    };
+
+    std::unique_ptr<Button> synthButton, effectButton, dragButton, dropButton;
     std::unique_ptr<Label> synthLabel, effectLabel;
     std::unique_ptr<Label> numInstancesLabel, numParameterLabel, midiChannelLabel;
     std::unique_ptr<ComboBox> numInstancesBox, midiChannelComboBox;
