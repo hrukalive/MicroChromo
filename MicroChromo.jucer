@@ -12,8 +12,16 @@
             file="Resources/MicroChromoKontaktScript.txt"/>
     </GROUP>
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
-      <FILE id="NEWLjE" name="ChromoMidiEditor.h" compile="0" resource="0"
-            file="Source/ChromoMidiEditor.h"/>
+      <FILE id="DdEe8x" name="Common.cpp" compile="1" resource="0" file="Source/Common.cpp"/>
+      <FILE id="KS8Ulu" name="Common.h" compile="0" resource="0" file="Source/Common.h"/>
+      <FILE id="qJC4tX" name="Note.cpp" compile="1" resource="0" file="Source/Note.cpp"/>
+      <FILE id="wHjlDr" name="Note.h" compile="0" resource="0" file="Source/Note.h"/>
+      <FILE id="rkfhtY" name="InternalPlugins.cpp" compile="1" resource="0"
+            file="Source/InternalPlugins.cpp"/>
+      <FILE id="NnANeP" name="InternalPlugins.h" compile="0" resource="0"
+            file="Source/InternalPlugins.h"/>
+      <FILE id="Z1ZimM" name="PluginInstance.h" compile="0" resource="0"
+            file="Source/PluginInstance.h"/>
       <FILE id="AUEOJz" name="ParameterCcLearn.cpp" compile="1" resource="0"
             file="Source/ParameterCcLearn.cpp"/>
       <FILE id="Si3N2C" name="ParameterCcLearn.h" compile="0" resource="0"
@@ -22,19 +30,9 @@
             file="Source/ParameterLinkEditor.cpp"/>
       <FILE id="K4vpvQ" name="ParameterLinkEditor.h" compile="0" resource="0"
             file="Source/ParameterLinkEditor.h"/>
-      <FILE id="DdEe8x" name="Common.cpp" compile="1" resource="0" file="Source/Common.cpp"/>
-      <FILE id="KS8Ulu" name="Common.h" compile="0" resource="0" file="Source/Common.h"/>
       <FILE id="uNIWbV" name="PluginBundle.cpp" compile="1" resource="0"
             file="Source/PluginBundle.cpp"/>
       <FILE id="yFSpZJ" name="PluginBundle.h" compile="0" resource="0" file="Source/PluginBundle.h"/>
-      <FILE id="Z1ZimM" name="PluginInstance.h" compile="0" resource="0"
-            file="Source/PluginInstance.h"/>
-      <FILE id="rkfhtY" name="InternalPlugins.cpp" compile="1" resource="0"
-            file="Source/InternalPlugins.cpp"/>
-      <FILE id="NnANeP" name="InternalPlugins.h" compile="0" resource="0"
-            file="Source/InternalPlugins.h"/>
-      <FILE id="qJC4tX" name="Note.cpp" compile="1" resource="0" file="Source/Note.cpp"/>
-      <FILE id="wHjlDr" name="Note.h" compile="0" resource="0" file="Source/Note.h"/>
       <FILE id="WcOkwD" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="bbuHO5" name="PluginProcessor.h" compile="0" resource="0"
@@ -42,6 +40,14 @@
       <FILE id="Zymonl" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="fD4vtN" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="VZzcob" name="MainEditor.cpp" compile="1" resource="0" file="Source/MainEditor.cpp"/>
+      <FILE id="uz28GU" name="MainEditor.h" compile="0" resource="0" file="Source/MainEditor.h"/>
+      <FILE id="ECYk5f" name="ColorEditor.cpp" compile="1" resource="0" file="Source/ColorEditor.cpp"/>
+      <FILE id="fZY2Pp" name="ColorEditor.h" compile="0" resource="0" file="Source/ColorEditor.h"/>
+      <FILE id="JL7oSn" name="SimpleMidiEditor.cpp" compile="1" resource="0"
+            file="Source/SimpleMidiEditor.cpp"/>
+      <FILE id="SMn1PA" name="SimpleMidiEditor.h" compile="0" resource="0"
+            file="Source/SimpleMidiEditor.h"/>
       <FILE id="Yz8b1b" name="PluginWindow.h" compile="0" resource="0" file="Source/PluginWindow.h"/>
     </GROUP>
     <GROUP id="{D7A887BC-F737-252E-9A4A-2A38B9EC6D5A}" name="SoundTouch">

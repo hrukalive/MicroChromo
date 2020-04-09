@@ -13,6 +13,8 @@
 #include <JuceHeader.h>
 
 class PluginBundle;
+class MicroChromoAudioProcessor;
+class MicroChromoAudioProcessorEditor;
 
 enum
 {
@@ -50,7 +52,6 @@ enum
 enum CommandIDs
 {
     openPluginScanner = 1,
-    openMidiScanner,
     testCommand
 };
 
@@ -135,6 +136,82 @@ private:
     std::unique_ptr<AudioProcessorParameter::Listener> listener1{ nullptr }, listener2{ nullptr };
 };
 
+class ComponentWithTable : public Component, public TableListBoxModel
+{
+public:
+    ComponentWithTable(MicroChromoAudioProcessorEditor& editor);
+    ~ComponentWithTable() = default;
+
+    void selectedRowsChanged(int row) override;
+
+    virtual String getText(const int rowNumber, const int columnNumber) const { return ""; };
+    virtual void setText(const int rowNumber, const int columnNumber, const String& newText) {};
+
+    virtual int getSelectedId(const int rowNumber, const int columnNumber) const { return -1; };
+    virtual void setSelectedId(const int rowNumber, const int columnNumber, const int newId) {};
+
+    virtual void buttonClicked(const int rowNumber, const int columnNumber, const Colour& newColor) {};
+
+    virtual void updateColorMapList() {}
+
+protected:
+    MicroChromoAudioProcessorEditor& owner;
+    MicroChromoAudioProcessor& processor;
+    TableListBox table{ {}, this };
+    Font font{ 14.0f };
+
+    int lastRow = -1;
+
+    HashMap<String, int> itemTextToitemId;
+    HashMap<int, String> itemIdToitemText;
+    Array<String> itemOrder;
+
+    friend class EditableTextCustomComponent;
+    friend class ComboBoxCustomComponent;
+    friend class TextButtonCustomComponent;
+};
+
+class EditableTextCustomComponent : public Label
+{
+public:
+    EditableTextCustomComponent(ComponentWithTable& td);
+    void mouseDown(const MouseEvent& event) override;
+    void textWasEdited() override;
+    void setRowAndColumn(const int newRow, const int newColumn);
+private:
+    ComponentWithTable& owner;
+    int rowId{ -1 }, columnId{ -1 };
+};
+
+class ComboBoxCustomComponent : public ComboBox, ComboBox::Listener
+{
+public:
+    ComboBoxCustomComponent(ComponentWithTable& td);
+    ~ComboBoxCustomComponent();
+
+    void updateList();
+    void setRowAndColumn(const int newRow, const int newColumn);
+    void comboBoxChanged(ComboBox* comboBoxThatHasChanged) override;
+private:
+    ComponentWithTable& owner;
+    int rowId{ -1 }, columnId{ -1 };
+};
+
+class TextButtonCustomComponent : public TextButton, Button::Listener
+{
+public:
+    TextButtonCustomComponent(ComponentWithTable& td);
+    ~TextButtonCustomComponent();
+
+    void updateColor(Colour newColor);
+    void buttonClicked(Button* btn);
+    void setRowAndColumn(const int newRow, const int newColumn);
+private:
+    ComponentWithTable& owner;
+    int rowId{ -1 }, columnId{ -1 };
+    Colour color;
+};
+
 struct SimpleMidiMessage
 {
     SimpleMidiMessage(int channel, int key, float timestamp, float velocity, int pitchbend, int cc, bool isNoteOn, float adjustment);
@@ -153,5 +230,27 @@ struct SimpleMidiMessageComparator
     {
         const float timeDiff = first.noteMsg.getTimeStamp() - second.noteMsg.getTimeStamp();
         return (timeDiff > 0.f) - (timeDiff < 0.f);
+    }
+};
+
+class ColorPitchBendRecord
+{
+public:
+    ColorPitchBendRecord();
+    ColorPitchBendRecord(String name, int value, Colour color);
+
+    String name;
+    int value;
+    Colour color;
+};
+
+struct ColorPitchBendRecordComparator
+{
+    ColorPitchBendRecordComparator() = default;
+
+    static int compareElements(const ColorPitchBendRecord& first, const ColorPitchBendRecord& second)
+    {
+        const float valDiff = first.value - second.value;
+        return (valDiff > 0.f) - (valDiff < 0.f);
     }
 };
