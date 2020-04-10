@@ -73,6 +73,7 @@ public:
     void filterNotesWithColorMap();
     void updateNoteColorMap(Array<ColorPitchBendRecord>& colors);
     void renameNoteColorMap(String oldName, String newName);
+    void clearNoteColorMap();
     void sendAllNotesOff();
 
     //==============================================================================
@@ -97,6 +98,8 @@ public:
     int getCcBase() { return ccBase; }
     Array<Note>& getNotes() { return notes; }
     auto& getNoteColorMap() { return noteColorMap; }
+    String getSelectedColorPresetName() { return selectedPreset; }
+    void setSelectedColorPresetName(String name) { selectedPreset = name; }
 
     OwnedArray<MidiMessageSequence>& getNoteMidiSequence() { return notesMidiSeq; }
     OwnedArray<MidiMessageSequence>& getCcMidiSequence() { return ccMidiSeq; }
@@ -126,7 +129,9 @@ private:
 
     //==============================================================================
     std::atomic<int> numInstancesParameter{ 1 }, parameterSlotNumber{ 16 };
+    String selectedPreset = "---INIT---";
 
+    //==============================================================================
     OwnedArray<AudioBuffer<float>> bufferArrayA, bufferArrayB;
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
     std::shared_ptr<PluginBundle> ccBundle{ nullptr };
@@ -137,7 +142,7 @@ private:
     
     OwnedArray<MidiMessageSequence> notesMidiSeq, ccMidiSeq;
     HashMap<String, ColorPitchBendRecord> noteColorMap;
-    std::atomic<uint32> cid = 0;
+
     std::atomic<int> ccBase{ 102 }, psModSource{ USE_NONE }, midiChannel{ 1 };
 
     //==============================================================================

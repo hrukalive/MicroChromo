@@ -51,8 +51,13 @@ void ColorEditor::ColorChooserComponent::resized()
 
 //==============================================================================
 ColorEditor::ColorEditor(MicroChromoAudioProcessorEditor& editor, SimpleMidiEditor& midiEditor) :
-    ComponentWithTable(editor), _midiEditor(midiEditor), noteColorMap(processor.getNoteColorMap())
+    ComponentWithTable(editor), 
+    appProperties(processor.getApplicationProperties()), 
+    _midiEditor(midiEditor), 
+    noteColorMap(processor.getNoteColorMap())
 {
+    loadColorPreset();
+
     int columnId = 1;
     table.getHeader().addColumn("Name", columnId++, 120, 100, 200, TableHeaderComponent::notSortable);
     table.getHeader().addColumn("Color", columnId++, 50, 50, 100, TableHeaderComponent::notSortable);
@@ -72,6 +77,9 @@ ColorEditor::ColorEditor(MicroChromoAudioProcessorEditor& editor, SimpleMidiEdit
         noteColorMap.set("New" + String(i), ColorPitchBendRecord("New" + String(i), 0, Colours::grey));
         updateColorMapList();
         _midiEditor.updateColorMapList();
+        hasPresetModified = true;
+        if (presetComboBox.getSelectedId() > 0)
+            presetComboBox.setText("*" + presetComboBox.getText());
     };
 
     addAndMakeVisible(removeBtn);
@@ -82,10 +90,41 @@ ColorEditor::ColorEditor(MicroChromoAudioProcessorEditor& editor, SimpleMidiEdit
             updateColorMapList();
             processor.filterNotesWithColorMap();
             _midiEditor.updateColorMapList();
+            hasPresetModified = true;
+            if (presetComboBox.getSelectedId() > 0)
+                presetComboBox.setText("*" + presetComboBox.getText());
         }
     };
 
+    addAndMakeVisible(presetComboBox);
+    presetComboBox.onChange = [&]() {
+        if (presetComboBox.getSelectedId() > 0)
+            useColorPreset(colorMapPresetsList.getReference(presetComboBox.getSelectedId() - 1).name);
+    };
+
+    addAndMakeVisible(saveBtn);
+    saveBtn.onClick = [&]() {
+        presetNamePrompt = new AlertWindow("Add Preset", "Name", AlertWindow::AlertIconType::NoIcon);
+        presetNamePrompt->addTextEditor("nameEditor", "", "", false);
+        presetNamePrompt->addButton("OK", 1, KeyPress(KeyPress::returnKey, 0, 0));
+        presetNamePrompt->addButton("Cancel", 0, KeyPress(KeyPress::escapeKey, 0, 0));
+        presetNamePrompt->enterModalState(true, ModalCallbackFunction::create([this](int r) {
+            if (r)
+            {
+                auto name = presetNamePrompt->getTextEditorContents("nameEditor");
+                addColorPreset(name, noteColorMapList);
+            }
+        }), true);
+    };
+
+    addAndMakeVisible(deleteBtn);
+    deleteBtn.onClick = [&]() {
+        removeColorPreset(colorMapPresetsList.getReference(presetComboBox.getSelectedId() - 1).name);
+    };
+
     updateColorMapList();
+    selectPresetWithName(processor.getSelectedColorPresetName());
+    checkModified();
 
     setSize(400, 300);
 }
@@ -200,6 +239,9 @@ void ColorEditor::setText(const int rowNumber, const int columnNumber, const Str
     default:
         break;
     }
+    hasPresetModified = true;
+    if (presetComboBox.getSelectedId() > 0)
+        presetComboBox.setText("*" + presetComboBox.getText());
 }
 
 void ColorEditor::colorChooserClosed(int rowNumber, int columnId, const Colour& color)
@@ -207,6 +249,9 @@ void ColorEditor::colorChooserClosed(int rowNumber, int columnId, const Colour& 
     noteColorMap.getReference(noteColorMapList[rowNumber].name).color = color;
     updateColorMapList();
     _midiEditor.updateColorMapList();
+    hasPresetModified = true;
+    if (presetComboBox.getSelectedId() > 0)
+        presetComboBox.setText("*" + presetComboBox.getText());
 }
 
 void ColorEditor::updateColorMapList()
@@ -221,6 +266,19 @@ void ColorEditor::updateColorMapList()
 
     table.updateContent();
     table.repaint();
+}
+
+void ColorEditor::updateColorMapPresetList()
+{
+    colorMapPresetsList.clear();
+
+    HashMap<String, ColorPitchBendRecordCollection>::Iterator it(colorMapPresets);
+    while (it.next())
+        colorMapPresetsList.add(it.getValue());
+
+    colorMapPresetsList.sort(ColorPitchBendRecordCollectionComparator());
+
+    updatePresetComboBox();
 }
 
 void ColorEditor::paint(Graphics& g)
@@ -241,6 +299,138 @@ void ColorEditor::resized()
     tmp.removeFromLeft(space);
     removeBtn.setBounds(tmp.removeFromLeft(half));
 
+    tmp = b.removeFromTop(24);
+    b.removeFromTop(space);
+    auto tmp2 = tmp.proportionOfWidth(0.7);
+    auto tmp3 = tmp.proportionOfWidth(0.14);
+    auto tmp4 = tmp.proportionOfWidth(0.01);
+    presetComboBox.setBounds(tmp.removeFromLeft(tmp2));
+    tmp.removeFromLeft(tmp4);
+    saveBtn.setBounds(tmp.removeFromLeft(tmp3));
+    tmp.removeFromLeft(tmp4);
+    deleteBtn.setBounds(tmp.removeFromLeft(tmp3));
+
     table.setBounds(b);
 }
 
+void ColorEditor::loadColorPreset()
+{
+    colorMapPresets.clear();
+    if (appProperties.getUserSettings()->containsKey("colorMapPresets"))
+    {
+        auto root = appProperties.getUserSettings()->getXmlValue("colorMapPresets");
+        forEachXmlChildElementWithTagName(*root, child, "colorMap")
+        {
+            auto name = child->getStringAttribute("name", "Unknown");
+            if (name.isNotEmpty())
+            {
+                Array<ColorPitchBendRecord> colors;
+                forEachXmlChildElementWithTagName(*child, record, "record")
+                {
+                    colors.add(ColorPitchBendRecord(record->getStringAttribute("name", "Unknown"),
+                        record->getDoubleAttribute("value", 0),
+                        Colour::fromString(record->getStringAttribute("color", "0x000000"))));
+                }
+                colorMapPresets.set(name, ColorPitchBendRecordCollection(name, colors));
+            }
+        }
+    }
+    colorMapPresets.set("---INIT---", ColorPitchBendRecordCollection());
+
+    updateColorMapPresetList();
+}
+
+void ColorEditor::useColorPreset(String name)
+{
+    if (colorMapPresets.contains(name))
+    {
+        processor.setSelectedColorPresetName(name);
+        processor.updateNoteColorMap(colorMapPresets[name].collection);
+        updateColorMapList();
+        _midiEditor.updateColorMapList();
+    }
+    hasPresetModified = false;
+}
+
+void ColorEditor::addColorPreset(String name, Array<ColorPitchBendRecord> colors)
+{
+    processor.setSelectedColorPresetName(name);
+    colorMapPresets.set(name, { name, colors });
+    saveColorMapPresets();
+    hasPresetModified = false;
+    updateColorMapPresetList();
+}
+
+void ColorEditor::removeColorPreset(String name)
+{
+    if (name == "---INIT---")
+        return;
+    colorMapPresets.remove(name);
+    saveColorMapPresets();
+    updateColorMapPresetList();
+}
+
+void ColorEditor::updatePresetComboBox()
+{
+    presetComboBox.clear();
+    int i = 1;
+    for (auto& c : colorMapPresetsList)
+    {
+        presetComboBox.addItem(c.name, i);
+        i++;
+    }
+    selectPresetWithName(processor.getSelectedColorPresetName());
+}
+
+void ColorEditor::selectPresetWithName(String name)
+{
+    if (!colorMapPresets.contains(name))
+        name = "---INIT---";
+
+    for (int i = 0; i < colorMapPresetsList.size(); i++)
+    {
+        if (colorMapPresetsList[i].name == name)
+        {
+            presetComboBox.setSelectedId(i + 1, dontSendNotification);
+            break;
+        }
+    }
+    checkModified();
+}
+
+void ColorEditor::checkModified()
+{
+    if (presetComboBox.getSelectedId() > 0)
+    {
+        auto& selected = colorMapPresetsList.getReference(presetComboBox.getSelectedId() - 1);
+        if (selected.collection.size() != noteColorMapList.size())
+        {
+            hasPresetModified = true;
+            presetComboBox.setText("*" + presetComboBox.getText());
+        }
+        else
+        {
+            auto colors = selected.collection;
+            colors.sort(ColorPitchBendRecordComparator());
+            for (int i = 0; i < noteColorMapList.size(); i++)
+            {
+                if (ColorPitchBendRecordComparator::compareElements(colors.getReference(i), noteColorMapList.getReference(i)) != 0)
+                {
+                    hasPresetModified = true;
+                    presetComboBox.setText("*" + presetComboBox.getText());
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void ColorEditor::saveColorMapPresets()
+{
+    std::unique_ptr<XmlElement> root{ new XmlElement("colorMapPresets") };
+    HashMap<String, ColorPitchBendRecordCollection>::Iterator it(colorMapPresets);
+    while (it.next())
+        root->addChildElement(ColorPitchBendRecordCollection::getColorMapXml(it.getKey(), it.getValue().collection));
+    appProperties.getUserSettings()->setValue("colorMapPresets", root.get());
+    appProperties.saveIfNeeded();
+}
