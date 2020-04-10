@@ -89,6 +89,13 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
     notes.add(Note(60, 8, 3, 0.8f, "0"));
     notes.add(Note(64, 8, 3, 0.8f, "0"));
     notes.add(Note(67, 8, 3, 0.8f, "0"));
+    //notes.add(Note(60, 2, 1, 1));
+    //notes.add(Note(61, 4, 1, 1));
+    //notes.add(Note(62, 6, 2, 1));
+    //notes.add(Note(63, 7, 2, 1));
+    //notes.add(Note(64, 8, 2, 1));
+    //notes.add(Note(65, 9, 2, 1));
+    //notes.add(Note(66, 10, 2, 1));
 }
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
@@ -513,41 +520,54 @@ void MicroChromoAudioProcessor::updateMidiSequenceGeneral(Array<SimpleMidiMessag
 
     for (auto& note : sequence)
     {
+        bool needFindEmpty = true;
         bool needOverride = true;
         if (note.noteMsg.isNoteOn())
         {
             for (int i = 0; i < numInstancesParameter; i++)
             {
-                if (channelToNote[i].empty())
-                {
-                    notesMidiSeq[i]->addEvent(note.noteMsg);
-                    ccMidiSeq[i]->addEvent(note.ccMsg);
-
-                    channelToNote[i].insert(note.noteMsg.getNoteNumber());
-                    channelToCcValue[i] = note.ccMsg.getControllerValue();
-                    noteToChannel[note.noteMsg.getNoteNumber()] = i;
-
-                    channelUseCount[i] = channelUseCounter++;
-
-                    needOverride = false;
-
-                    DBG("Addfreev " << i << " " << note.toString());
-                    DBG("Addccccc " << i << " " << note.toString());
-                    break;
-                }
-                else if (note.ccMsg.getControllerValue() == channelToCcValue[i])
+                if (note.ccMsg.getControllerValue() == channelToCcValue[i])
                 {
                     notesMidiSeq[i]->addEvent(note.noteMsg);
 
                     channelToNote[i].insert(note.noteMsg.getNoteNumber());
                     noteToChannel[note.noteMsg.getNoteNumber()] = i;
 
-                    channelUseCount[i] = channelUseCounter++;
+                    channelUseCount[i] = ++channelUseCounter;
 
+                    needFindEmpty = false;
                     needOverride = false;
-                     
+
                     DBG("Sameaddv " << i << " " << note.toString());
                     break;
+                }
+            }
+            if (needFindEmpty)
+            {
+                int minIdx = -1, minVal = INT_MAX;
+                for (auto& v : channelUseCount)
+                {
+                    if (v.second < minVal && channelToNote[v.first].empty())
+                    {
+                        minIdx = v.first;
+                        minVal = v.second;
+                    }
+                }
+                if (minIdx != -1)
+                {
+                    notesMidiSeq[minIdx]->addEvent(note.noteMsg);
+                    ccMidiSeq[minIdx]->addEvent(note.ccMsg);
+
+                    channelToNote[minIdx].insert(note.noteMsg.getNoteNumber());
+                    channelToCcValue[minIdx] = note.ccMsg.getControllerValue();
+                    noteToChannel[note.noteMsg.getNoteNumber()] = minIdx;
+
+                    channelUseCount[minIdx] = ++channelUseCounter;
+
+                    needOverride = false;
+
+                    DBG("Addfreev " << minIdx << " " << note.toString());
+                    DBG("Addccccc " << minIdx << " " << note.toString());
                 }
             }
             if (needOverride)
@@ -578,7 +598,7 @@ void MicroChromoAudioProcessor::updateMidiSequenceGeneral(Array<SimpleMidiMessag
                 channelToCcValue[minIdx] = note.ccMsg.getControllerValue();
                 noteToChannel[note.noteMsg.getNoteNumber()] = minIdx;
 
-                channelUseCount[minIdx] = channelUseCounter++;
+                channelUseCount[minIdx] = ++channelUseCounter;
 
                 DBG("Override " << minIdx << " " << note.toString());
             }
@@ -628,42 +648,58 @@ void MicroChromoAudioProcessor::updateMidiSequenceKontakt(Array<SimpleMidiMessag
 
     for (auto& note : sequence)
     {
+        bool needFindEmpty = true;
         bool needOverride = true;
         if (note.noteMsg.isNoteOn())
         {
             for (int i = 0; i < numInstancesParameter; i++)
             {
                 auto realIdx = i * 12 + note.noteMsg.getNoteNumber() % 12;
-                if (channelToNote[realIdx].empty())
-                {
-                    notesMidiSeq[i]->addEvent(note.noteMsg);
-                    ccMidiSeq[i]->addEvent(note.ccMsg);
-
-                    channelToNote[realIdx].insert(note.noteMsg.getNoteNumber());
-                    channelToCcValue[realIdx] = note.ccMsg.getControllerValue();
-                    noteToChannel[note.noteMsg.getNoteNumber()] = realIdx;
-
-                    channelUseCount[realIdx] = channelUseCounter++;
-
-                    needOverride = false;
-
-                    DBG("Addfreev " << i << " " << realIdx % 12 << note.toString());
-                    DBG("Addccccc " << i << " " << realIdx % 12 << note.toString());
-                    break;
-                }
-                else if (note.ccMsg.getControllerValue() == channelToCcValue[realIdx])
+                if (note.ccMsg.getControllerValue() == channelToCcValue[realIdx])
                 {
                     notesMidiSeq[i]->addEvent(note.noteMsg);
 
                     channelToNote[realIdx].insert(note.noteMsg.getNoteNumber());
                     noteToChannel[note.noteMsg.getNoteNumber()] = realIdx;
 
-                    channelUseCount[realIdx] = channelUseCounter++;
+                    channelUseCount[realIdx] = ++channelUseCounter;
 
+                    needFindEmpty = false;
                     needOverride = false;
 
                     DBG("Sameaddv " << i << " " << realIdx % 12 << note.toString());
                     break;
+                }
+            }
+            if (needFindEmpty)
+            {
+                int minIdx = -1, minVal = INT_MAX;
+                for (int i = note.noteMsg.getNoteNumber() % 12; i < numInstancesParameter * 12; i += 12)
+                {
+                    auto v = channelUseCount[i];
+                    if (v < minVal && channelToNote[i].empty())
+                    {
+                        minIdx = i;
+                        minVal = v;
+                    }
+                }
+                int seqIndex = minIdx / 12;
+
+                if (minIdx != -1)
+                {
+                    notesMidiSeq[seqIndex]->addEvent(note.noteMsg);
+                    ccMidiSeq[seqIndex]->addEvent(note.ccMsg);
+
+                    channelToNote[minIdx].insert(note.noteMsg.getNoteNumber());
+                    channelToCcValue[minIdx] = note.ccMsg.getControllerValue();
+                    noteToChannel[note.noteMsg.getNoteNumber()] = minIdx;
+
+                    channelUseCount[minIdx] = ++channelUseCounter;
+
+                    needOverride = false;
+
+                    DBG("Addfreev " << seqIndex << " " << minIdx % 12 << note.toString());
+                    DBG("Addccccc " << seqIndex << " " << minIdx % 12 << note.toString());
                 }
             }
             if (needOverride)
@@ -696,7 +732,7 @@ void MicroChromoAudioProcessor::updateMidiSequenceKontakt(Array<SimpleMidiMessag
                 channelToCcValue[minIdx] = note.ccMsg.getControllerValue();
                 noteToChannel[note.noteMsg.getNoteNumber()] = minIdx;
 
-                channelUseCount[minIdx] = channelUseCounter++;
+                channelUseCount[minIdx] = ++channelUseCounter;
 
                 DBG("Override " << seqIndex << " " << minIdx % 12 << note.toString());
             }
