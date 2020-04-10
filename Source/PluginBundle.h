@@ -31,7 +31,7 @@ public:
     //==============================================================================
     void prepareToPlay(double sampleRate, int samplesPerBlock);
     void releaseResources();
-    void processBlock(OwnedArray<AudioBuffer<float>>&, MidiBuffer&);
+    void processBlock(OwnedArray<AudioBuffer<float>>&, OwnedArray<MidiBuffer>&);
     int getTotalNumInputChannels() const noexcept { return instances[0]->processor->getTotalNumInputChannels(); }
     int getTotalNumOutputChannels() const noexcept { return instances[0]->processor->getTotalNumOutputChannels(); }
     int getMainBusNumInputChannels() const noexcept { return instances[0]->processor->getMainBusNumInputChannels(); }
@@ -59,13 +59,9 @@ public:
     void preLoadPlugin(int numInstances);
     void loadPlugin(const PluginDescription desc, int numInstances, std::function<void(PluginBundle&)> callback = nullptr);
     void loadPluginSync(const PluginDescription desc, int numInstances);
-    MidiMessageCollector* getCollectorAt(int index);
 
     //==============================================================================
     void adjustInstanceNumber(int newNumInstances, std::function<void(void)> callback = nullptr);
-    void clearMidiCollectorBuffer();
-    void addMessageToAllQueue(MidiMessage& msg);
-    void sendAllNotesOff();
 
     //==============================================================================
     void openParameterLinkEditor();
@@ -117,7 +113,6 @@ private:
     Array<int> linkParameterIndices;
     std::unordered_set<int> linkParameterIndicesSet;
     std::unordered_map<int, int> linkParameterIndicesHistory;
-    OwnedArray<MidiMessageCollector> collectors;
     PluginDescription _emptyPlugin, _defaultPlugin;
     std::atomic<int> instanceStarted = 0;
     std::atomic<int> instanceStartedTemp = 0;

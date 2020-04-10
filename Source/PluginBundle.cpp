@@ -24,8 +24,6 @@ PluginBundle::PluginBundle(MicroChromoAudioProcessor& p,
     _emptyPlugin(emptyPlugin), 
     _defaultPlugin(defaultPlugin)
 {
-    for (auto i = 0; i < maxInstances; i++)
-        collectors.set(i, new MidiMessageCollector());
     ccLearn = std::make_unique<ParameterCcLearn>(this);
 }
 
@@ -35,7 +33,6 @@ PluginBundle::~PluginBundle()
     activePluginWindows.clear();
     instances.clear();
     instanceTemps.clear();
-    collectors.clear();
 }
 
 void PluginBundle::preLoadPlugin(int numInstances)
@@ -89,13 +86,6 @@ void PluginBundle::loadPluginSync(const PluginDescription desc, int numInstances
         addPluginCallback(std::move(instance), error, i);
     }
     checkPluginLoaded(desc, numInstances);
-}
-
-MidiMessageCollector* PluginBundle::getCollectorAt(int index)
-{
-    if (index >= instanceStarted.load())
-        return nullptr;
-    return collectors[index];
 }
 
 void PluginBundle::addPluginCallback(std::unique_ptr<AudioPluginInstance> instance, const String& error, int index)
@@ -176,43 +166,6 @@ void PluginBundle::adjustInstanceNumber(int newNumInstances, std::function<void(
             if (callback)
                 callback();
         });
-}
-
-void PluginBundle::clearMidiCollectorBuffer()
-{
-    if (isLoaded())
-        for (int i = 0; i < instanceStarted.load(); i++)
-            collectors[i]->reset(_sampleRate);
-}
-
-void PluginBundle::addMessageToAllQueue(MidiMessage& msg)
-{
-    if (isLoaded())
-        for (int i = 0; i < instanceStarted.load(); i++)
-            collectors[i]->addMessageToQueue(msg);
-}
-
-void PluginBundle::sendAllNotesOff()
-{
-    if (isLoaded())
-    {
-        for (int i = 0; i < instanceStarted.load(); i++)
-        {
-            collectors[i]->reset(_sampleRate);
-            for (auto j = 1; j <= 16; j++)
-            {
-                MidiMessage msg1(MidiMessage::allNotesOff(j));
-                MidiMessage msg2(MidiMessage::allSoundOff(j));
-                MidiMessage msg3(MidiMessage::allControllersOff(j));
-                msg1.setTimeStamp(0.001);
-                msg2.setTimeStamp(0.001);
-                msg3.setTimeStamp(0.001);
-                collectors[i]->addMessageToQueue(msg1);
-                collectors[i]->addMessageToQueue(msg2);
-                collectors[i]->addMessageToQueue(msg3);
-            }
-        }
-    }
 }
 
 void PluginBundle::openParameterLinkEditor()
@@ -325,20 +278,16 @@ void PluginBundle::prepareToPlay(double sampleRate, int samplesPerBlock)
     _sampleRate = sampleRate;
     _samplesPerBlock = samplesPerBlock;
     for (int i = 0; i < instanceStarted.load(); i++)
-    {
         instances[i]->prepare(sampleRate, samplesPerBlock);
-        collectors[i]->reset(sampleRate);
-    }
 }
 
-void PluginBundle::processBlock(OwnedArray<AudioBuffer<float>>& bufferArray, MidiBuffer& /*midiMessages*/)
+void PluginBundle::processBlock(OwnedArray<AudioBuffer<float>>& bufferArray, OwnedArray<MidiBuffer>& midiMessagesArray)
 {
     if (isLoaded())
     {
         for (auto i = 0; i < instanceStarted.load(); i++)
         {
-            MidiBuffer midiBuffer;
-            collectors[i]->removeNextBlockOfMessages(midiBuffer, _samplesPerBlock.load());
+            auto& midiBuffer = *midiMessagesArray[i];
             MidiMessage midi_message;
             int sample_offset;
 
@@ -348,6 +297,7 @@ void PluginBundle::processBlock(OwnedArray<AudioBuffer<float>>& bufferArray, Mid
                 }
             }
             instances[i]->processor->processBlock(*bufferArray[i], midiBuffer);
+            midiBuffer.clear();
         }
     }
 }

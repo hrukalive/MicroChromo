@@ -113,7 +113,7 @@ ParameterCcLearn::~ParameterCcLearn()
 			p->removeListener(this);
 }
 
-void ParameterCcLearn::processCc(int instanceIndex, int ccNumber, int ccValue, float sampleOffset)
+void ParameterCcLearn::processCc(int instanceIndex, int ccNumber, int ccValue, float /*sampleOffset*/)
 {
 	if (_isLearning)
 	{
@@ -122,7 +122,7 @@ void ParameterCcLearn::processCc(int instanceIndex, int ccNumber, int ccValue, f
 		progressWindow->updateCc(tmpCcSource);
 	}
 	else if (_hasLearned && ccSource == ccNumber)
-		_bundle->getParameters(instanceIndex)[paramIndex]->setValueAt(ccValue / 100.0f * (learnedCcMax - learnedCcMin) + learnedCcMin, sampleOffset);
+		_bundle->getParameters(instanceIndex)[paramIndex]->setValue(ccValue / 100.0f * (learnedCcMax - learnedCcMin) + learnedCcMin);
 }
 
 bool ParameterCcLearn::validLearn()

@@ -74,7 +74,7 @@ public:
     void updateNoteColorMap(Array<ColorPitchBendRecord>& colors);
     void renameNoteColorMap(String oldName, String newName);
     void clearNoteColorMap();
-    void sendAllNotesOff();
+
 
     //==============================================================================
     void addNote(const Note& note);
@@ -119,6 +119,9 @@ private:
     void updateMidiSequenceGeneral(Array<SimpleMidiMessage>& sequence);
     void updateMidiSequenceKontakt(Array<SimpleMidiMessage>& sequence);
 
+    void addMessageToAllBuffer(OwnedArray<MidiBuffer>& midiBuffers, MidiMessage& msg, int sampleOffset);
+    void sendAllNotesOff();
+
     //==============================================================================
     ApplicationProperties appProperties;
     KnownPluginList knownPluginList, synthKnownPluginList, psKnownPluginList;
@@ -132,9 +135,9 @@ private:
     String selectedPreset = "---INIT---";
 
     //==============================================================================
-    OwnedArray<AudioBuffer<float>> bufferArrayA, bufferArrayB;
+    OwnedArray<AudioBuffer<float>> audioBufferArrayA, audioBufferArrayB;
+    OwnedArray<MidiBuffer> midiBufferArrayA, midiBufferArrayB;
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
-    std::shared_ptr<PluginBundle> ccBundle{ nullptr };
 
     OwnedArray<ParameterLinker> synthParamPtr, psParamPtr;
 
@@ -154,6 +157,7 @@ private:
 
     std::atomic<bool> isPlayingNote{ false };
     std::atomic<int> isWithIn{ -1 };
+    bool wasStopped = true;
 
     float nextStartTime = -1.0, rangeStartTime = FP_INFINITE, rangeEndTime = -FP_INFINITE;
 
