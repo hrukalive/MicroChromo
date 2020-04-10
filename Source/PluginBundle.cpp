@@ -465,18 +465,18 @@ void PluginBundle::setStateInformation(const void* data, int sizeInBytes)
     {
         if (xml->hasTagName("bundle"))
         {
-            if (xml->hasAttribute("ccData"))
-            {
-                MemoryBlock ccData;
-                ccData.fromBase64Encoding(xml->getStringAttribute("ccData"));
-                ccLearn->setStateInformation(ccData.getData(), ccData.getSize());
-            }
             if (xml->hasAttribute("data"))
             {
                 MemoryBlock proc_data;
                 proc_data.fromBase64Encoding(xml->getStringAttribute("data"));
                 for (auto i = 0; i < instanceStarted.load(); i++)
                     instances[i]->processor->setStateInformation(proc_data.getData(), proc_data.getSize());
+            }
+            if (xml->hasAttribute("ccData"))
+            {
+                MemoryBlock ccData;
+                ccData.fromBase64Encoding(xml->getStringAttribute("ccData"));
+                ccLearn->setStateInformation(ccData.getData(), ccData.getSize());
             }
             if (xml->hasAttribute("linkParameterIndices"))
             {

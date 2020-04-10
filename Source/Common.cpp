@@ -282,3 +282,22 @@ ColorPitchBendRecord::ColorPitchBendRecord() :
     name("Original"), value(0), color(Colours::grey) {}
 ColorPitchBendRecord::ColorPitchBendRecord(String name, int value, Colour color) :
     name(name), value(value), color(color) {}
+
+ColorPitchBendRecordCollection::ColorPitchBendRecordCollection() :
+    name("---INIT---"), collection({ ColorPitchBendRecord("0", 0, Colours::grey) }) {}
+ColorPitchBendRecordCollection::ColorPitchBendRecordCollection(String name, const Array<ColorPitchBendRecord>& colors) :
+    name(name), collection(colors) {}
+
+XmlElement* ColorPitchBendRecordCollection::getColorMapXml(const String& name, const Array<ColorPitchBendRecord>& colors)
+{
+    XmlElement* root{ new XmlElement("colorMap") };
+    root->setAttribute("name", name);
+    for (auto& c : colors)
+    {
+        auto* line = root->createNewChildElement("record");
+        line->setAttribute("name", c.name);
+        line->setAttribute("value", c.value);
+        line->setAttribute("color", c.color.toString());
+    }
+    return root;
+}

@@ -254,3 +254,25 @@ struct ColorPitchBendRecordComparator
         return (valDiff > 0.f) - (valDiff < 0.f);
     }
 };
+
+class ColorPitchBendRecordCollection
+{
+public:
+    ColorPitchBendRecordCollection();
+    ColorPitchBendRecordCollection(String name, const Array<ColorPitchBendRecord>& colors);
+
+    static XmlElement* getColorMapXml(const String& name, const Array<ColorPitchBendRecord>& colors);
+
+    String name;
+    Array<ColorPitchBendRecord> collection;
+};
+
+struct ColorPitchBendRecordCollectionComparator
+{
+    ColorPitchBendRecordCollectionComparator() = default;
+
+    static int compareElements(const ColorPitchBendRecordCollection& first, const ColorPitchBendRecordCollection& second)
+    {
+        return first.name.compare(second.name);
+    }
+};

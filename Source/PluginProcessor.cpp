@@ -736,6 +736,7 @@ void MicroChromoAudioProcessor::updateNoteColorMap(Array<ColorPitchBendRecord>& 
         noteColorMap.set(c.name, c);
     if (!noteColorMap.contains("0"))
         noteColorMap.set("0", ColorPitchBendRecord("0", 0, Colours::grey));
+    filterNotesWithColorMap();
 }
 
 void MicroChromoAudioProcessor::renameNoteColorMap(String oldName, String newName)
@@ -753,6 +754,11 @@ void MicroChromoAudioProcessor::renameNoteColorMap(String oldName, String newNam
                 note.setPitchColor(newName);
         }
     }
+}
+
+void MicroChromoAudioProcessor::clearNoteColorMap()
+{
+    updateNoteColorMap(Array<ColorPitchBendRecord>());
 }
 
 void MicroChromoAudioProcessor::filterNotesWithColorMap()
@@ -815,6 +821,7 @@ void MicroChromoAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml->setAttribute("midiChannel", midiChannel);
     xml->setAttribute("ccBase", ccBase);
     xml->setAttribute("isModSrcKontakt", psModSource == USE_KONTAKT ? 1 : 0);
+    xml->setAttribute("selectedPreset", selectedPreset);
 
     auto stateXml = state.createXml();
     auto synthDescXml = synthBundle->getDescription().createXml();
@@ -846,6 +853,14 @@ void MicroChromoAudioProcessor::getStateInformation (MemoryBlock& destData)
         hasPs = true;
     }
 
+
+    Array<ColorPitchBendRecord> colorMaps;
+    HashMap<String, ColorPitchBendRecord>::Iterator it(noteColorMap);
+    while (it.next())
+        colorMaps.add(it.getValue());
+    colorMaps.sort(ColorPitchBendRecordComparator());
+    xml->addChildElement(ColorPitchBendRecordCollection::getColorMapXml("", colorMaps));
+
     copyXmlToBinary(*xml, destData);
 
     if (hasSynth)
@@ -872,6 +887,7 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
             numInstancesParameter = xml->getIntAttribute("numInstances", 1);
             updateMidiChannel(xml->getIntAttribute("midiChannel", 1));
             updateCcMidiSequenceWithNewBase(xml->getIntAttribute("ccBase", 102));
+            selectedPreset = xml->getStringAttribute("selectedPreset", "---INIT---");
             forEachXmlChildElement(*xml, child)
             {
                 if (child->hasTagName(parameters.state.getType()))
@@ -915,6 +931,18 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
                         else
                             this->addPlugin(desc, false);
                     }
+                }
+                if (child->hasTagName("colorMap"))
+                {
+                    Array<ColorPitchBendRecord> colors;
+                    forEachXmlChildElementWithTagName(*child, record, "record")
+                    {
+                        colors.add(ColorPitchBendRecord(record->getStringAttribute("name", "Unknown"),
+                            record->getDoubleAttribute("value", 0),
+                            Colour::fromString(record->getStringAttribute("color", "0x000000"))));
+                    }
+                    colors.sort(ColorPitchBendRecordComparator());
+                    updateNoteColorMap(colors);
                 }
             }
         }

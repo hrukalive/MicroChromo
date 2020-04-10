@@ -40,13 +40,29 @@ public:
     //void buttonClicked(const int rowNumber, const int columnNumber, const Colour& newColor) override;
     void colorChooserClosed(int rowNumber, int columnId, const Colour& color);
 
+    void loadColorPreset();
+    void useColorPreset(String name);
+    void addColorPreset(String name, Array<ColorPitchBendRecord> colors);
+    void removeColorPreset(String name);
+
     void updateColorMapList() override;
+    void updateColorMapPresetList();
+    void updatePresetComboBox();
+    void selectPresetWithName(String name);
 
     void paint (Graphics&) override;
     void resized() override;
 
 private:
+    void saveColorMapPresets();
+    void checkModified();
+
     SimpleMidiEditor& _midiEditor;
+    ApplicationProperties& appProperties;
+
+    HashMap<String, ColorPitchBendRecordCollection> colorMapPresets;
+    Array<ColorPitchBendRecordCollection> colorMapPresetsList;
+    bool hasPresetModified = false;
 
     //==============================================================================
     class ColorChooserComponent : public Component
@@ -73,7 +89,10 @@ private:
     HashMap<String, ColorPitchBendRecord>& noteColorMap;
     Array<ColorPitchBendRecord> noteColorMapList;
 
-    TextButton addBtn{ "Add" }, removeBtn{ "Remove" };
+    AlertWindow* presetNamePrompt{ nullptr };
+
+    TextButton addBtn{ "Add" }, removeBtn{ "Remove" }, saveBtn{ "Save" }, deleteBtn{ "Del" };
+    ComboBox presetComboBox;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ColorEditor)
 };
