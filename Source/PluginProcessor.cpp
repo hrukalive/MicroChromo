@@ -276,19 +276,57 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 {
     ScopedNoDenormals noDenormals;
 
-
-    if (getPlayHead())
+    posInfo.isPlaying = false;
+    auto* playhead = getPlayHead();
+    if (playhead != nullptr)
     {
-        getPlayHead()->getCurrentPosition(posInfo);
-        hasPlayheadInfo = true;
-    }
-    else
-    {
-        hasPlayheadInfo = false;
-        posInfo.isPlaying = false;
+        playhead->getCurrentPosition(posInfo);
+
+        if (posInfo.isPlaying)
+        {
+            ScopedLock lock(transportLock);
+            transportState = HOST_PLAYING;
+            transportTimeElasped = posInfo.timeInSeconds;
+            transportTimeSnapshot = 0;
+        }
     }
 
-    auto startTime = posInfo.timeInSeconds;
+    if (!posInfo.isPlaying)
+    {
+        ScopedLock lock(transportLock);
+        switch (transportState)
+        {
+        case HOST_PLAYING: transportState = PLUGIN_PAUSED; break;
+        case PLUGIN_PAUSED: break;
+        case PLUGIN_STOPPED: break;
+        case PLUGIN_PLAYING:
+        {
+            transportTimeElasped = jmax(0.0, Time::getMillisecondCounterHiRes() / 1000.0f - transportTimeSnapshot);
+            posInfo.isPlaying = true;
+            break;
+        }
+        case PLUGIN_QUERY_PLAY:
+        {
+            transportTimeSnapshot = Time::getMillisecondCounterHiRes() / 1000.0f - transportTimeElasped + buffer.getNumSamples() * sampleLength;
+            transportState = PLUGIN_PLAYING;
+            break;
+        }
+        case PLUGIN_QUERY_PAUSE: transportState = PLUGIN_PAUSED; break;
+        case PLUGIN_QUERY_STOP:
+        {
+            transportTimeElasped = 0;
+            transportState = PLUGIN_STOPPED;
+            break;
+        }
+        default:
+            break;
+        }
+        
+        if (transportTimeElasped > rangeEndTime)
+            transportState = PLUGIN_PAUSED;
+    }
+
+    auto startTime = transportTimeElasped.load();
     auto endTime = startTime + bufferLength;
     auto isWithInNow = (rangeStartTime < rangeEndTime && startTime >= rangeStartTime && startTime < rangeEndTime) ? 1 : 0;
 
@@ -1118,6 +1156,39 @@ void MicroChromoAudioProcessor::insertNote(int index, const Note& note)
 void MicroChromoAudioProcessor::sortNotes()
 {
     notes.sort(NoteComparator(), true);
+}
+
+void MicroChromoAudioProcessor::togglePlayback()
+{
+    ScopedLock lock(transportLock);
+    if (transportState == PLUGIN_PAUSED || transportState == PLUGIN_STOPPED)
+        transportState = PLUGIN_QUERY_PLAY;
+    else if (transportState == PLUGIN_PLAYING)
+        transportState = PLUGIN_QUERY_PAUSE;
+}
+
+void MicroChromoAudioProcessor::stopPlayback()
+{
+    ScopedLock lock(transportLock);
+    if (transportState == PLUGIN_PLAYING || transportState == PLUGIN_PAUSED)
+        transportState = PLUGIN_QUERY_STOP;
+}
+
+void MicroChromoAudioProcessor::setTimeForPlayback(double time)
+{
+    ScopedLock lock(transportLock);
+    transportTimeElasped = time;
+    transportTimeSnapshot = Time::getMillisecondCounterHiRes() / 1000.0f - transportTimeElasped;
+}
+
+int MicroChromoAudioProcessor::getTransportState()
+{
+    return transportState;
+}
+
+double MicroChromoAudioProcessor::getTimeElapsed()
+{
+    return transportTimeElasped;
 }
 
 void MicroChromoAudioProcessor::updatePitchShiftModulationSource()

@@ -18,6 +18,11 @@ MainEditor::TextButtonDropTarget::TextButtonDropTarget(String text, MainEditor& 
 
 bool MainEditor::TextButtonDropTarget::isInterestedInFileDrag(const StringArray& files)
 {
+    for (auto& f : files)
+    {
+        if (!f.endsWith(".mid") && !f.endsWith(".midi"))
+            return false;
+    }
     return true;
 }
 
@@ -174,7 +179,25 @@ void MainEditor::changeListenerCallback(ChangeBroadcaster* changed)
 
 void MainEditor::itemDroppedCallback(const StringArray& files)
 {
-    DBG("Something dropped");
+    MidiFile midiFile;
+    String filepath(files[0]);
+    std::unique_ptr<InputStream> stream{ new FileInputStream(File(filepath)) };
+    midiFile.readFrom(*stream);
+    midiFile.convertTimestampTicksToSeconds();
+
+    MidiMessageSequence seq(*midiFile.getTrack(0));
+    seq.sort();
+    seq.updateMatchedPairs();
+    for (auto i = 0; i < seq.getNumEvents(); i++)
+    {
+        auto* evt = seq.getEventPointer(i);
+        processor.addNote(Note(
+            evt->message.getNoteNumber(),
+            evt->message.getTimeStamp(),
+            evt->noteOffObject->message.getTimeStamp() - evt->message.getTimeStamp(),
+            evt->message.getVelocity()));
+    }
+    _parent.updateMidiEditor();
 }
 
 void MainEditor::mouseDown(const MouseEvent& e)
@@ -213,16 +236,21 @@ void MainEditor::mouseDrag(const MouseEvent& e)
                 if (notesMidiSeq[i]->getNumEvents() == 0)
                     continue;
 
-                MidiMessageSequence copy;
-                for (auto& evt : *notesMidiSeq[i])
-                    copy.addEvent(MidiMessage(evt->message).withTimeStamp(evt->message.getTimeStamp() * 48000));
-                for (auto& evt : *ccMidiSeq[i])
-                    copy.addEvent(MidiMessage(evt->message).withTimeStamp(evt->message.getTimeStamp() * 48000));
-                copy.sort();
-                copy.updateMatchedPairs();
-
                 MidiFile file;
-                file.addTrack(copy);
+                file.setTicksPerQuarterNote(960);
+
+                MidiMessageSequence seq;
+                seq.addEvent(MidiMessage::timeSignatureMetaEvent(4, 4));
+                seq.addEvent(MidiMessage::tempoMetaEvent((60000.f / (float)(60 * 4)) * 1000.f));
+                for (auto& evt : *notesMidiSeq[i])
+                    seq.addEvent(MidiMessage(evt->message).withTimeStamp(evt->message.getTimeStamp() * 960));
+                for (auto& evt : *ccMidiSeq[i])
+                    seq.addEvent(MidiMessage(evt->message).withTimeStamp(evt->message.getTimeStamp() * 960));
+                seq.sort();
+                seq.updateMatchedPairs();
+                seq.addEvent(MidiMessage::endOfTrack(), notesMidiSeq[i]->getEndTime() * 960);
+
+                file.addTrack(seq);
 
                 std::shared_ptr<TemporaryFile> outf = std::make_shared<TemporaryFile>(".mid");
                 if (std::unique_ptr<FileOutputStream> p_os{ outf->getFile().createOutputStream() })

@@ -53,7 +53,7 @@ void MicroChromoAudioProcessorEditor::CustomTabbedComponent::currentTabChanged(i
 {
     switch (newCurrentTabIndex)
     {
-    case 0: _owner.setSize(400, 300); break;
+    case 0: _owner.setSize(400, 300 + 90); break;
     case 1: _owner.setSize(500, 500); break;
     case 2: _owner.setSize(300, 500); break;
     default:
@@ -83,6 +83,31 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     addAndMakeVisible(menuBar.get());
     menuBar->setVisible(true);
 
+    addAndMakeVisible(playTransportBtn);
+    playTransportBtn.onClick = [&]() {
+        processor.togglePlayback();
+    };
+
+    addAndMakeVisible(stopTransportBtn);
+    stopTransportBtn.onClick = [&]() {
+        processor.stopPlayback();
+    };
+
+    addAndMakeVisible(transportSlider);
+    transportSlider.setTextBoxStyle(Slider::NoTextBox, true, 0, 0);
+    transportSlider.setRange(0.0, 1.0, 0.00001);
+    transportSlider.onDragStart = [&]() {
+        transportSliderDragging = true;
+    };
+    transportSlider.onDragEnd = [&]() {
+        transportSliderDragging = false;
+        processor.setTimeForPlayback(processor.getMidiSequenceEndTime() * transportSlider.getValue());
+    };
+
+    transportLabel.setText("00:00:00.000", dontSendNotification);
+    transportLabel.setFont(Font(30));
+    addAndMakeVisible(transportLabel);
+
     mainEditor.reset(new MainEditor(p, *this));
     midiEditor.reset(new SimpleMidiEditor(*this));
     colorEditor.reset(new ColorEditor(*this, *midiEditor));
@@ -99,11 +124,14 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     changeListenerCallback(synthBundle.get());
     changeListenerCallback(psBundle.get());
 
-    setSize(400, 300);
+    setSize(400, 300 + 90);
+
+    startTimer(100);
 }
 
 MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 {
+    stopTimer();
     knownPluginList.removeChangeListener(this);
 
     synthBundle->removeChangeListener(this);
@@ -125,6 +153,52 @@ void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* 
             appProperties.saveIfNeeded();
         }
     }
+}
+
+void MicroChromoAudioProcessorEditor::timerCallback()
+{
+    switch (processor.getTransportState())
+    {
+    case PLUGIN_PLAYING:
+    {
+        playTransportBtn.setEnabled(true);
+        stopTransportBtn.setEnabled(true);
+        transportSlider.setEnabled(true);
+        playTransportBtn.setButtonText("Pause");
+        break;
+    }
+    case PLUGIN_PAUSED: case PLUGIN_STOPPED:
+    {
+        playTransportBtn.setEnabled(true);
+        stopTransportBtn.setEnabled(true);
+        transportSlider.setEnabled(true);
+        playTransportBtn.setButtonText("Play");
+        break;
+    }
+    default:
+    {
+        playTransportBtn.setEnabled(false);
+        stopTransportBtn.setEnabled(false);
+        transportSlider.setEnabled(false);
+        break;
+    }
+    }
+
+    auto seconds = processor.getTimeElapsed();
+    if (!transportSliderDragging)
+        transportSlider.setValue(seconds / processor.getMidiSequenceEndTime(), dontSendNotification);
+
+    std::ostringstream ss;
+    ss << std::setfill('0') << std::setw(2) << int(floor(seconds / 3600)) % 24
+        << std::setw(1) << ":" << std::setw(2) << int(floor(seconds / 60)) % 60
+        << std::setw(1) << ":" << std::setw(2) << int(floor(seconds)) % 60
+        << std::setw(1) << "." << std::setw(3) << int(floor(seconds * 1000)) % 1000;
+    transportLabel.setText(ss.str(), dontSendNotification);
+}
+
+void MicroChromoAudioProcessorEditor::updateMidiEditor()
+{
+    midiEditor->updateTableContent();
 }
 
 //==============================================================================
@@ -267,6 +341,20 @@ void MicroChromoAudioProcessorEditor::paint (Graphics& g)
 void MicroChromoAudioProcessorEditor::resized()
 {
     auto b = getLocalBounds();
+
+    auto bottomPanel = b.removeFromBottom(90).withSizeKeepingCentre(300, 90);
+    bottomPanel.reduce(5, 10);
+    transportSlider.setBounds(bottomPanel.removeFromTop(24));
+    bottomPanel.removeFromTop(6);
+    playTransportBtn.setBounds(bottomPanel.removeFromLeft(50));
+    bottomPanel.removeFromLeft(6);
+    stopTransportBtn.setBounds(bottomPanel.removeFromLeft(50));
+    bottomPanel.removeFromLeft(6);
+    transportLabel.setBounds(bottomPanel.withSizeKeepingCentre(jmin(bottomPanel.getWidth(), 
+        6 + transportLabel.getFont().getStringWidth(transportLabel.getText())), bottomPanel.getHeight()));
+
+    //6 + label.getFont().getStringWidth(label.getText()), 16)
+
     menuBar->setBounds(b.removeFromTop(LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight()));
     tabComp->setBounds(b);
 }

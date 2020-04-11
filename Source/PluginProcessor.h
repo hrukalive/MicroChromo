@@ -83,6 +83,13 @@ public:
     void sortNotes();
 
     //==============================================================================
+    void togglePlayback();
+    void stopPlayback();
+    void setTimeForPlayback(double time);
+    int getTransportState();
+    double getTimeElapsed();
+
+    //==============================================================================
     ApplicationProperties& getApplicationProperties() { return appProperties; }
     AudioPluginFormatManager& getAudioPluginFormatManager() { return formatManager; }
     KnownPluginList& getKnownPluginList() { return knownPluginList; }
@@ -100,6 +107,7 @@ public:
     auto& getNoteColorMap() { return noteColorMap; }
     String getSelectedColorPresetName() { return selectedPreset; }
     void setSelectedColorPresetName(String name) { selectedPreset = name; }
+    double getMidiSequenceEndTime() { return rangeEndTime; }
 
     OwnedArray<MidiMessageSequence>& getNoteMidiSequence() { return notesMidiSeq; }
     OwnedArray<MidiMessageSequence>& getCcMidiSequence() { return ccMidiSeq; }
@@ -142,15 +150,14 @@ private:
     OwnedArray<ParameterLinker> synthParamPtr, psParamPtr;
 
     Array<Note> notes;
+    HashMap<String, ColorPitchBendRecord> noteColorMap;
     
     OwnedArray<MidiMessageSequence> notesMidiSeq, ccMidiSeq;
-    HashMap<String, ColorPitchBendRecord> noteColorMap;
 
     std::atomic<int> ccBase{ 102 }, psModSource{ USE_NONE }, midiChannel{ 1 };
 
     //==============================================================================
     AudioPlayHead::CurrentPositionInfo posInfo;
-    std::atomic<bool> hasPlayheadInfo{ false };
     Array<MidiMessage> controllerStateMessage;
 
     std::atomic<bool> properlyPrepared{ false };
@@ -158,6 +165,10 @@ private:
     std::atomic<bool> isPlayingNote{ false };
     std::atomic<int> isWithIn{ -1 };
     bool wasStopped = true;
+
+    std::atomic<int> transportState{ PLUGIN_PAUSED };
+    std::atomic<double> transportTimeSnapshot{ 0.0 }, transportTimeElasped{ 0.0 };
+    CriticalSection transportLock;
 
     float nextStartTime = -1.0, rangeStartTime = FP_INFINITE, rangeEndTime = -FP_INFINITE;
 

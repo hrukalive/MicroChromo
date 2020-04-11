@@ -39,6 +39,7 @@ public:
     void setSelectedId(const int rowNumber, const int columnNumber, const int newId) override;
 
     void updateColorMapList() override;
+    void updateTableContent();
 
     void paint(Graphics& g) override;
     void resized() override;

@@ -22,7 +22,8 @@ class MicroChromoAudioProcessorEditor  :
     public AudioProcessorEditor,
     public ApplicationCommandTarget,
     public MenuBarModel,
-    public ChangeListener
+    public ChangeListener,
+    public Timer
 {
 public:
 
@@ -49,6 +50,9 @@ public:
 
     //==============================================================================
     void changeListenerCallback(ChangeBroadcaster*) override;
+    void timerCallback() override;
+
+    void updateMidiEditor();
 
 private:
 
@@ -66,6 +70,10 @@ private:
     std::unique_ptr<ColorEditor> colorEditor;
 
     std::unique_ptr<MenuBarComponent> menuBar;
+    TextButton playTransportBtn{ "Pause" }, stopTransportBtn{ "Stop" };
+    Slider transportSlider;
+    Label transportLabel;
+    std::atomic<bool> transportSliderDragging{ false };
 
     class CustomTabbedComponent : public TabbedComponent
     {

@@ -175,6 +175,7 @@ int SimpleMidiEditor::getSelectedId(const int rowNumber, const int columnNumber)
 {
     if (columnNumber == 6)
         return itemTextToitemId[notes[rowNumber].getPitchColor()];
+    return 0;
 }
 
 void SimpleMidiEditor::setSelectedId(const int rowNumber, const int /*columnNumber*/, const int newId)
@@ -205,6 +206,11 @@ void SimpleMidiEditor::updateColorMapList()
         c++;
     }
 
+    table.updateContent();
+}
+
+void SimpleMidiEditor::updateTableContent()
+{
     table.updateContent();
 }
 

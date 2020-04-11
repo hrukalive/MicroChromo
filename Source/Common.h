@@ -49,18 +49,29 @@ enum
     CC_VALUE_BASE = 20 + mainMenuIdBase
 };
 
-enum CommandIDs
-{
-    openPluginScanner = 1,
-    testCommand
-};
-
 enum
 {
     USE_NONE = 1,
     USE_PS,
     USE_SYNTH,
     USE_KONTAKT
+};
+
+enum
+{
+    HOST_PLAYING = 1,
+    PLUGIN_QUERY_PLAY,
+    PLUGIN_QUERY_PAUSE,
+    PLUGIN_QUERY_STOP,
+    PLUGIN_PLAYING,
+    PLUGIN_STOPPED,
+    PLUGIN_PAUSED
+};
+
+enum CommandIDs
+{
+    openPluginScanner = 1,
+    testCommand
 };
 
 class AudioParameterFloatVariant : public AudioParameterFloat
