@@ -260,28 +260,25 @@ void ParameterCcLearn::parameterValueChanged(int parameterIndex, float newValue)
 	}
 }
 
-void ParameterCcLearn::getStateInformation(MemoryBlock& destData)
+std::unique_ptr<XmlElement> ParameterCcLearn::createXml()
 {
-	std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>("cclearn_module");
+	std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>("ccLearnModule");
 	xml->setAttribute("ccSource", ccSource);
 	xml->setAttribute("paramIndex", paramIndex);
 	xml->setAttribute("learnedCcMin", learnedCcMin);
 	xml->setAttribute("learnedCcMax", learnedCcMax);
-	AudioProcessor::copyXmlToBinary(*xml, destData);
+	return xml;
 }
 
-void ParameterCcLearn::setStateInformation(const void* data, int sizeInBytes)
+void ParameterCcLearn::loadFromXml(const XmlElement* xml)
 {
-	std::unique_ptr<XmlElement> xml(AudioProcessor::getXmlFromBinary(data, sizeInBytes));
-	if (xml.get() != nullptr)
+	if (xml != nullptr && xml->getTagName() == "ccLearnModule")
 	{
-		if (xml->hasTagName("cclearn_module"))
-		{
-			setCcLearn(xml->getIntAttribute("ccSource", -1), 
-				xml->getIntAttribute("paramIndex", -1), 
-				xml->getDoubleAttribute("learnedCcMin", FP_INFINITE), 
-				xml->getDoubleAttribute("learnedCcMax", -FP_INFINITE));
-		}
+		auto tmp = xml->getIntAttribute("ccSource", -1);
+		setCcLearn(tmp,
+			xml->getIntAttribute("paramIndex", -1), 
+			tmp == -1 ? FP_INFINITE : xml->getDoubleAttribute("learnedCcMin", FP_INFINITE),
+			tmp == -1 ? -FP_INFINITE : xml->getDoubleAttribute("learnedCcMax", -FP_INFINITE));
 	}
 }
 

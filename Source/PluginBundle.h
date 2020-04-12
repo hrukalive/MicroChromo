@@ -43,8 +43,8 @@ public:
     const PluginDescription getDescription() { return currentDesc; }
 
     //==============================================================================
-    void getStateInformation(MemoryBlock& destData);
-    void setStateInformation(const void* data, int sizeInBytes);
+    std::unique_ptr<XmlElement> createXml(String rootTag);
+    void loadFromXml(const XmlElement* xml, String rootTag);
     void propagateState();
 
     //==============================================================================
@@ -74,10 +74,7 @@ public:
     bool isNewlyLoaded() { return _isNewlyLoaded.load(); }
     bool finishedLoading() { return _finishedLoading.load(); }
     bool hasError() { return _isError.load(); }
-    void resetCcLearn();
-    void startCcLearn();
-    bool hasCcLearned();
-    void setCcLearn(int ccNum, int index, float min, float max);
+
     int getLearnedCcSource() { return ccLearn->getCcSource(); }
     int getLearnedCcParameterIndex() { return ccLearn->getCcLearnedParameterIndex(); }
     ParameterCcLearn& getCcLearnModule() { return *ccLearn; }

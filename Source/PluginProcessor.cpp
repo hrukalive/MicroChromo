@@ -181,6 +181,8 @@ void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     sampleLength = 1.0 / sampleRate;
     bufferLength = samplesPerBlock / sampleRate;
 
+    playingNotes.clear();
+
     audioBufferArrayA.clear();
     audioBufferArrayB.clear();
     midiBufferArrayA.clear();
@@ -234,12 +236,12 @@ void MicroChromoAudioProcessor::sendAllNotesOff()
         midiBuffer->clear();
         for (auto j = 1; j <= 16; j++)
         {
-            MidiMessage msg1(MidiMessage::allNotesOff(j));
-            MidiMessage msg2(MidiMessage::allSoundOff(j));
-            MidiMessage msg3(MidiMessage::allControllersOff(j));
-            midiBuffer->addEvent(msg1, 0);
-            midiBuffer->addEvent(msg2, 0);
-            midiBuffer->addEvent(msg3, 0);
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 0);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 0);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 0);
+            for (auto n : playingNotes)
+                midiBuffer->addEvent(MidiMessage::noteOff(midiChannel, n), 0);
+            playingNotes.clear();
         }
     }
     for (auto* midiBuffer : midiBufferArrayB)
@@ -247,14 +249,12 @@ void MicroChromoAudioProcessor::sendAllNotesOff()
         midiBuffer->clear();
         for (auto j = 1; j <= 16; j++)
         {
-            MidiMessage msg1(MidiMessage::allNotesOff(j));
-            MidiMessage msg2(MidiMessage::allSoundOff(j));
-            MidiMessage msg3(MidiMessage::allControllersOff(j));
-            midiBuffer->addEvent(msg1, 0);
-            midiBuffer->addEvent(msg2, 0);
-            midiBuffer->addEvent(msg3, 0);
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 0);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 0);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 0);
         }
     }
+    DBG("All note off");
 
     isPlayingNote = false;
 }
@@ -351,7 +351,7 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
             ccMidiSeq[i]->createControllerUpdatesForTime(midiChannel, startTime, controllerStateMessage);
             for (auto& msg : controllerStateMessage)
             {
-                ccMidiBufferArray[i]->addEvent(msg, 0);
+                ccMidiBufferArray[i]->addEvent(msg, 8);
                 DBG("Recovering CC: " << msg.getControllerNumber() << ": " << msg.getControllerValue());
             }
         }
@@ -413,91 +413,101 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
             DBG("Stopped before, now playing.");
         }
 
-        if (isWithInNow == 1)
+        if (needClearance) // If all note off sent, then skip this block
         {
-            // Foward other MIDI messages like controllers
-            MidiMessage midiMessage;
-            int sampleOffset;
-            for (MidiBuffer::Iterator it(midiMessages); it.getNextEvent(midiMessage, sampleOffset);)
+            if (isWithInNow == 1)
             {
-                if (!midiMessage.isNoteOnOrOff())
+                // Foward other MIDI messages like controllers
+                MidiMessage midiMessage;
+                int sampleOffset;
+                for (MidiBuffer::Iterator it(midiMessages); it.getNextEvent(midiMessage, sampleOffset);)
                 {
-                    if (psModSource == USE_PS)
+                    if (!midiMessage.isNoteOnOrOff())
                     {
-                        addMessageToAllBuffer(midiBufferArrayA, midiMessage, sampleOffset);
-                        if (!midiMessage.isControllerOfType(psBundle->getLearnedCcSource()))
+                        if (psModSource == USE_PS)
+                        {
+                            addMessageToAllBuffer(midiBufferArrayA, midiMessage, sampleOffset);
+                            if (!midiMessage.isControllerOfType(psBundle->getLearnedCcSource()))
+                                addMessageToAllBuffer(midiBufferArrayB, midiMessage, sampleOffset);
+                        }
+                        else if (psModSource == USE_SYNTH)
+                        {
+                            if (!midiMessage.isControllerOfType(synthBundle->getLearnedCcSource()))
+                                addMessageToAllBuffer(midiBufferArrayA, midiMessage, sampleOffset);
                             addMessageToAllBuffer(midiBufferArrayB, midiMessage, sampleOffset);
-                    }
-                    else if (psModSource == USE_SYNTH)
-                    {
-                        if (!midiMessage.isControllerOfType(synthBundle->getLearnedCcSource()))
-                            addMessageToAllBuffer(midiBufferArrayA, midiMessage, sampleOffset);
-                        addMessageToAllBuffer(midiBufferArrayB, midiMessage, sampleOffset);
-                    }
-                    else if (psModSource == USE_KONTAKT)
-                    {
-                        if (!midiMessage.isController() || 
-                            midiMessage.getControllerNumber() < ccBase ||
-                            midiMessage.getControllerNumber() >= ccBase + 12)
-                            addMessageToAllBuffer(midiBufferArrayA, midiMessage, sampleOffset);
-                        addMessageToAllBuffer(midiBufferArrayB, midiMessage, sampleOffset);
+                        }
+                        else if (psModSource == USE_KONTAKT)
+                        {
+                            if (!midiMessage.isController() ||
+                                midiMessage.getControllerNumber() < ccBase ||
+                                midiMessage.getControllerNumber() >= ccBase + 12)
+                                addMessageToAllBuffer(midiBufferArrayA, midiMessage, sampleOffset);
+                            addMessageToAllBuffer(midiBufferArrayB, midiMessage, sampleOffset);
+                        }
                     }
                 }
-            }
 
-            // Play note prior to start time that are not yet off.
-            if (!isPlayingNote)
-            {
+                // Play note prior to start time that are not yet off.
+                if (!isPlayingNote)
+                {
+                    for (int i = 0; i < numInstancesParameter; i++)
+                    {
+                        const auto noteEvtIndex = notesMidiSeq[i]->getNextIndexAtTime(startTime);
+                        for (int j = 0; j < noteEvtIndex; j++)
+                        {
+                            MidiMessageSequence::MidiEventHolder* evt = notesMidiSeq[i]->getEventPointer(j);
+                            if (evt->message.isNoteOn() && evt->noteOffObject != nullptr && evt->noteOffObject->message.getTimeStamp() > startTime)
+                            {
+                                midiBufferArrayA[i]->addEvent(evt->message, 16);
+                                if (evt->message.isNoteOn())
+                                    playingNotes.insert(evt->message.getNoteNumber());
+                                else if (evt->message.isNoteOff())
+                                    playingNotes.erase(evt->message.getNoteNumber());
+                                DBG("Retrigger note " << evt->message.getNoteNumber());
+                                isPlayingNote = true;
+                            }
+                        }
+                    }
+                }
+
+                // Move messages in sequences to buffer for playback.
                 for (int i = 0; i < numInstancesParameter; i++)
                 {
-                    const auto noteEvtIndex = notesMidiSeq[i]->getNextIndexAtTime(startTime);
-                    for (int j = 0; j < noteEvtIndex; j++)
+                    for (int j = notesMidiSeq[i]->getNextIndexAtTime(startTime); j < notesMidiSeq[i]->getNumEvents(); j++)
                     {
                         MidiMessageSequence::MidiEventHolder* evt = notesMidiSeq[i]->getEventPointer(j);
-                        if (evt->message.isNoteOn() && evt->noteOffObject != nullptr && evt->noteOffObject->message.getTimeStamp() > startTime)
+
+                        if (evt->message.getTimeStamp() >= startTime && evt->message.getTimeStamp() < endTime)
                         {
-                            midiBufferArrayA[i]->addEvent(evt->message, 0);
+                            midiBufferArrayA[i]->addEvent(evt->message, roundDoubleToInt((evt->message.getTimeStamp() - startTime) * sampleLength));
+                            if (evt->message.isNoteOn())
+                                playingNotes.insert(evt->message.getNoteNumber());
+                            else if (evt->message.isNoteOff())
+                                playingNotes.erase(evt->message.getNoteNumber());
                             isPlayingNote = true;
                         }
-                        if (evt->message.getTimeStamp() > startTime)
+                        if (evt->message.getTimeStamp() >= endTime)
+                            break;
+                    }
+                    for (int j = ccMidiSeq[i]->getNextIndexAtTime(startTime); j < ccMidiSeq[i]->getNumEvents(); j++)
+                    {
+                        MidiMessageSequence::MidiEventHolder* evt = ccMidiSeq[i]->getEventPointer(j);
+
+                        if (evt->message.getTimeStamp() >= startTime && evt->message.getTimeStamp() < endTime)
+                        {
+                            ccMidiBufferArray[i]->addEvent(evt->message, roundDoubleToInt((evt->message.getTimeStamp() - startTime) * sampleLength));
+                        }
+                        if (evt->message.getTimeStamp() >= endTime)
                             break;
                     }
                 }
-            }
 
-            // Move messages in sequences to buffer for playback.
-            for (int i = 0; i < numInstancesParameter; i++)
+            }
+            else
             {
-                for (int j = notesMidiSeq[i]->getNextIndexAtTime(startTime); j < notesMidiSeq[i]->getNumEvents(); j++)
-                {
-                    MidiMessageSequence::MidiEventHolder* evt = notesMidiSeq[i]->getEventPointer(j);
-
-                    if (evt->message.getTimeStamp() >= startTime && evt->message.getTimeStamp() < endTime)
-                    {
-                        midiBufferArrayA[i]->addEvent(evt->message, roundDoubleToInt((evt->message.getTimeStamp() - startTime) * sampleLength));
-                        isPlayingNote = true;
-                    }
-                    if (evt->message.getTimeStamp() >= endTime)
-                        break;
-                }
-                for (int j = ccMidiSeq[i]->getNextIndexAtTime(startTime); j < ccMidiSeq[i]->getNumEvents(); j++)
-                {
-                    MidiMessageSequence::MidiEventHolder* evt = ccMidiSeq[i]->getEventPointer(j);
-
-                    if (evt->message.getTimeStamp() >= startTime && evt->message.getTimeStamp() < endTime)
-                    {
-                        ccMidiBufferArray[i]->addEvent(evt->message, roundDoubleToInt((evt->message.getTimeStamp() - startTime) * sampleLength));
-                    }
-                    if (evt->message.getTimeStamp() >= endTime)
-                        break;
-                }
+                forwardMidiBuffer();
+                midiMessages.clear();
             }
-            
-        }
-        else
-        {
-            forwardMidiBuffer();
-            midiMessages.clear();
         }
     }
 
@@ -560,6 +570,8 @@ void MicroChromoAudioProcessor::updateMidiSequence(int newBase)
     {
         notesMidiSeq.add(new MidiMessageSequence());
         ccMidiSeq.add(new MidiMessageSequence());
+        for (int j = 0; j < (psModSource == USE_KONTAKT ? 12 : 1); j++)
+            ccMidiSeq[i]->addEvent(MidiMessage::controllerEvent(midiChannel, ccBase + j, 50));
     }
 
     Array<SimpleMidiMessage> sequence;
@@ -579,7 +591,11 @@ void MicroChromoAudioProcessor::updateMidiSequence(int newBase)
             key--;
             pitchbend += 100;
         }
-        sequence.add(SimpleMidiMessage(midiChannel, key, note.getBeat(), note.getVelocity(), pitchbend, ccBase, true, 2 * sampleLength));
+        key = jmax(0, key);
+        if (psModSource == USE_KONTAKT)
+            sequence.add(SimpleMidiMessage(midiChannel, key, note.getBeat(), note.getVelocity(), pitchbend, ccBase + key % 12, true, 2 * sampleLength));
+        else
+            sequence.add(SimpleMidiMessage(midiChannel, key, note.getBeat(), note.getVelocity(), pitchbend, ccBase, true, 2 * sampleLength));
         sequence.add(SimpleMidiMessage(midiChannel, key, note.getBeat() + note.getLength(), note.getVelocity(), 0, -1, false, 0));
     }
     sequence.sort(SimpleMidiMessageComparator(), true);
@@ -598,6 +614,7 @@ void MicroChromoAudioProcessor::updateMidiSequence(int newBase)
         if (rangeEndTime < seq->getEndTime())
             rangeEndTime = seq->getEndTime();
     }
+    rangeEndTime += 4;
 
     updateMidSeqSus = false;
     suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus);
@@ -924,6 +941,7 @@ void MicroChromoAudioProcessor::updateCcMidiSequenceWithNewBase(int newBase)
         ccMidiSeq.set(i, newSeq, true);
     }
     ccBase = newBase;
+    DBG("CC base updated to " << newBase);
 }
 
 //==============================================================================
@@ -944,7 +962,9 @@ void MicroChromoAudioProcessor::getStateInformation (MemoryBlock& destData)
         return desc.name.isNotEmpty() && desc.uid != 0;
     };
 
-    auto state = parameters.copyState();
+    //auto state = parameters.copyState();
+    //auto stateXml = new XmlElement(*state.createXml());
+
     std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>("root");
     xml->setAttribute("numInstances", numInstancesParameter);
     xml->setAttribute("midiChannel", midiChannel);
@@ -952,36 +972,9 @@ void MicroChromoAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml->setAttribute("isModSrcKontakt", psModSource == USE_KONTAKT ? 1 : 0);
     xml->setAttribute("selectedPreset", selectedPreset);
 
-    auto stateXml = state.createXml();
-    auto synthDescXml = synthBundle->getDescription().createXml();
-    auto psDescXml = psBundle->getDescription().createXml();
-
-    MemoryBlock synthData, psData;
-    synthBundle->getStateInformation(synthData);
-    psBundle->getStateInformation(psData);
-
-    xml->addChildElement(stateXml.get());
-
-    std::unique_ptr<XmlElement> synthXml, psXml;
-    bool hasSynth = false, hasPs = false;
-    if (synthBundle->isLoaded() && validDesc(synthBundle->getDescription()))
-    {
-        synthXml = std::make_unique<XmlElement>("synth_bundle");
-        synthXml->addChildElement(synthDescXml.get());
-        xml->addChildElement(synthXml.get());
-        xml->setAttribute("synthStateData", synthData.toBase64Encoding());
-        hasSynth = true;
-    }
-
-    if (psBundle->isLoaded() && validDesc(psBundle->getDescription()))
-    {
-        psXml = std::make_unique<XmlElement>("pitchshift_bundle");
-        psXml->addChildElement(psDescXml.get());
-        xml->addChildElement(psXml.get());
-        xml->setAttribute("psStateData", psData.toBase64Encoding());
-        hasPs = true;
-    }
-
+    //xml->addChildElement(stateXml);
+    xml->addChildElement(new XmlElement(*synthBundle->createXml("synthBundle")));
+    xml->addChildElement(new XmlElement(*psBundle->createXml("pitchshiftBundle")));
 
     Array<ColorPitchBendRecord> colorMaps;
     HashMap<String, ColorPitchBendRecord>::Iterator it(noteColorMap);
@@ -991,15 +984,7 @@ void MicroChromoAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml->addChildElement(ColorPitchBendRecordCollection::getColorMapXml("", colorMaps));
 
     copyXmlToBinary(*xml, destData);
-
-    if (hasSynth)
-        synthXml->removeChildElement(synthDescXml.get(), false);
-    if (hasPs)
-        psXml->removeChildElement(psDescXml.get(), false);
-
-    xml->removeChildElement(stateXml.get(), false);
-    xml->removeChildElement(synthXml.get(), false);
-    xml->removeChildElement(psXml.get(), false);
+    xml->writeTo(File("J:\\TEMPS\\13-SP20\\MUS 499\\Test.xml"));
 }
 
 void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -1017,62 +1002,45 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
             updateMidiChannel(xml->getIntAttribute("midiChannel", 1));
             updateCcMidiSequenceWithNewBase(xml->getIntAttribute("ccBase", 102));
             selectedPreset = xml->getStringAttribute("selectedPreset", "---INIT---");
-            forEachXmlChildElement(*xml, child)
+
+            auto isModSrcKontakt = xml->getIntAttribute("isModSrcKontakt", 0);
+            if (auto* child = xml->getChildByName("synthBundle"))
             {
-                if (child->hasTagName(parameters.state.getType()))
-                    parameters.replaceState(ValueTree::fromXml(*child));
-                if (child->hasTagName("synth_bundle"))
+                PluginDescription desc;
+                desc.loadFromXml(*(child->getChildByName("PLUGIN")));
+                if (validDesc(desc))
                 {
-                    PluginDescription desc;
-                    desc.loadFromXml(*child->getFirstChildElement());
-                    if (validDesc(desc))
-                    {
-                        if (xml->hasAttribute("synthStateData"))
-                        {
-                            MemoryBlock proc_data;
-                            proc_data.fromBase64Encoding(xml->getStringAttribute("synthStateData"));
-                            if (xml->getIntAttribute("isModSrcKontakt", 0))
-                            {
-                                this->addPlugin(desc, true, [proc_data, this](PluginBundle& bundle) {
-                                        bundle.setStateInformation(proc_data.getData(), proc_data.getSize());
-                                        this->toggleUseKontakt(true);
-                                    });
-                            }
-                            else
-                                this->addPlugin(desc, true, [proc_data](PluginBundle& bundle) {bundle.setStateInformation(proc_data.getData(), proc_data.getSize()); });
-                        }
-                        else
-                            this->addPlugin(desc, true);
-                    }
+                    this->addPlugin(desc, true, [copyChild = *child, isModSrcKontakt, this](PluginBundle& bundle) {
+                        bundle.loadFromXml(&copyChild, "synthBundle");
+                        if (isModSrcKontakt)
+                            this->toggleUseKontakt(true);
+                        });
                 }
-                if (child->hasTagName("pitchshift_bundle"))
+            }
+
+            if (auto* child = xml->getChildByName("pitchshiftBundle"))
+            {
+                PluginDescription desc;
+                desc.loadFromXml(*(child->getChildByName("PLUGIN")));
+                if (validDesc(desc))
                 {
-                    PluginDescription desc;
-                    desc.loadFromXml(*child->getFirstChildElement());
-                    if (validDesc(desc))
-                    {
-                        if (xml->hasAttribute("psStateData"))
-                        {
-                            MemoryBlock proc_data;
-                            proc_data.fromBase64Encoding(xml->getStringAttribute("psStateData"));
-                            this->addPlugin(desc, false, [proc_data](PluginBundle& bundle) {bundle.setStateInformation(proc_data.getData(), proc_data.getSize()); });
-                        }
-                        else
-                            this->addPlugin(desc, false);
-                    }
+                    this->addPlugin(desc, false, [copyChild = *child](PluginBundle& bundle) {
+                        bundle.loadFromXml(&copyChild, "pitchshiftBundle");
+                        });
                 }
-                if (child->hasTagName("colorMap"))
+            }
+
+            if (auto* child = xml->getChildByName("colorMap"))
+            {
+                Array<ColorPitchBendRecord> colors;
+                forEachXmlChildElementWithTagName(*child, record, "record")
                 {
-                    Array<ColorPitchBendRecord> colors;
-                    forEachXmlChildElementWithTagName(*child, record, "record")
-                    {
-                        colors.add(ColorPitchBendRecord(record->getStringAttribute("name", "Unknown"),
-                            record->getDoubleAttribute("value", 0),
-                            Colour::fromString(record->getStringAttribute("color", "0x000000"))));
-                    }
-                    colors.sort(ColorPitchBendRecordComparator());
-                    updateNoteColorMap(colors);
+                    colors.add(ColorPitchBendRecord(record->getStringAttribute("name", "Unknown"),
+                        record->getDoubleAttribute("value", 0),
+                        Colour::fromString(record->getStringAttribute("color", "ff000000"))));
                 }
+                colors.sort(ColorPitchBendRecordComparator());
+                updateNoteColorMap(colors);
             }
         }
     }
@@ -1129,9 +1097,6 @@ void MicroChromoAudioProcessor::finishLoadingPlugin()
             prepareToPlay(getSampleRate(), getBlockSize());
             updateHostDisplay();
         }
-
-        if (psBundle->getDescription().isDuplicateOf(this->internalTypes[2]))
-            psBundle->setCcLearn(100, 0, 0.25f, 0.75f);
 
         updatePitchShiftModulationSource();
 
@@ -1191,7 +1156,7 @@ double MicroChromoAudioProcessor::getTimeElapsed()
     return transportTimeElasped;
 }
 
-void MicroChromoAudioProcessor::updatePitchShiftModulationSource()
+void MicroChromoAudioProcessor::updatePitchShiftModulationSource(int useKontakt)
 {
     updateModSrcSus = true;
     suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus);
@@ -1199,10 +1164,11 @@ void MicroChromoAudioProcessor::updatePitchShiftModulationSource()
     auto& synthCcLearnModule = synthBundle->getCcLearnModule();
     auto& psCcLearnModule = psBundle->getCcLearnModule();
 
-    if (psModSource == USE_KONTAKT)
+    if (useKontakt == 1)
     {
         if (synthBundle->isKontakt())
         {
+            psModSource = USE_KONTAKT;
             if (synthCcLearnModule.hasLearned())
                 synthCcLearnModule.reset();
             if (psCcLearnModule.hasLearned())
@@ -1210,17 +1176,20 @@ void MicroChromoAudioProcessor::updatePitchShiftModulationSource()
             if (!isCurrentModSrcKontakt)
                 updateMidiSequence(jlimit(0, 116, ccBase.load()));
             DBG("Mod src now is: Kontakt");
+            return;
         }
-        else
-        {
-            AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Error", "Kontakt is not detected.");
-            psModSource = USE_NONE;
-        }
+        psModSource = USE_NONE;
     }
-    else if (psModSource == USE_NONE)
+    if (useKontakt == 0 && psModSource == USE_KONTAKT && !synthBundle->isKontakt())
+        psModSource = USE_NONE;
+
+    if (useKontakt == -1 || psModSource != USE_KONTAKT)
     {
-        if (synthCcLearnModule.hasLearned() && !psCcLearnModule.hasLearned())
+        if (synthCcLearnModule.hasLearned())
         {
+            if (psCcLearnModule.hasLearned())
+                psCcLearnModule.reset();
+
             psModSource = USE_SYNTH;
             if (isCurrentModSrcKontakt)
                 updateMidiSequence(synthCcLearnModule.getCcSource());
@@ -1228,18 +1197,8 @@ void MicroChromoAudioProcessor::updatePitchShiftModulationSource()
                 updateCcMidiSequenceWithNewBase(synthCcLearnModule.getCcSource());
             DBG("Mod src now is: Synth " << ccBase);
         }
-        else if (!synthCcLearnModule.hasLearned() && psCcLearnModule.hasLearned())
+        else if (psCcLearnModule.hasLearned())
         {
-            psModSource = USE_PS;
-            if (isCurrentModSrcKontakt)
-                updateMidiSequence(psCcLearnModule.getCcSource());
-            else
-                updateCcMidiSequenceWithNewBase(psCcLearnModule.getCcSource());
-            DBG("Mod src now is: Ps " << ccBase);
-        }
-        else if (synthCcLearnModule.hasLearned() && psCcLearnModule.hasLearned())
-        {
-            synthCcLearnModule.reset();
             psModSource = USE_PS;
             if (isCurrentModSrcKontakt)
                 updateMidiSequence(psCcLearnModule.getCcSource());
@@ -1253,42 +1212,6 @@ void MicroChromoAudioProcessor::updatePitchShiftModulationSource()
             DBG("Mod src now is: None");
         }
     }
-    else if (psModSource == USE_SYNTH)
-    {
-        if (!synthCcLearnModule.hasLearned())
-        {
-            psModSource = USE_NONE;
-            DBG("Mod src synth is None");
-        }
-        else
-        {
-            if (synthCcLearnModule.getCcSource() != ccBase)
-            {
-                updateCcMidiSequenceWithNewBase(synthCcLearnModule.getCcSource());
-                DBG("Mod src update: Synth " << ccBase);
-            }
-            if (psCcLearnModule.hasLearned())
-                psCcLearnModule.reset();
-        }
-    }
-    else if (psModSource == USE_PS)
-    {
-        if (!psCcLearnModule.hasLearned())
-        {
-            psModSource = USE_NONE;
-            DBG("Mod src ps is None");
-        }
-        else
-        {
-            if (psCcLearnModule.getCcSource() != ccBase)
-            {
-                updateCcMidiSequenceWithNewBase(psCcLearnModule.getCcSource());
-                DBG("Mod src update: Ps " << ccBase);
-            }
-            if (synthCcLearnModule.hasLearned())
-                synthCcLearnModule.reset();
-        }
-    }
 
     updateModSrcSus = false;
     suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus);
@@ -1298,27 +1221,28 @@ bool MicroChromoAudioProcessor::canLearnCc(const PluginBundle* bundle)
 {
     if (psModSource == USE_KONTAKT)
         return false;
-    if (synthBundle.get() == bundle && psBundle->hasCcLearned())
+    if (synthBundle.get() == bundle && psBundle->getCcLearnModule().hasLearned())
         return false;
-    if (psBundle.get() == bundle && synthBundle->hasCcLearned())
+    if (psBundle.get() == bundle && synthBundle->getCcLearnModule().hasLearned())
         return false;
     return true;
 }
 
 bool MicroChromoAudioProcessor::canChooseKontakt()
 {
-    if (!synthBundle->hasCcLearned() && !psBundle->hasCcLearned())
+    if (!synthBundle->getCcLearnModule().hasLearned() && !psBundle->getCcLearnModule().hasLearned())
         return true;
     return false;
 }
 
 void MicroChromoAudioProcessor::toggleUseKontakt(bool isOn)
 {
+    if (!synthBundle->isKontakt())
+        return;
     if (isOn)
-        psModSource = USE_KONTAKT;
+        updatePitchShiftModulationSource(1);
     else
-        psModSource = USE_NONE;
-    updatePitchShiftModulationSource();
+        updatePitchShiftModulationSource(-1);
 }
 
 int MicroChromoAudioProcessor::getPitchShiftModulationSource()

@@ -22,8 +22,8 @@ public:
 	void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override {}
 
 	//==============================================================================
-	void getStateInformation(MemoryBlock& destData);
-	void setStateInformation(const void* data, int sizeInBytes);
+	std::unique_ptr<XmlElement> createXml();
+	void loadFromXml(const XmlElement* xml);
 
 	//==============================================================================
 	int getCcLearnedParameterIndex() { return paramIndex; }

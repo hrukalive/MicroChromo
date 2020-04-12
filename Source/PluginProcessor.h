@@ -112,7 +112,7 @@ public:
     OwnedArray<MidiMessageSequence>& getNoteMidiSequence() { return notesMidiSeq; }
     OwnedArray<MidiMessageSequence>& getCcMidiSequence() { return ccMidiSeq; }
 
-    void updatePitchShiftModulationSource();
+    void updatePitchShiftModulationSource(int useKontakt = 0);
     int getPitchShiftModulationSource();
     bool canLearnCc(const PluginBundle* bundle);
     bool canChooseKontakt();
@@ -165,6 +165,7 @@ private:
     std::atomic<bool> isPlayingNote{ false };
     std::atomic<int> isWithIn{ -1 };
     bool wasStopped = true;
+    std::unordered_set<int> playingNotes;
 
     std::atomic<int> transportState{ PLUGIN_PAUSED };
     std::atomic<double> transportTimeSnapshot{ 0.0 }, transportTimeElasped{ 0.0 };

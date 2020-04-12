@@ -127,7 +127,7 @@ void PluginBundle::checkPluginLoaded(const PluginDescription desc, int numInstan
             instanceStarted = instanceStartedTemp.load();
             _numInstances = numInstances;
 
-            resetCcLearn();
+            ccLearn->reset();
             resetParameterLink();
             linkParameterIndices.clear();
             linkParameterIndicesHistory.clear();
@@ -158,11 +158,10 @@ void PluginBundle::checkPluginLoaded(const PluginDescription desc, int numInstan
 
 void PluginBundle::adjustInstanceNumber(int newNumInstances, std::function<void(void)> callback)
 {
-    MemoryBlock data;
-    getStateInformation(data);
-    loadPlugin(currentDesc, newNumInstances, [data, callback](PluginBundle& bundle)
+    auto xml = *createXml("root");
+    loadPlugin(currentDesc, newNumInstances, [xml, callback](PluginBundle& bundle)
         {
-            bundle.setStateInformation(data.getData(), data.getSize());
+            bundle.loadFromXml(&xml, "root");
             if (callback)
                 callback();
         });
@@ -355,106 +354,68 @@ void PluginBundle::parameterGestureChanged(int parameterIndex, bool gestureIsSta
     }
 }
 
-void PluginBundle::resetCcLearn()
+std::unique_ptr<XmlElement> PluginBundle::createXml(String rootTag)
 {
-    ccLearn->reset();
-}
+    std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>(rootTag);
 
-void PluginBundle::startCcLearn()
-{
-    ccLearn->startLearning();
-}
+    xml->addChildElement(new XmlElement(*getDescription().createXml()));
+    xml->addChildElement(new XmlElement(*ccLearn->createXml()));
 
-bool PluginBundle::hasCcLearned()
-{
-    return ccLearn->hasLearned();
-}
+    XmlElement* linkParameterIndicesRoot = new XmlElement("linkParameterIndices");
+    for (int val : linkParameterIndices)
+    {
+        auto* element = linkParameterIndicesRoot->createNewChildElement("item");
+        element->setAttribute("value", val);
+    }
+    xml->addChildElement(linkParameterIndicesRoot);
 
-void PluginBundle::setCcLearn(int ccNum, int index, float min, float max)
-{
-    ccLearn->setCcLearn(ccNum, index, min, max);
-}
-
-void PluginBundle::getStateInformation(MemoryBlock& destData)
-{
-    std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>("bundle");
-
-    MemoryBlock ccData;
-    ccLearn->getStateInformation(ccData);
-    xml->setAttribute("ccData", ccData.toBase64Encoding());
-    
-    MemoryBlock linkedData;
-    MemoryOutputStream stream(linkedData, false);
-    for (int i : linkParameterIndices)
-        stream.writeInt(i);
-    stream.flush();
-    xml->setAttribute("linkParameterIndices", linkedData.toBase64Encoding());
-
-    MemoryBlock linkedKeyData, linkedValueData;
-    MemoryOutputStream keyStream(linkedKeyData, false), valueStream(linkedValueData, false);
+    XmlElement* linkParameterHistoryRoot = new XmlElement("linkParameterHistory");
     for (auto& x : linkParameterIndicesHistory)
     {
-        keyStream.writeInt(x.first);
-        valueStream.writeInt(x.second);
+        auto* element = linkParameterHistoryRoot->createNewChildElement("record");
+        element->setAttribute("key", x.first);
+        element->setAttribute("value", x.second);
     }
-    keyStream.flush();
-    valueStream.flush();
-    xml->setAttribute("linkParameterHistoryKey", linkedKeyData.toBase64Encoding());
-    xml->setAttribute("linkParameterHistoryValue", linkedValueData.toBase64Encoding());
+    xml->addChildElement(linkParameterHistoryRoot);
 
     MemoryBlock data;
     instances[0]->processor->getStateInformation(data);
-    xml->setAttribute("data", data.toBase64Encoding());
-    AudioProcessor::copyXmlToBinary(*xml, destData);
+    xml->setAttribute("processorData", data.toBase64Encoding());
+
+    return xml;
 }
 
-void PluginBundle::setStateInformation(const void* data, int sizeInBytes)
+void PluginBundle::loadFromXml(const XmlElement* xml, String rootTag)
 {
-    std::unique_ptr<XmlElement> xml(AudioProcessor::getXmlFromBinary(data, sizeInBytes));
-    if (xml.get() != nullptr)
+    if (xml != nullptr && xml->getTagName() == rootTag)
     {
-        if (xml->hasTagName("bundle"))
+        if (xml->hasAttribute("processorData"))
         {
-            if (xml->hasAttribute("data"))
-            {
-                MemoryBlock proc_data;
-                proc_data.fromBase64Encoding(xml->getStringAttribute("data"));
-                for (auto i = 0; i < instanceStarted.load(); i++)
-                    instances[i]->processor->setStateInformation(proc_data.getData(), proc_data.getSize());
-            }
-            if (xml->hasAttribute("ccData"))
-            {
-                MemoryBlock ccData;
-                ccData.fromBase64Encoding(xml->getStringAttribute("ccData"));
-                ccLearn->setStateInformation(ccData.getData(), ccData.getSize());
-            }
-            if (xml->hasAttribute("linkParameterIndices"))
-            {
-                if (xml->hasAttribute("linkParameterHistoryKey") && xml->hasAttribute("linkParameterHistoryValue"))
-                {
-                    MemoryBlock linkedKeyData, linkedValueData;
-                    linkedKeyData.fromBase64Encoding(xml->getStringAttribute("linkParameterHistoryKey"));
-                    linkedValueData.fromBase64Encoding(xml->getStringAttribute("linkParameterHistoryValue"));
-                    MemoryInputStream keyStream(linkedKeyData, false), valueStream(linkedValueData, false);
-                    Array<int> keyArr, valArr;
-                    while (!keyStream.isExhausted())
-                        keyArr.add(keyStream.readInt());
-                    while (!valueStream.isExhausted())
-                        valArr.add(valueStream.readInt());
-                    if (keyArr.size() == valArr.size())
-                    {
-                        linkParameterIndicesHistory.clear();
-                        for (int i = 0; i < keyArr.size(); i++)
-                            linkParameterIndicesHistory[keyArr[i]] = valArr[i];
-                    }
-                }
+            MemoryBlock proc_data;
+            proc_data.fromBase64Encoding(xml->getStringAttribute("processorData"));
+            for (auto i = 0; i < instanceStarted.load(); i++)
+                instances[i]->processor->setStateInformation(proc_data.getData(), proc_data.getSize());
+        }
 
-                MemoryBlock linkedData;
-                linkedData.fromBase64Encoding(xml->getStringAttribute("linkParameterIndices"));
+        ccLearn->loadFromXml(xml->getChildByName("ccLearnModule"));
+
+        if (auto* linkParameterIndicesRoot = xml->getChildByName("linkParameterIndices"))
+        {
+            if (auto* linkParameterHistoryRoot = xml->getChildByName("linkParameterHistory"))
+            {
+                linkParameterIndicesHistory.clear();
+                forEachXmlChildElementWithTagName(*linkParameterHistoryRoot, record, "record")
+                {
+                    linkParameterIndicesHistory[record->getIntAttribute("key", -1)] = record->getIntAttribute("value", -1);
+                }
+            }
+            if (linkParameterIndicesRoot->getNumChildElements() > 0)
+            {
                 linkParameterIndices.clear();
-                MemoryInputStream stream(linkedData, false);
-                while (!stream.isExhausted())
-                    linkParameterIndices.add(stream.readInt());
+                forEachXmlChildElementWithTagName(*linkParameterIndicesRoot, item, "item")
+                {
+                    linkParameterIndices.add(item->getIntAttribute("value", -1));
+                }
                 resetParameterLink();
                 linkParameters();
             }
