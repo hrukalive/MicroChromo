@@ -45,6 +45,8 @@ public:
     void resized() override;
 
 private:
+    MicroChromoAudioProcessorEditor& owner;
+    MicroChromoAudioProcessor& processor;
     Array<Note>& notes;
     HashMap<String, ColorPitchBendRecord>& noteColorMap;
 

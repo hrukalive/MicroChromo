@@ -15,7 +15,7 @@
 
 //==============================================================================
 SimpleMidiEditor::SimpleMidiEditor(MicroChromoAudioProcessorEditor& editor) : 
-    ComponentWithTable(editor), notes(processor.getNotes()), noteColorMap(processor.getNoteColorMap())
+    owner(editor), processor(editor.getProcessor()), notes(processor.getNotes()), noteColorMap(processor.getNoteColorMap())
 {
     int columnId = 1;
     table.getHeader().addColumn("ID", columnId++, 50, 20, 100, TableHeaderComponent::notSortable);

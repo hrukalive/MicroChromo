@@ -57,6 +57,9 @@ private:
     void saveColorMapPresets();
     void checkModified();
 
+    MicroChromoAudioProcessorEditor& owner;
+    MicroChromoAudioProcessor& processor;
+
     SimpleMidiEditor& _midiEditor;
     ApplicationProperties& appProperties;
 

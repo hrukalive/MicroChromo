@@ -93,6 +93,11 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
         processor.stopPlayback();
     };
 
+    addAndMakeVisible(panicBtn);
+    panicBtn.onClick = [&]() {
+        processor.triggerPanic();
+    };
+
     addAndMakeVisible(transportSlider);
     transportSlider.setTextBoxStyle(Slider::NoTextBox, true, 0, 0);
     transportSlider.setRange(0.0, 1.0, 0.00001);
@@ -204,7 +209,7 @@ void MicroChromoAudioProcessorEditor::updateMidiEditor()
 //==============================================================================
 StringArray MicroChromoAudioProcessorEditor::getMenuBarNames()
 {
-    return { "File", "Synth", "Effect" };
+    return { "File", "Edit", "Synth", "Effect", "Plugin" };
 }
 
 PopupMenu MicroChromoAudioProcessorEditor::getMenuForIndex(int menuIndex, const String& /*menuName*/)
@@ -213,35 +218,36 @@ PopupMenu MicroChromoAudioProcessorEditor::getMenuForIndex(int menuIndex, const 
 
     if (menuIndex == 0)
     {
+        menu.addCommandItem(&commandManager, CommandIDs::openProject);
+        menu.addCommandItem(&commandManager, CommandIDs::saveProject);
+        menu.addCommandItem(&commandManager, CommandIDs::saveAsProject);
+    }
+    else if (menuIndex == 1)
+    {
+        menu.addCommandItem(&commandManager, CommandIDs::undoAction);
+        menu.addCommandItem(&commandManager, CommandIDs::redoAction);
+    }
+    else if (menuIndex == 2)
+        menu = *synthBundle->getMainPopupMenu();
+    else if (menuIndex == 3)
+        menu = *psBundle->getMainPopupMenu();
+    else if (menuIndex == 4)
+    {
         menu.addCommandItem(&commandManager, CommandIDs::openPluginScanner);
         menu.addSeparator();
         menu.addItem(PLUGIN_SORT_MANUFACTURER, "Sort by Manufacturer", true, pluginSortMethod == KnownPluginList::SortMethod::sortByManufacturer);
         menu.addItem(PLUGIN_SORT_CATEGORY, "Sort by Category", true, pluginSortMethod == KnownPluginList::SortMethod::sortByCategory);
         menu.addItem(PLUGIN_SORT_ALPHABETICALLY, "Sort Alphabetically", true, pluginSortMethod == KnownPluginList::SortMethod::sortAlphabetically);
     }
-    else if (menuIndex == 1)
-        menu = *synthBundle->getMainPopupMenu();
-    else if (menuIndex == 2)
-        menu = *psBundle->getMainPopupMenu();
 
     return menu;
 }
 
 void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLevelMenuIndex)
 {
-    if (topLevelMenuIndex == 0)
+    if (topLevelMenuIndex == 2 || topLevelMenuIndex == 3)
     {
-        switch (menuItemID)
-        {
-        case PLUGIN_SORT_MANUFACTURER: pluginSortMethod = KnownPluginList::SortMethod::sortByManufacturer; break;
-        case PLUGIN_SORT_CATEGORY: pluginSortMethod = KnownPluginList::SortMethod::sortByCategory; break;
-        case PLUGIN_SORT_ALPHABETICALLY: pluginSortMethod = KnownPluginList::SortMethod::sortAlphabetically; break;
-        default: break;
-        }
-    }
-    else if (topLevelMenuIndex == 1 || topLevelMenuIndex == 2)
-    {
-        bool isSynth = topLevelMenuIndex == 1;
+        bool isSynth = topLevelMenuIndex == 2;
         auto bundle = isSynth ? this->synthBundle : this->psBundle;
         switch (menuItemID)
         {
@@ -283,6 +289,16 @@ void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLe
         }
         }
     }
+    else if (topLevelMenuIndex == 4)
+    {
+        switch (menuItemID)
+        {
+        case PLUGIN_SORT_MANUFACTURER: pluginSortMethod = KnownPluginList::SortMethod::sortByManufacturer; break;
+        case PLUGIN_SORT_CATEGORY: pluginSortMethod = KnownPluginList::SortMethod::sortByCategory; break;
+        case PLUGIN_SORT_ALPHABETICALLY: pluginSortMethod = KnownPluginList::SortMethod::sortAlphabetically; break;
+        default: break;
+        }
+    }
 }
 
 //==============================================================================
@@ -294,7 +310,12 @@ ApplicationCommandTarget* MicroChromoAudioProcessorEditor::getNextCommandTarget(
 void MicroChromoAudioProcessorEditor::getAllCommands(Array<CommandID>& c)
 {
     Array<CommandID> commands{
-        CommandIDs::openPluginScanner
+        CommandIDs::openPluginScanner,
+        CommandIDs::openProject,
+        CommandIDs::saveProject,
+        CommandIDs::saveAsProject,
+        CommandIDs::undoAction,
+        CommandIDs::redoAction
     };
     c.addArray(commands);
 }
@@ -303,8 +324,48 @@ void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, Applic
 {
     switch (commandID)
     {
+    case CommandIDs::openProject:
+        result.setInfo("Open Project", "Open project", "File", 0);
+#if JUCE_MAC
+        result.addDefaultKeypress('o', ModifierKeys::commandModifier);
+#else
+        result.addDefaultKeypress('o', ModifierKeys::ctrlModifier);
+#endif
+        break;
+    case CommandIDs::saveProject:
+        result.setInfo("Save Project", "Save project", "File", 0);
+#if JUCE_MAC
+        result.addDefaultKeypress('s', ModifierKeys::commandModifier);
+#else
+        result.addDefaultKeypress('s', ModifierKeys::ctrlModifier);
+#endif
+        break;
+    case CommandIDs::saveAsProject:
+        result.setInfo("Save As", "Save as", "File", 0);
+#if JUCE_MAC
+        result.addDefaultKeypress('s', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
+#else
+        result.addDefaultKeypress('s', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
+#endif
+        break;
+    case CommandIDs::undoAction:
+        result.setInfo("Undo", "Undo", "Edit", 0);
+#if JUCE_MAC
+        result.addDefaultKeypress('z', ModifierKeys::commandModifier);
+#else
+        result.addDefaultKeypress('z', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
+#endif
+        break;
+    case CommandIDs::redoAction:
+        result.setInfo("Redo", "Redo", "Edit", 0);
+#if JUCE_MAC
+        result.addDefaultKeypress('r', ModifierKeys::commandModifier);
+#else
+        result.addDefaultKeypress('r', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
+#endif
+        break;
     case CommandIDs::openPluginScanner:
-        result.setInfo("Open Scanner", "Open the scanner for plugins", "File", 0);
+        result.setInfo("Open Scanner", "Open the scanner for plugins", "Plugin", 0);
 #if JUCE_MAC
         result.addDefaultKeypress('q', ModifierKeys::commandModifier);
 #else
@@ -326,6 +387,11 @@ bool MicroChromoAudioProcessorEditor::perform(const InvocationInfo& info)
         pluginListWindow->toFront(true);
         break;
     }
+    case CommandIDs::openProject:
+    case CommandIDs::saveProject:
+    case CommandIDs::saveAsProject:
+    case CommandIDs::undoAction:
+    case CommandIDs::redoAction: break;
     default:
         return false;
     }
@@ -347,13 +413,13 @@ void MicroChromoAudioProcessorEditor::resized()
     transportSlider.setBounds(bottomPanel.removeFromTop(24));
     bottomPanel.removeFromTop(6);
     playTransportBtn.setBounds(bottomPanel.removeFromLeft(50));
-    bottomPanel.removeFromLeft(6);
+    bottomPanel.removeFromLeft(4);
     stopTransportBtn.setBounds(bottomPanel.removeFromLeft(50));
-    bottomPanel.removeFromLeft(6);
+    bottomPanel.removeFromLeft(4);
+    panicBtn.setBounds(bottomPanel.removeFromLeft(20));
+    bottomPanel.removeFromLeft(4);
     transportLabel.setBounds(bottomPanel.withSizeKeepingCentre(jmin(bottomPanel.getWidth(), 
         6 + transportLabel.getFont().getStringWidth(transportLabel.getText())), bottomPanel.getHeight()));
-
-    //6 + label.getFont().getStringWidth(label.getText()), 16)
 
     menuBar->setBounds(b.removeFromTop(LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight()));
     tabComp->setBounds(b);

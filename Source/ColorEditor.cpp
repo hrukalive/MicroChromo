@@ -51,7 +51,7 @@ void ColorEditor::ColorChooserComponent::resized()
 
 //==============================================================================
 ColorEditor::ColorEditor(MicroChromoAudioProcessorEditor& editor, SimpleMidiEditor& midiEditor) :
-    ComponentWithTable(editor), 
+    owner(editor), processor(editor.getProcessor()),
     appProperties(processor.getApplicationProperties()), 
     _midiEditor(midiEditor), 
     noteColorMap(processor.getNoteColorMap())

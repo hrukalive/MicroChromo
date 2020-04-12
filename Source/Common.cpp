@@ -177,8 +177,7 @@ void ParameterLinker::OneToManyListener::parameterGestureChanged(int /*parameter
         _thisLockGesture = true;
 }
 
-ComponentWithTable::ComponentWithTable(MicroChromoAudioProcessorEditor& editor) : 
-    owner(editor), processor(editor.getProcessor()) {}
+ComponentWithTable::ComponentWithTable() {}
 
 void ComponentWithTable::selectedRowsChanged(int row)
 {

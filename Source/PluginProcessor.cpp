@@ -240,7 +240,7 @@ void MicroChromoAudioProcessor::sendAllNotesOff()
             midiBuffer->addEvent(MidiMessage::allSoundOff(j), 0);
             midiBuffer->addEvent(MidiMessage::allControllersOff(j), 0);
             for (auto n : playingNotes)
-                midiBuffer->addEvent(MidiMessage::noteOff(midiChannel, n), 0);
+                midiBuffer->addEvent(MidiMessage::noteOff(j, n), 0);
             playingNotes.clear();
         }
     }
@@ -255,6 +255,38 @@ void MicroChromoAudioProcessor::sendAllNotesOff()
         }
     }
     DBG("All note off");
+
+    isPlayingNote = false;
+}
+
+void MicroChromoAudioProcessor::sendAllNotesOffPanic()
+{
+    for (auto* midiBuffer : midiBufferArrayA)
+    {
+        midiBuffer->clear();
+        for (auto j = 1; j <= 16; j++)
+        {
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 0);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 0);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 0);
+            for (int k = 0; k < 128; k++)
+                midiBuffer->addEvent(MidiMessage::noteOff(j, k), 1);
+            playingNotes.clear();
+        }
+    }
+    for (auto* midiBuffer : midiBufferArrayB)
+    {
+        midiBuffer->clear();
+        for (auto j = 1; j <= 16; j++)
+        {
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 0);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 0);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 0);
+            for (int k = 0; k < 128; k++)
+                midiBuffer->addEvent(MidiMessage::noteOff(j, k), 1);
+        }
+    }
+    DBG("All note off (panic)");
 
     isPlayingNote = false;
 }
@@ -509,6 +541,12 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
                 midiMessages.clear();
             }
         }
+    }
+
+    if (panicNoteOff)
+    {
+        panicNoteOff = false;
+        sendAllNotesOffPanic();
     }
 
     // Synthesis

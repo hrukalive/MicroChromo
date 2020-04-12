@@ -121,6 +121,9 @@ public:
     void updateMidiChannel(int newMidiChannel);
     void updateKontaktCcBase(int newCcBase);
 
+    void triggerPanic() { panicNoteOff = true; }
+
+
     static const int MAX_INSTANCES = 8;
 private:
 
@@ -129,6 +132,7 @@ private:
 
     void addMessageToAllBuffer(OwnedArray<MidiBuffer>& midiBuffers, MidiMessage& msg, int sampleOffset);
     void sendAllNotesOff();
+    void sendAllNotesOffPanic();
 
     //==============================================================================
     ApplicationProperties appProperties;
@@ -162,7 +166,7 @@ private:
 
     std::atomic<bool> properlyPrepared{ false };
 
-    std::atomic<bool> isPlayingNote{ false };
+    std::atomic<bool> isPlayingNote{ false }, panicNoteOff{ false };
     std::atomic<int> isWithIn{ -1 };
     bool wasStopped = true;
     std::unordered_set<int> playingNotes;

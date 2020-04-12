@@ -71,7 +71,11 @@ enum
 enum CommandIDs
 {
     openPluginScanner = 1,
-    testCommand
+    openProject,
+    saveProject,
+    saveAsProject,
+    undoAction,
+    redoAction
 };
 
 class AudioParameterFloatVariant : public AudioParameterFloat
@@ -150,7 +154,7 @@ private:
 class ComponentWithTable : public Component, public TableListBoxModel
 {
 public:
-    ComponentWithTable(MicroChromoAudioProcessorEditor& editor);
+    ComponentWithTable();
     ~ComponentWithTable() = default;
 
     void selectedRowsChanged(int row) override;
@@ -166,8 +170,6 @@ public:
     virtual void updateColorMapList() {}
 
 protected:
-    MicroChromoAudioProcessorEditor& owner;
-    MicroChromoAudioProcessor& processor;
     TableListBox table{ {}, this };
     Font font{ 14.0f };
 

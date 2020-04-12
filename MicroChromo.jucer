@@ -14,6 +14,8 @@
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
       <FILE id="DdEe8x" name="Common.cpp" compile="1" resource="0" file="Source/Common.cpp"/>
       <FILE id="KS8Ulu" name="Common.h" compile="0" resource="0" file="Source/Common.h"/>
+      <FILE id="sBHjoK" name="Project.cpp" compile="1" resource="0" file="Source/Project.cpp"/>
+      <FILE id="jyos2R" name="Project.h" compile="0" resource="0" file="Source/Project.h"/>
       <FILE id="qJC4tX" name="Note.cpp" compile="1" resource="0" file="Source/Note.cpp"/>
       <FILE id="wHjlDr" name="Note.h" compile="0" resource="0" file="Source/Note.h"/>
       <FILE id="rkfhtY" name="InternalPlugins.cpp" compile="1" resource="0"

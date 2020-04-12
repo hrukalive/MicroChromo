@@ -70,7 +70,7 @@ private:
     std::unique_ptr<ColorEditor> colorEditor;
 
     std::unique_ptr<MenuBarComponent> menuBar;
-    TextButton playTransportBtn{ "Play" }, stopTransportBtn{ "Stop" };
+    TextButton playTransportBtn{ "Play" }, stopTransportBtn{ "Stop" }, panicBtn{ "!" };
     Slider transportSlider;
     Label transportLabel;
     std::atomic<bool> transportSliderDragging{ false };
