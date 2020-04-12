@@ -476,17 +476,17 @@ class PitchShiftPlugin : public InternalPlugin, public AudioProcessorValueTreeSt
             "Cent",
             NormalisableRange<float>(0.0f,
                 1.0f,
-                0.005f),
+                0.01f),
             0.5f,
             String(),
             AudioProcessorParameter::genericParameter,
             [](const float value, int /*maximumStringLength*/)
             {
-                return String(int(value * 200) - 100) + " cents";
+                return String(int(value * 100) - 50) + " cents";
             },
             [](const String& text)
             {
-                return (text.getFloatValue() + 100) / 200.0f;
+                return (text.getFloatValue() + 50) / 100.0f;
             }));
 
         return { params.begin(), params.end() };
@@ -516,7 +516,7 @@ public:
 
     void parameterChanged(const String& /*parameterID*/, float newValue) override
     {
-        psValue.setTargetValue(newValue * 2 - 1);
+        psValue.setTargetValue(newValue * 1 - 0.5);
     }
 
     void prepareToPlay(double sampleRate, int newBlockSize) override

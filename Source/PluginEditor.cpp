@@ -255,7 +255,7 @@ void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLe
         case SLOT_MENU_PROPAGATE_STATE:  bundle->propagateState(); break;
         case SLOT_MENU_EXPOSE_PARAMETER:  bundle->openParameterLinkEditor(); break;
         case SLOT_MENU_START_CC: bundle->getCcLearnModule().startLearning(); break;
-        case SLOT_MENU_SHOW_CC: bundle->getCcLearnModule().showStatus(); break;
+        case SLOT_MENU_MANAGE_CC: bundle->getCcLearnModule().showStatus(); break;
         case SLOT_MENU_CLEAR_CC: bundle->getCcLearnModule().reset(true); break;
         case SLOT_MENU_USE_KONTAKT: processor.toggleUseKontakt(processor.getPitchShiftModulationSource() != USE_KONTAKT); break;
         case SLOT_MENU_COPY_KONTAKT_SCRIPT: 

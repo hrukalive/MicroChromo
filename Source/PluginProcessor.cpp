@@ -427,12 +427,12 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
                         if (psModSource == USE_PS)
                         {
                             addMessageToAllBuffer(midiBufferArrayA, midiMessage, sampleOffset);
-                            if (!midiMessage.isControllerOfType(psBundle->getLearnedCcSource()))
+                            if (!midiMessage.isControllerOfType(psBundle->getCcLearnModule().getCcSource()))
                                 addMessageToAllBuffer(midiBufferArrayB, midiMessage, sampleOffset);
                         }
                         else if (psModSource == USE_SYNTH)
                         {
-                            if (!midiMessage.isControllerOfType(synthBundle->getLearnedCcSource()))
+                            if (!midiMessage.isControllerOfType(synthBundle->getCcLearnModule().getCcSource()))
                                 addMessageToAllBuffer(midiBufferArrayA, midiMessage, sampleOffset);
                             addMessageToAllBuffer(midiBufferArrayB, midiMessage, sampleOffset);
                         }

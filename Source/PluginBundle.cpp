@@ -203,8 +203,8 @@ void PluginBundle::linkParameters()
 {
     auto& parameters = instances[0]->processor->getParameters();
     linkParameterIndices.sort();
-    auto learnedCc = getLearnedCcParameterIndex();
-    linkParameterIndices.removeIf([&parameters, learnedCc](int v) { return v >= parameters.size() || v == learnedCc; });
+    auto learnedCc = ccLearn->getCcLearnedParameterIndex();
+    linkParameterIndices.removeIf([&parameters, learnedCc](int v) { return v >= parameters.size() || learnedCc.contains(v); });
     linkParameterIndicesSet.clear();
     for (auto index : linkParameterIndices)
         linkParameterIndicesSet.insert(index);
@@ -479,7 +479,7 @@ std::unique_ptr<PopupMenu> PluginBundle::getMainPopupMenu()
     floatMenu->addItem(SLOT_MENU_EXPOSE_PARAMETER, "Expose parameters");
     floatMenu->addSeparator();
     floatMenu->addItem(SLOT_MENU_START_CC, "Start CC Learn", canLearnCc && !ccLearn->isLearning());
-    floatMenu->addItem(SLOT_MENU_SHOW_CC, "Show CC Status", ccLearn->hasLearned());
+    floatMenu->addItem(SLOT_MENU_MANAGE_CC, "Manage CC Status", ccLearn->hasLearned());
     floatMenu->addItem(SLOT_MENU_CLEAR_CC, "Clear CC Learn", ccLearn->hasLearned());
     if (this == processor.getSynthBundlePtr().get() && isKontakt())
     {

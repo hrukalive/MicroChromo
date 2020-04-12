@@ -75,8 +75,6 @@ public:
     bool finishedLoading() { return _finishedLoading.load(); }
     bool hasError() { return _isError.load(); }
 
-    int getLearnedCcSource() { return ccLearn->getCcSource(); }
-    int getLearnedCcParameterIndex() { return ccLearn->getCcLearnedParameterIndex(); }
     ParameterCcLearn& getCcLearnModule() { return *ccLearn; }
     PluginDescription getEmptyPluginDescription() { return _emptyPlugin; }
     PluginDescription getDefaultPluginDescription() { return _defaultPlugin; }

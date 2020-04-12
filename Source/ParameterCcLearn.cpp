@@ -98,6 +98,141 @@ void ParameterCcLearn::ProgressWindow::closeButtonPressed()
 	setVisible(false);
 }
 
+
+
+
+
+
+
+//==============================================================================
+ParameterCcLearn::StatusComponent::StatusComponent(ParameterCcLearn& parent) : _parent(parent), items(parent.items)
+{
+	table.getHeader().addColumn("Parameter", 1, 200, 200, 300, TableHeaderComponent::notSortable);
+	table.getHeader().addColumn("Min", 2, 60, 60, 120, TableHeaderComponent::notSortable);
+	table.getHeader().addColumn("Max", 3, 60, 60, 120, TableHeaderComponent::notSortable);
+	table.setColour(ListBox::outlineColourId, Colours::grey);
+	table.setOutlineThickness(1);
+	table.setMultipleSelectionEnabled(false);
+	addAndMakeVisible(table);
+
+	ccNumberTextBox.setMultiLine(false, false);
+	ccNumberTextBox.setTextToShowWhenEmpty("Enter or move CC", Colour::greyLevel(0.5));
+	ccNumberTextBox.setCaretVisible(true);
+	ccNumberTextBox.setInputRestrictions(3, "0123456789");
+	ccNumberTextBox.onTextChange = [&]() {
+		auto val = jlimit(0, 127, ccNumberTextBox.getText().getIntValue());
+		ccNumberTextBox.setText(String(val), false);
+	};
+	if (parent.ccSource > -1)
+		ccNumberTextBox.setText(String(parent.ccSource), false);
+	addAndMakeVisible(ccNumberTextBox);
+
+	setBtn.onClick = [&]() {
+		_parent.setCcSource(ccNumberTextBox.getText().getIntValue());
+	};
+	addAndMakeVisible(setBtn);
+
+	removeBtn.onClick = [&]() {
+		if (lastRow > -1)
+		{
+			_parent.removeCcLearn(items[lastRow].paramIndex);
+			table.updateContent();
+		}
+	};
+	addAndMakeVisible(removeBtn);
+	table.updateContent();
+
+	setSize(350, 300);
+}
+
+void ParameterCcLearn::StatusComponent::paint(Graphics& g)
+{
+	g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
+}
+
+void ParameterCcLearn::StatusComponent::resized()
+{
+	auto b = getLocalBounds();
+	b.reduce(10, 10);
+
+	auto tmp = b.removeFromTop(24);
+	setBtn.setBounds(tmp.removeFromRight(40));
+	tmp.removeFromRight(4);
+	ccNumberTextBox.setBounds(tmp);
+	b.removeFromTop(4);
+
+	removeBtn.setBounds(b.removeFromBottom(24));
+	b.removeFromBottom(4);
+
+	table.setBounds(b);
+}
+
+void ParameterCcLearn::StatusComponent::selectedRowsChanged(int row)
+{
+	lastRow = row;
+}
+
+int ParameterCcLearn::StatusComponent::getNumRows()
+{
+	return items.size();
+}
+
+void ParameterCcLearn::StatusComponent::paintRowBackground(Graphics& g, int rowNumber, int /*width*/, int /*height*/, bool rowIsSelected)
+{
+	auto alternateColour = getLookAndFeel().findColour(ListBox::backgroundColourId)
+		.interpolatedWith(getLookAndFeel().findColour(ListBox::textColourId), 0.03f);
+	if (rowIsSelected)
+		g.fillAll(findColour(TextEditor::highlightColourId));
+	else if (rowNumber % 2)
+		g.fillAll(alternateColour);
+}
+
+void ParameterCcLearn::StatusComponent::paintCell(Graphics& g, int rowNumber, int columnId, int width, int height, bool rowIsSelected)
+{
+	g.setColour(getLookAndFeel().findColour(ListBox::textColourId));
+	g.setFont(font);
+
+	String text;
+	switch (columnId)
+	{
+	case 1: text = items[rowNumber].paramName + " (" + String(items[rowNumber].paramIndex) + ")"; break;
+	case 2: text = String(items[rowNumber].learnedCcMin, 3); break;
+	case 3: text = String(items[rowNumber].learnedCcMax, 3); break;
+	default:
+		break;
+	}
+	g.drawText(text, 2, 0, width - 4, height, Justification::centredLeft, true);
+
+	g.setColour(getLookAndFeel().findColour(ListBox::backgroundColourId));
+	g.fillRect(width - 1, 0, 1, height);
+}
+
+int ParameterCcLearn::StatusComponent::getColumnAutoSizeWidth(int columnId)
+{
+	int widest = 92;
+
+	for (auto i = getNumRows(); --i >= 0;)
+	{
+
+		String text;
+		switch (columnId)
+		{
+		case 1: text = items[i].paramName + " (" + String(items[i].paramIndex) + ")"; break;
+		case 2: text = String(items[i].learnedCcMin, 3); break;
+		case 3: text = String(items[i].learnedCcMax, 3); break;
+		default:
+			break;
+		}
+		widest = jmax(widest, font.getStringWidth(text));
+	}
+
+	return widest + 8;
+}
+
+
+
+
+
 //==============================================================================
 ParameterCcLearn::ParameterCcLearn(PluginBundle* bundle) :
 	_bundle(bundle)
@@ -122,7 +257,8 @@ void ParameterCcLearn::processCc(int instanceIndex, int ccNumber, int ccValue, f
 		progressWindow->updateCc(tmpCcSource);
 	}
 	else if (_hasLearned && ccSource == ccNumber)
-		_bundle->getParameters(instanceIndex)[paramIndex]->setValue(ccValue / 100.0f * (learnedCcMax - learnedCcMin) + learnedCcMin);
+		for (auto& item : items)
+			_bundle->getParameters(instanceIndex)[item.paramIndex]->setValue(ccValue / 100.0f * (item.learnedCcMax - item.learnedCcMin) + item.learnedCcMin);
 }
 
 bool ParameterCcLearn::validLearn()
@@ -133,7 +269,7 @@ bool ParameterCcLearn::validLearn()
 		&& tmpLearnedCcMin < tmpLearnedCcMax;
 }
 
-void ParameterCcLearn::setCcLearn(int ccNumber, int parameterIndex, float min, float max)
+void ParameterCcLearn::addCcLearn(int ccNumber, int parameterIndex, float min, float max)
 {
 	_isLearning = false;
 	if (_parameters)
@@ -146,27 +282,44 @@ void ParameterCcLearn::setCcLearn(int ccNumber, int parameterIndex, float min, f
 	tmpLearnedCcMax = max;
 	_parameters = &(_bundle->getParameters());
 
-	if (validLearn())
+	if (validLearn() && !learnedIndices.contains(tmpParamIndex))
 	{
-		if (_hasLearned)
-			(*_parameters)[paramIndex]->addListener(_bundle);
-
-		paramIndex = tmpParamIndex.load();
 		ccSource = tmpCcSource.load();
-		learnedCcMin = tmpLearnedCcMin.load();
-		learnedCcMax = tmpLearnedCcMax.load();
+		CcItem item;
+		item.paramIndex = tmpParamIndex.load();
+		item.paramName = (*_parameters)[item.paramIndex]->getName(128);
+		item.learnedCcMin = tmpLearnedCcMin.load();
+		item.learnedCcMax = tmpLearnedCcMax.load();
+		items.add(item);
+		items.sort(CcItemComparator());
+		learnedIndices.insert(tmpParamIndex);
 		resetTempValues();
 
-		(*_parameters)[paramIndex]->removeListener(_bundle);
+		(*_parameters)[item.paramIndex]->removeListener(_bundle);
 		_hasLearned = true;
 
 		_bundle->getProcessor().updatePitchShiftModulationSource();
 	}
 }
 
+void ParameterCcLearn::removeCcLearn(int parameterIndex)
+{
+	if (!learnedIndices.contains(parameterIndex))
+		return;
+	if (learnedIndices.size() == 1)
+	{
+		reset(true);
+		return;
+	}
+	if (_parameters)
+		(*_parameters)[parameterIndex]->addListener(_bundle);
+	items.removeIf([parameterIndex](CcItem item) { return item.paramIndex == parameterIndex; });
+	learnedIndices.erase(parameterIndex);
+}
+
 void ParameterCcLearn::resetTempValues()
 {
-	tmpCcSource = -1;
+	tmpCcSource = ccSource.load();
 	tmpParamIndex = -1;
 	tmpLearnedCcMin = FP_INFINITE;
 	tmpLearnedCcMax = -FP_INFINITE;
@@ -174,19 +327,31 @@ void ParameterCcLearn::resetTempValues()
 	progressWindow->updateCc(tmpCcSource);
 }
 
+void ParameterCcLearn::setCcSource(int newCcSource)
+{
+	if (newCcSource >= 0 && newCcSource < 128)
+	{
+		ccSource = newCcSource;
+		_bundle->getProcessor().updatePitchShiftModulationSource();
+	}
+}
+
 void ParameterCcLearn::reset(bool notify)
 {
 	_hasLearned = false;
 	_isLearning = false;
 	if (_parameters)
+	{
 		for (auto* p : *_parameters)
 			p->removeListener(this);
+		for (auto& item : items)
+			(*_parameters)[item.paramIndex]->addListener(_bundle);
+	}
 	_parameters = nullptr;
-	resetTempValues();
 	ccSource = -1;
-	paramIndex = -1;
-	learnedCcMin = FP_INFINITE;
-	learnedCcMax = -FP_INFINITE;
+	items.clear();
+	learnedIndices.clear();
+	resetTempValues();
 	progressWindow->updateText(updateProgressNote());
 	progressWindow->updateCc(tmpCcSource);
 
@@ -213,18 +378,20 @@ void ParameterCcLearn::stopLearning()
 		for (auto* p : *_parameters)
 			p->removeListener(this);
 	}
-	if (validLearn())
+	if (validLearn() && !learnedIndices.contains(tmpParamIndex))
 	{
-		if (_hasLearned)
-			(*_parameters)[paramIndex]->addListener(_bundle);
-
-		paramIndex = tmpParamIndex.load();
 		ccSource = tmpCcSource.load();
-		learnedCcMin = tmpLearnedCcMin.load();
-		learnedCcMax = tmpLearnedCcMax.load();
+		CcItem item;
+		item.paramIndex = tmpParamIndex.load();
+		item.paramName = (*_parameters)[item.paramIndex]->getName(128);
+		item.learnedCcMin = tmpLearnedCcMin.load();
+		item.learnedCcMax = tmpLearnedCcMax.load();
+		items.add(item);
+		items.sort(CcItemComparator());
+		learnedIndices.insert(tmpParamIndex);
 		resetTempValues();
 
-		(*_parameters)[paramIndex]->removeListener(_bundle);
+		(*_parameters)[item.paramIndex]->removeListener(_bundle);
 		_hasLearned = true;
 
 		_bundle->getProcessor().updatePitchShiftModulationSource();
@@ -247,6 +414,12 @@ void ParameterCcLearn::parameterValueChanged(int parameterIndex, float newValue)
 				progressWindow->updateCc(tmpCcSource);
 				return;
 			}
+			if (learnedIndices.contains(parameterIndex))
+			{
+				progressWindow->updateText(updateProgressNote("Parameter moved has already been learned."));
+				progressWindow->updateCc(tmpCcSource);
+				return;
+			}
 			tmpLearnedCcMin = FP_INFINITE;
 			tmpLearnedCcMax = -FP_INFINITE;
 		}
@@ -264,9 +437,15 @@ std::unique_ptr<XmlElement> ParameterCcLearn::createXml()
 {
 	std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>("ccLearnModule");
 	xml->setAttribute("ccSource", ccSource);
-	xml->setAttribute("paramIndex", paramIndex);
-	xml->setAttribute("learnedCcMin", learnedCcMin);
-	xml->setAttribute("learnedCcMax", learnedCcMax);
+
+	items.sort(CcItemComparator());
+	for (auto& item : items)
+	{
+		auto* itemsXml = xml->createNewChildElement("item");
+		itemsXml->setAttribute("paramIndex", item.paramIndex);
+		itemsXml->setAttribute("learnedCcMin", item.learnedCcMin);
+		itemsXml->setAttribute("learnedCcMax", item.learnedCcMax);
+	}
 	return xml;
 }
 
@@ -274,11 +453,18 @@ void ParameterCcLearn::loadFromXml(const XmlElement* xml)
 {
 	if (xml != nullptr && xml->getTagName() == "ccLearnModule")
 	{
-		auto tmp = xml->getIntAttribute("ccSource", -1);
-		setCcLearn(tmp,
-			xml->getIntAttribute("paramIndex", -1), 
-			tmp == -1 ? FP_INFINITE : xml->getDoubleAttribute("learnedCcMin", FP_INFINITE),
-			tmp == -1 ? -FP_INFINITE : xml->getDoubleAttribute("learnedCcMax", -FP_INFINITE));
+		auto src = xml->getIntAttribute("ccSource", -1);
+		if (src > -1)
+		{
+			forEachXmlChildElementWithTagName(*xml, child, "item")
+			{
+				addCcLearn(src,
+					child->getIntAttribute("paramIndex", -1),
+					child->getDoubleAttribute("learnedCcMin", FP_INFINITE),
+					child->getDoubleAttribute("learnedCcMax", -FP_INFINITE));
+			}
+			items.sort(CcItemComparator());
+		}
 	}
 }
 
@@ -310,9 +496,15 @@ void ParameterCcLearn::showStatus()
 	if (!_hasLearned)
 		AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon, "CC Learn Status", "No learned parameter.");
 	else
-		AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon, "CC Learn Status",
-			"CC Number: " + String(ccSource) + newLine.getDefault() +
-			"Parameter: " + ((*_parameters)[paramIndex]->getName(256)) + " (" + String(paramIndex) + ")" + newLine.getDefault() +
-			"Value min: " + String(learnedCcMin.load(), 3) + newLine.getDefault() +
-			"Value max: " + String(learnedCcMax.load(), 3));
+	{
+		DialogWindow::LaunchOptions dialogOption;
+
+		dialogOption.dialogTitle = "CC Status Manager";
+		dialogOption.dialogBackgroundColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
+		dialogOption.escapeKeyTriggersCloseButton = false;
+		dialogOption.useNativeTitleBar = false;
+		dialogOption.resizable = true;
+		dialogOption.content.setOwned(new StatusComponent(*this));
+		dialogOption.launchAsync();
+	}
 }
