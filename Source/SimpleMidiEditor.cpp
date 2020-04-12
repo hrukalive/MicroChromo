@@ -28,7 +28,7 @@ SimpleMidiEditor::SimpleMidiEditor(MicroChromoAudioProcessorEditor& editor) :
 
     table.setColour(ListBox::outlineColourId, Colours::grey);
     table.setOutlineThickness(1);
-    table.setMultipleSelectionEnabled(false);
+    table.setMultipleSelectionEnabled(true);
     table.getHeader().setSortColumnId(3, true);
 
     addAndMakeVisible(table);
@@ -41,11 +41,13 @@ SimpleMidiEditor::SimpleMidiEditor(MicroChromoAudioProcessorEditor& editor) :
 
     addAndMakeVisible(removeBtn);
     removeBtn.onClick = [&]() {
-        if (lastRow > -1)
+        for (int row = notes.size() - 1; row >= 0; row--)
         {
-            notes.removeAndReturn(lastRow);
-            table.updateContent();
+            if (table.isRowSelected(row))
+                notes.removeAndReturn(row);
         }
+        table.deselectAllRows();
+        table.updateContent();
     };
 
     addAndMakeVisible(updateBtn);
@@ -180,8 +182,23 @@ int SimpleMidiEditor::getSelectedId(const int rowNumber, const int columnNumber)
 
 void SimpleMidiEditor::setSelectedId(const int rowNumber, const int /*columnNumber*/, const int newId)
 {
-    notes.getReference(rowNumber).setPitchColor(itemIdToitemText[newId]);
-    table.repaintRow(rowNumber);
+    String colorName = itemIdToitemText[newId];
+
+    if (getSelectedId(rowNumber, 6) != newId)
+    {
+        if (!table.isRowSelected(rowNumber))
+            table.selectRow(rowNumber);
+
+        for (int row = 0; row < notes.size(); row++)
+        {
+            if (table.isRowSelected(row))
+            {
+                notes.getReference(row).setPitchColor(colorName);
+                dynamic_cast<ComboBoxCustomComponent*>(table.getCellComponent(6, row))->setSelectedId(newId, dontSendNotification);
+                table.repaintRow(row);
+            }
+        }
+    }
 }
 
 void SimpleMidiEditor::updateColorMapList()
