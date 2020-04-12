@@ -72,13 +72,23 @@ MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEd
 
     synthButton.reset(new TextButton("Synth"));
     addAndMakeVisible(synthButton.get());
-    synthButton->addMouseListener(this, true);
+    synthButton->onClick = [&]() {
+        floatMenu = synthBundle->getPluginPopupMenu(_parent.getPluginSortMethod(), processor.getSynthKnownPluginList());
+        PopupMenu::Options options;
+        floatMenu->showMenuAsync(options.withTargetComponent(synthButton.get()).withMaximumNumColumns(1),
+            ModalCallbackFunction::create([this](int r) { bundlePopupMenuSelected(r, true); }));
+    };
     synthLabel.reset(new Label("SynthLabel", "<empty>"));
     addAndMakeVisible(synthLabel.get());
 
     effectButton.reset(new TextButton("Effect"));
     addAndMakeVisible(effectButton.get());
-    effectButton->addMouseListener(this, true);
+    effectButton->onClick = [&]() {
+        floatMenu = psBundle->getPluginPopupMenu(_parent.getPluginSortMethod(), processor.getPsKnownPluginList());
+        PopupMenu::Options options;
+        floatMenu->showMenuAsync(options.withTargetComponent(effectButton.get()).withMaximumNumColumns(1),
+            ModalCallbackFunction::create([this](int r) { bundlePopupMenuSelected(r, false); }));
+    };
     effectLabel.reset(new Label("EffectLabel", "<empty>"));
     addAndMakeVisible(effectLabel.get());
 
@@ -87,6 +97,16 @@ MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEd
     dragButton->addMouseListener(this, true);
 
     dropButton.reset(new TextButtonDropTarget("Drop MIDI Here", *this));
+    dropButton->onClick = [&]() {
+        FileChooser chooser("Import MIDI file",
+            lastOpenedLocation == "" ? File::getSpecialLocation(File::userHomeDirectory) : lastOpenedLocation,
+            "*.mid; *.midi");
+        if (chooser.browseForFileToOpen())
+        {
+            lastOpenedLocation = chooser.getResult().getParentDirectory().getFullPathName();
+            itemDroppedCallback({ chooser.getResult().getFullPathName() });
+        }
+    };
     addAndMakeVisible(dropButton.get());
 
     numParameterSlot.reset(new TextEditor());
@@ -191,30 +211,29 @@ void MainEditor::itemDroppedCallback(const StringArray& files)
     for (auto i = 0; i < seq.getNumEvents(); i++)
     {
         auto* evt = seq.getEventPointer(i);
-        processor.addNote(Note(
-            evt->message.getNoteNumber(),
-            evt->message.getTimeStamp(),
-            evt->noteOffObject->message.getTimeStamp() - evt->message.getTimeStamp(),
-            evt->message.getVelocity()));
+        DBG(evt->message.getDescription());
+        if (evt->message.isNoteOn())
+            processor.addNote(Note(
+                evt->message.getNoteNumber(),
+                evt->message.getTimeStamp(),
+                evt->noteOffObject->message.getTimeStamp() - evt->message.getTimeStamp(),
+                evt->message.getVelocity() / 127.0f));
     }
     _parent.updateMidiEditor();
 }
 
-void MainEditor::mouseDown(const MouseEvent& e)
+void MainEditor::mouseDoubleClick(const MouseEvent& e)
 {
-    if (e.eventComponent == synthButton.get())
+    if (e.eventComponent == dragButton.get())
     {
-        floatMenu = synthBundle->getPluginPopupMenu(_parent.getPluginSortMethod(), processor.getSynthKnownPluginList());
-        PopupMenu::Options options;
-        floatMenu->showMenuAsync(options.withTargetComponent(synthButton.get()).withMaximumNumColumns(1),
-            ModalCallbackFunction::create([this](int r) { bundlePopupMenuSelected(r, true); }));
-    }
-    else if (e.eventComponent == effectButton.get())
-    {
-        floatMenu = psBundle->getPluginPopupMenu(_parent.getPluginSortMethod(), processor.getPsKnownPluginList());
-        PopupMenu::Options options;
-        floatMenu->showMenuAsync(options.withTargetComponent(effectButton.get()).withMaximumNumColumns(1),
-            ModalCallbackFunction::create([this](int r) { bundlePopupMenuSelected(r, false); }));
+        FileChooser chooser("Export MIDI file to...",
+            lastSavedLocation == "" ? File::getSpecialLocation(File::userHomeDirectory) : lastSavedLocation,
+            "*.mid; *.midi");
+        if (chooser.browseForDirectory())
+        {
+            lastSavedLocation = chooser.getResult().getFullPathName();
+            AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::NoIcon, "What", chooser.getResult().getFullPathName());
+        }
     }
 }
 
@@ -231,6 +250,8 @@ void MainEditor::mouseDrag(const MouseEvent& e)
             auto& notesMidiSeq = processor.getNoteMidiSequence();
             auto& ccMidiSeq = processor.getCcMidiSequence();
 
+            auto tmpFilename = "temp_" + String::toHexString(Random::getSystemRandom().nextInt());
+
             for (int i = 0; i < notesMidiSeq.size(); i++)
             {
                 if (notesMidiSeq[i]->getNumEvents() == 0)
@@ -240,8 +261,8 @@ void MainEditor::mouseDrag(const MouseEvent& e)
                 file.setTicksPerQuarterNote(960);
 
                 MidiMessageSequence seq;
-                seq.addEvent(MidiMessage::timeSignatureMetaEvent(4, 4));
-                seq.addEvent(MidiMessage::tempoMetaEvent((60000.f / (float)(60 * 4)) * 1000.f));
+                //seq.addEvent(MidiMessage::timeSignatureMetaEvent(4, 4));
+                //seq.addEvent(MidiMessage::tempoMetaEvent(int((60000.f / (float)(60)) * 1000.f)));
                 for (auto& evt : *notesMidiSeq[i])
                     seq.addEvent(MidiMessage(evt->message).withTimeStamp(evt->message.getTimeStamp() * 960));
                 for (auto& evt : *ccMidiSeq[i])
@@ -252,7 +273,7 @@ void MainEditor::mouseDrag(const MouseEvent& e)
 
                 file.addTrack(seq);
 
-                std::shared_ptr<TemporaryFile> outf = std::make_shared<TemporaryFile>(".mid");
+                std::shared_ptr<TemporaryFile> outf = std::make_shared<TemporaryFile>(File(), File::getSpecialLocation(File::tempDirectory).getNonexistentChildFile(tmpFilename + "_" + String(i + 1), ".mid"));
                 if (std::unique_ptr<FileOutputStream> p_os{ outf->getFile().createOutputStream() })
                 {
                     file.writeTo(*p_os, 1);

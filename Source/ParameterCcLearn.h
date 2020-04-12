@@ -147,7 +147,7 @@ private:
         Array<CcItem>& items;
 
         TextEditor ccNumberTextBox;
-        TextButton removeBtn{ "Remove" }, setBtn{ "Set" };
+        TextButton removeBtn{ "Remove" }, setBtn{ "Set" }, doneBtn{ "Done" };
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StatusComponent)
     };

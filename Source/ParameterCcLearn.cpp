@@ -140,6 +140,12 @@ ParameterCcLearn::StatusComponent::StatusComponent(ParameterCcLearn& parent) : _
         }
     };
     addAndMakeVisible(removeBtn);
+
+    doneBtn.onClick = [&]() {
+        this->getTopLevelComponent()->exitModalState(0);
+    };
+    addAndMakeVisible(doneBtn);
+
     table.updateContent();
 
     setSize(350, 300);
@@ -156,13 +162,17 @@ void ParameterCcLearn::StatusComponent::resized()
     b.reduce(10, 10);
 
     auto tmp = b.removeFromTop(24);
-    setBtn.setBounds(tmp.removeFromRight(40));
-    tmp.removeFromRight(4);
+    setBtn.setBounds(tmp.removeFromRight(50));
+    tmp.removeFromRight(6);
     ccNumberTextBox.setBounds(tmp);
-    b.removeFromTop(4);
+    b.removeFromTop(6);
 
-    removeBtn.setBounds(b.removeFromBottom(24));
-    b.removeFromBottom(4);
+    tmp = b.removeFromBottom(24);
+    removeBtn.setBounds(tmp.removeFromRight(100));
+    tmp.removeFromRight(6);
+    doneBtn.setBounds(tmp);
+
+    b.removeFromBottom(6);
 
     table.setBounds(b);
 }

@@ -75,6 +75,7 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     setApplicationCommandManagerToWatch(&commandManager);
     commandManager.registerAllCommandsForTarget(this);
     addKeyListener(commandManager.getKeyMappings());
+    setWantsKeyboardFocus(true);
 
     pluginSortMethod = (KnownPluginList::SortMethod)(appProperties.getUserSettings()->getIntValue("pluginSortMethod", KnownPluginList::sortByManufacturer));
     knownPluginList.addChangeListener(this);
@@ -147,6 +148,16 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 }
 
 //==============================================================================
+
+bool MicroChromoAudioProcessorEditor::keyPressed(const KeyPress& key)
+{
+    if (key.isKeyCode(KeyPress::spaceKey))
+    {
+        playTransportBtn.triggerClick();
+        return true;
+    }
+    return false;
+}
 
 void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* changed)
 {
@@ -221,6 +232,9 @@ PopupMenu MicroChromoAudioProcessorEditor::getMenuForIndex(int menuIndex, const 
         menu.addCommandItem(&commandManager, CommandIDs::openProject);
         menu.addCommandItem(&commandManager, CommandIDs::saveProject);
         menu.addCommandItem(&commandManager, CommandIDs::saveAsProject);
+        menu.addSeparator();
+        menu.addCommandItem(&commandManager, CommandIDs::importMidi);
+        menu.addCommandItem(&commandManager, CommandIDs::exportMidi);
     }
     else if (menuIndex == 1)
     {
@@ -314,6 +328,8 @@ void MicroChromoAudioProcessorEditor::getAllCommands(Array<CommandID>& c)
         CommandIDs::openProject,
         CommandIDs::saveProject,
         CommandIDs::saveAsProject,
+        CommandIDs::importMidi,
+        CommandIDs::exportMidi,
         CommandIDs::undoAction,
         CommandIDs::redoAction
     };
@@ -348,12 +364,18 @@ void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, Applic
         result.addDefaultKeypress('s', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
 #endif
         break;
+    case CommandIDs::importMidi:
+        result.setInfo("Import MIDI", "Import MIDI file", "File", 0);
+        break;
+    case CommandIDs::exportMidi:
+        result.setInfo("Export MIDI", "Export MIDI file", "File", 0);
+        break;
     case CommandIDs::undoAction:
         result.setInfo("Undo", "Undo", "Edit", 0);
 #if JUCE_MAC
         result.addDefaultKeypress('z', ModifierKeys::commandModifier);
 #else
-        result.addDefaultKeypress('z', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
+        result.addDefaultKeypress('z', ModifierKeys::ctrlModifier);
 #endif
         break;
     case CommandIDs::redoAction:
@@ -361,15 +383,15 @@ void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, Applic
 #if JUCE_MAC
         result.addDefaultKeypress('r', ModifierKeys::commandModifier);
 #else
-        result.addDefaultKeypress('r', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
+        result.addDefaultKeypress('r', ModifierKeys::ctrlModifier);
 #endif
         break;
     case CommandIDs::openPluginScanner:
         result.setInfo("Open Scanner", "Open the scanner for plugins", "Plugin", 0);
 #if JUCE_MAC
-        result.addDefaultKeypress('q', ModifierKeys::commandModifier);
+        result.addDefaultKeypress('q', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
 #else
-        result.addDefaultKeypress('q', ModifierKeys::ctrlModifier);
+        result.addDefaultKeypress('q', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
 #endif
         break;
     default:
@@ -390,6 +412,8 @@ bool MicroChromoAudioProcessorEditor::perform(const InvocationInfo& info)
     case CommandIDs::openProject:
     case CommandIDs::saveProject:
     case CommandIDs::saveAsProject:
+    case CommandIDs::importMidi:
+    case CommandIDs::exportMidi:
     case CommandIDs::undoAction:
     case CommandIDs::redoAction: break;
     default:

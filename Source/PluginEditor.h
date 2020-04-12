@@ -40,6 +40,7 @@ public:
     void getAllCommands(Array<CommandID>& c) override;
     void getCommandInfo(CommandID commandID, ApplicationCommandInfo& result) override;
     bool perform(const InvocationInfo& info) override;
+
     MicroChromoAudioProcessor& getProcessor() { return processor; }
     KnownPluginList::SortMethod getPluginSortMethod() { return pluginSortMethod; }
 
@@ -49,6 +50,7 @@ public:
     void menuItemSelected(int menuItemID, int topLevelMenuIndex) override;
 
     //==============================================================================
+    bool keyPressed(const KeyPress& key) override;
     void changeListenerCallback(ChangeBroadcaster*) override;
     void timerCallback() override;
 

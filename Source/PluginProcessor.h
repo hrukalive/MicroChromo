@@ -20,7 +20,7 @@ using GUICallback = std::function<void()>;
 //==============================================================================
 /**
 */
-class MicroChromoAudioProcessor  : public AudioProcessor, ChangeListener
+class MicroChromoAudioProcessor  : public AudioProcessor, ChangeListener, HighResolutionTimer
 {
 public:
     //==============================================================================
@@ -34,7 +34,7 @@ public:
    #ifndef JucePlugin_PreferredChannelConfigurations
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
    #endif
-
+    void hiResTimerCallback() override;
     void processBlock (AudioBuffer<float>&, MidiBuffer&) override;
 
     //==============================================================================
@@ -171,8 +171,9 @@ private:
     bool wasStopped = true;
     std::unordered_set<int> playingNotes;
 
+    std::atomic<bool> isHostPlaying{ false };
     std::atomic<int> transportState{ PLUGIN_PAUSED };
-    std::atomic<double> transportTimeSnapshot{ 0.0 }, transportTimeElasped{ 0.0 };
+    std::atomic<double> transportTimeElasped{ 0.0 };
     CriticalSection transportLock;
 
     float nextStartTime = -1.0, rangeStartTime = FP_INFINITE, rangeEndTime = -FP_INFINITE;

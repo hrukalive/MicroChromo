@@ -73,6 +73,8 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 
     controllerStateMessage.ensureStorageAllocated(128);
 
+    startTimer(10);
+
     noteColorMap.set("0", ColorPitchBendRecord("0", 0, Colours::grey));
 
     notes.add(Note(60, 2, 2, 0.8f, "0"));
@@ -100,6 +102,7 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
 {
+    stopTimer();
     knownPluginList.removeChangeListener(this);
     synthParamPtr.clear();
     psParamPtr.clear();
@@ -304,11 +307,37 @@ bool MicroChromoAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
 }
 #endif
 
+void MicroChromoAudioProcessor::hiResTimerCallback()
+{
+    if (!isHostPlaying)
+    {
+        ScopedLock lock(transportLock);
+        switch (transportState)
+        {
+        case HOST_PLAYING: transportState = PLUGIN_PAUSED; break;
+        case PLUGIN_PLAYING: transportTimeElasped += getTimerInterval() / 1000.0; break;
+        case PLUGIN_QUERY_PLAY: transportState = PLUGIN_PLAYING; break;
+        case PLUGIN_QUERY_PAUSE: transportState = PLUGIN_PAUSED; break;
+        case PLUGIN_QUERY_STOP: transportTimeElasped = 0; transportState = PLUGIN_STOPPED; break;
+        default:
+            break;
+        }
+        if (transportTimeElasped > rangeEndTime)
+            transportState = PLUGIN_PAUSED;
+    }
+    else
+        transportState = HOST_PLAYING;
+}
+
 void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
 {
     ScopedNoDenormals noDenormals;
 
     posInfo.isPlaying = false;
+    isHostPlaying = false;
+
+    auto startTime = 0.0;
+
     auto* playhead = getPlayHead();
     if (playhead != nullptr)
     {
@@ -316,49 +345,19 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 
         if (posInfo.isPlaying)
         {
-            ScopedLock lock(transportLock);
-            transportState = HOST_PLAYING;
+            isHostPlaying = true;
             transportTimeElasped = posInfo.timeInSeconds;
-            transportTimeSnapshot = 0;
+            startTime = posInfo.timeInSeconds;
         }
     }
 
     if (!posInfo.isPlaying)
     {
-        ScopedLock lock(transportLock);
-        switch (transportState)
-        {
-        case HOST_PLAYING: transportState = PLUGIN_PAUSED; break;
-        case PLUGIN_PAUSED: break;
-        case PLUGIN_STOPPED: break;
-        case PLUGIN_PLAYING:
-        {
-            transportTimeElasped = jmax(0.0, Time::getMillisecondCounterHiRes() / 1000.0f - transportTimeSnapshot);
+        startTime = transportTimeElasped.load();
+        if (transportState == PLUGIN_PLAYING)
             posInfo.isPlaying = true;
-            break;
-        }
-        case PLUGIN_QUERY_PLAY:
-        {
-            transportTimeSnapshot = Time::getMillisecondCounterHiRes() / 1000.0f - transportTimeElasped + buffer.getNumSamples() * sampleLength;
-            transportState = PLUGIN_PLAYING;
-            break;
-        }
-        case PLUGIN_QUERY_PAUSE: transportState = PLUGIN_PAUSED; break;
-        case PLUGIN_QUERY_STOP:
-        {
-            transportTimeElasped = 0;
-            transportState = PLUGIN_STOPPED;
-            break;
-        }
-        default:
-            break;
-        }
-        
-        if (transportTimeElasped > rangeEndTime)
-            transportState = PLUGIN_PAUSED;
     }
 
-    auto startTime = transportTimeElasped.load();
     auto endTime = startTime + bufferLength;
     auto isWithInNow = (rangeStartTime < rangeEndTime && startTime >= rangeStartTime && startTime < rangeEndTime) ? 1 : 0;
 
@@ -408,14 +407,14 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
     }
     else
     {
-        bool needClearance = true;
+        bool noteOffSent = false;
         if (nextStartTime > 0.0 && std::abs(startTime - nextStartTime) > 2 * bufferLength)
         {
-            if (needClearance)
+            if (!noteOffSent)
             {
                 sendAllNotesOff();
                 ensureCcValue();
-                needClearance = false;
+                noteOffSent = true;
             }
             DBG("Playhead moved by cursor or looping");
         }
@@ -423,11 +422,11 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 
         if (isWithIn == -1 || isWithIn != isWithInNow)
         {
-            if (needClearance)
+            if (!noteOffSent)
             {
                 sendAllNotesOff();
                 ensureCcValue();
-                needClearance = false;
+                noteOffSent = true;
             }
             isWithIn = isWithInNow;
             DBG("Playing range entered or exited.");
@@ -435,17 +434,17 @@ void MicroChromoAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBu
 
         if (wasStopped)
         {
-            if (needClearance)
+            if (!noteOffSent)
             {
                 sendAllNotesOff();
                 ensureCcValue();
-                needClearance = false;
+                noteOffSent = true;
             }
             wasStopped = false;
             DBG("Stopped before, now playing.");
         }
 
-        if (needClearance) // If all note off sent, then skip this block
+        if (!noteOffSent) // If all note off sent, then skip this block
         {
             if (isWithInNow == 1)
             {
@@ -642,6 +641,10 @@ void MicroChromoAudioProcessor::updateMidiSequence(int newBase)
         updateMidiSequenceKontakt(sequence);
     else
         updateMidiSequenceGeneral(sequence);
+
+    for (int i = 0; i < notesMidiSeq.size(); i++)
+        for (int j = 0; j < (psModSource == USE_KONTAKT ? 12 : 1); j++)
+            ccMidiSeq[i]->addEvent(MidiMessage::controllerEvent(midiChannel, ccBase + j, 50).withTimeStamp(notesMidiSeq[i]->getEndTime() + 5));
 
     rangeStartTime = FP_INFINITE;
     rangeEndTime = -FP_INFINITE;
@@ -1181,7 +1184,6 @@ void MicroChromoAudioProcessor::setTimeForPlayback(double time)
 {
     ScopedLock lock(transportLock);
     transportTimeElasped = time;
-    transportTimeSnapshot = Time::getMillisecondCounterHiRes() / 1000.0f - transportTimeElasped;
 }
 
 int MicroChromoAudioProcessor::getTransportState()

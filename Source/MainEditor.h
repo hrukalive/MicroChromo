@@ -32,15 +32,16 @@ public:
     void paint(Graphics&) override;
     void resized() override;
 
-    void mouseDown(const MouseEvent&) override;
+    //==============================================================================
+    void mouseDoubleClick(const MouseEvent& event) override;
     void mouseDrag(const MouseEvent&) override;
 
     //==============================================================================
     void changeListenerCallback(ChangeBroadcaster*) override;
+    void timerCallback() override;
     void itemDroppedCallback(const StringArray& files);
 
     //==============================================================================
-    void timerCallback() override;
 
 private:
     MicroChromoAudioProcessor& processor;
@@ -67,6 +68,8 @@ private:
     std::unique_ptr<ComboBox> numInstancesBox, midiChannelComboBox;
     std::unique_ptr<TextEditor> numParameterSlot;
     std::unique_ptr<PopupMenu> floatMenu;
+
+    String lastOpenedLocation = "", lastSavedLocation = "";
 
     std::atomic<bool> ignoreInitialChange1{ true }, ignoreInitialChange2{ true };
     bool canDrop = true;

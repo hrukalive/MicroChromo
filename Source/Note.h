@@ -32,7 +32,7 @@ public:
     Note &operator= (Note &&other) noexcept = default;
 
     explicit Note(int keyVal, float beatVal = 0.f,
-         float lengthVal = 1.f, float velocityVal = 1.f, String pitchColorVal = "+0") noexcept;
+         float lengthVal = 1.f, float velocityVal = 1.f, String pitchColorVal = "0") noexcept;
 
     Note withKey(int newKey) const noexcept;
     Note withBeat(float newBeat) const noexcept;

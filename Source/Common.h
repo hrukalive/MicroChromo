@@ -74,6 +74,8 @@ enum CommandIDs
     openProject,
     saveProject,
     saveAsProject,
+    exportMidi,
+    importMidi,
     undoAction,
     redoAction
 };
