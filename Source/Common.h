@@ -10,11 +10,38 @@
 
 #pragma once
 
+
+//===----------------------------------------------------------------------===//
+// Pragmas
+//===----------------------------------------------------------------------===//
+
+// unreferenced formal parameter
+#pragma warning(disable: 4100)
+// hides class member
+#pragma warning(disable: 4458)
+// decorated name length exceeded, name was truncated
+#pragma warning(disable: 4503)
+// conditional expression is constant
+#pragma warning(disable: 4127)
+
+#if JUCE_LINUX
+#   define JUCE_USE_FREETYPE_AMALGAMATED 1
+#endif
+
 #include <JuceHeader.h>
 
 class PluginBundle;
 class MicroChromoAudioProcessor;
 class MicroChromoAudioProcessorEditor;
+
+#define BEATS_PER_BAR 4
+#define TICKS_PER_BEAT 16
+#define VELOCITY_SAVE_ACCURACY 1024
+
+inline float roundBeat(float beat)
+{
+    return roundf(beat * static_cast<float>(TICKS_PER_BEAT)) / static_cast<float>(TICKS_PER_BEAT);
+}
 
 enum
 {
@@ -78,6 +105,18 @@ enum CommandIDs
     importMidi,
     undoAction,
     redoAction
+};
+
+struct IdGenerator final
+{
+    using Id = int64;
+
+    static Id generateId()
+    {
+        return idCounter++;
+    }
+
+    static inline std::atomic<Id> idCounter{ 0 };
 };
 
 class AudioParameterFloatVariant : public AudioParameterFloat

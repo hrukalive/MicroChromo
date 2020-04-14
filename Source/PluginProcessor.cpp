@@ -12,6 +12,9 @@
 #include "PluginEditor.h"
 #include "InternalPlugins.h"
 
+#include "MidiTrack.h"
+#include "Note.h"
+
 //==============================================================================
 MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -77,20 +80,20 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
 
     noteColorMap.set("0", ColorPitchBendRecord("0", 0, Colours::grey));
 
-    notes.add(Note(60, 2, 2, 0.8f, "0"));
-    notes.add(Note(63, 2, 2, 0.8f, "0"));
-    notes.add(Note(67, 2, 2, 0.8f, "0"));
-    notes.add(Note(60 + 12, 2, 2, 0.8f, "0"));
-    notes.add(Note(63 + 12, 2, 2, 0.8f, "0"));
-    notes.add(Note(67 + 12, 2, 2, 0.8f, "0"));
+    notes.add(Note(nullptr, 60, 2, 2, 0.8f, "0"));
+    notes.add(Note(nullptr, 63, 2, 2, 0.8f, "0"));
+    notes.add(Note(nullptr, 67, 2, 2, 0.8f, "0"));
+    notes.add(Note(nullptr, 60 + 12, 2, 2, 0.8f, "0"));
+    notes.add(Note(nullptr, 63 + 12, 2, 2, 0.8f, "0"));
+    notes.add(Note(nullptr, 67 + 12, 2, 2, 0.8f, "0"));
 
-    notes.add(Note(60, 5, 2, 0.8f, "0"));
-    notes.add(Note(63, 5, 2, 0.8f, "0"));
-    notes.add(Note(67, 5, 2, 0.8f, "0"));
+    notes.add(Note(nullptr, 60, 5, 2, 0.8f, "0"));
+    notes.add(Note(nullptr, 63, 5, 2, 0.8f, "0"));
+    notes.add(Note(nullptr, 67, 5, 2, 0.8f, "0"));
 
-    notes.add(Note(60, 8, 3, 0.8f, "0"));
-    notes.add(Note(64, 8, 3, 0.8f, "0"));
-    notes.add(Note(67, 8, 3, 0.8f, "0"));
+    notes.add(Note(nullptr, 60, 8, 3, 0.8f, "0"));
+    notes.add(Note(nullptr, 64, 8, 3, 0.8f, "0"));
+    notes.add(Note(nullptr, 67, 8, 3, 0.8f, "0"));
     //notes.add(Note(60, 2, 1, 1));
     //notes.add(Note(61, 4, 1, 1));
     //notes.add(Note(62, 6, 2, 1));

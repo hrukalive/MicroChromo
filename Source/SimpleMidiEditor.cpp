@@ -12,6 +12,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "Note.h"
+#include "MidiTrack.h"
 
 //==============================================================================
 SimpleMidiEditor::SimpleMidiEditor(MicroChromoAudioProcessorEditor& editor) : 
@@ -35,7 +36,7 @@ SimpleMidiEditor::SimpleMidiEditor(MicroChromoAudioProcessorEditor& editor) :
 
     addAndMakeVisible(addBtn);
     addBtn.onClick = [&]() {
-        notes.add(Note(MIDDLE_C, notes.getLast().getBeat()));
+        notes.add(Note(nullptr, MIDDLE_C, notes.getLast().getBeat()));
         table.updateContent();
     };
 

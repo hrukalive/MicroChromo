@@ -5,19 +5,62 @@
               pluginVST3Category="Instrument" cppLanguageStandard="latest"
               pluginManufacturer="NyLP" pluginManufacturerCode="Nylp" pluginCode="Aaaa"
               aaxIdentifier="com.nylp.MicroChromo" pluginVSTCategory="kPlugCategSynth"
-              pluginAAXCategory="2048" pluginRTASCategory="2048" headerPath="../../soundtouch/include">
+              pluginAAXCategory="2048" pluginRTASCategory="2048" headerPath="../../soundtouch/include&#10;../../Source/&#10;../../Source/Actions&#10;../../Source/Midi&#10;../../Source/Midi/Events&#10;../../Source/Midi/Tracks">
   <MAINGROUP id="YsAiD7" name="MicroChromo">
     <GROUP id="{32A9BA9B-4C0F-B1C1-2CB7-430912355187}" name="Resources">
       <FILE id="Oe9g92" name="MicroChromoKontaktScript.txt" compile="0" resource="1"
             file="Resources/MicroChromoKontaktScript.txt"/>
     </GROUP>
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
+      <GROUP id="{3F7CE1B1-FD61-D094-2023-FB9A45CA3564}" name="Actions">
+        <FILE id="XDciBn" name="ColorMapActions.cpp" compile="1" resource="0"
+              file="Source/Action/ColorMapActions.cpp"/>
+        <FILE id="z5hQZw" name="ColorMapActions.h" compile="0" resource="0"
+              file="Source/Action/ColorMapActions.h"/>
+        <FILE id="E3kU2s" name="NoteActions.cpp" compile="1" resource="0" file="Source/Action/NoteActions.cpp"/>
+        <FILE id="TF1XCM" name="NoteActions.h" compile="0" resource="0" file="Source/Action/NoteActions.h"/>
+        <FILE id="lftNkR" name="ProcessorActions.cpp" compile="1" resource="0"
+              file="Source/Action/ProcessorActions.cpp"/>
+        <FILE id="LuIjAA" name="ProcessorActions.h" compile="0" resource="0"
+              file="Source/Action/ProcessorActions.h"/>
+      </GROUP>
+      <GROUP id="{B436B0A7-EB34-18D9-AC55-3E262AA2531A}" name="Midi">
+        <GROUP id="{A861206A-C5A1-8D5D-44A8-33610242E901}" name="Events">
+          <FILE id="rpXc38" name="MidiEvent.cpp" compile="1" resource="0" file="Source/Midi/Events/MidiEvent.cpp"/>
+          <FILE id="KZ47ox" name="MidiEvent.h" compile="0" resource="0" file="Source/Midi/Events/MidiEvent.h"/>
+          <FILE id="gH9zT4" name="Note.cpp" compile="1" resource="0" file="Source/Midi/Events/Note.cpp"/>
+          <FILE id="j820Ao" name="Note.h" compile="0" resource="0" file="Source/Midi/Events/Note.h"/>
+          <FILE id="fuTgRQ" name="TempoMarkerEvent.cpp" compile="1" resource="0"
+                file="Source/Midi/Events/TempoMarkerEvent.cpp"/>
+          <FILE id="cMf2ZI" name="TempoMarkerEvent.h" compile="0" resource="0"
+                file="Source/Midi/Events/TempoMarkerEvent.h"/>
+          <FILE id="Vt7zCx" name="TimeSignatureEvent.cpp" compile="1" resource="0"
+                file="Source/Midi/Events/TimeSignatureEvent.cpp"/>
+          <FILE id="sVxOne" name="TimeSignatureEvent.h" compile="0" resource="0"
+                file="Source/Midi/Events/TimeSignatureEvent.h"/>
+        </GROUP>
+        <GROUP id="{AF71CB1E-5317-ED3B-D7B8-29E3C6EAE1A9}" name="Tracks">
+          <FILE id="gzoKJj" name="MidiTrack.cpp" compile="1" resource="0" file="Source/Midi/Tracks/MidiTrack.cpp"/>
+          <FILE id="sLgYbK" name="MidiTrack.h" compile="0" resource="0" file="Source/Midi/Tracks/MidiTrack.h"/>
+          <FILE id="xf5yM4" name="NoteTrack.cpp" compile="1" resource="0" file="Source/Midi/Tracks/NoteTrack.cpp"/>
+          <FILE id="Na0OW7" name="NoteTrack.h" compile="0" resource="0" file="Source/Midi/Tracks/NoteTrack.h"/>
+          <FILE id="SpeDUb" name="TempoTrack.cpp" compile="1" resource="0" file="Source/Midi/Tracks/TempoTrack.cpp"/>
+          <FILE id="Yh5DdL" name="TempoTrack.h" compile="0" resource="0" file="Source/Midi/Tracks/TempoTrack.h"/>
+          <FILE id="ZjKXYL" name="TimeSignatureTrack.cpp" compile="1" resource="0"
+                file="Source/Midi/Tracks/TimeSignatureTrack.cpp"/>
+          <FILE id="P2zpIe" name="TimeSignatureTrack.h" compile="0" resource="0"
+                file="Source/Midi/Tracks/TimeSignatureTrack.h"/>
+        </GROUP>
+      </GROUP>
       <FILE id="DdEe8x" name="Common.cpp" compile="1" resource="0" file="Source/Common.cpp"/>
       <FILE id="KS8Ulu" name="Common.h" compile="0" resource="0" file="Source/Common.h"/>
+      <FILE id="ou1GuU" name="Serializable.h" compile="0" resource="0" file="Source/Serializable.h"/>
+      <FILE id="eGTiS8" name="SerializationKeys.h" compile="0" resource="0"
+            file="Source/SerializationKeys.h"/>
       <FILE id="sBHjoK" name="Project.cpp" compile="1" resource="0" file="Source/Project.cpp"/>
       <FILE id="jyos2R" name="Project.h" compile="0" resource="0" file="Source/Project.h"/>
-      <FILE id="qJC4tX" name="Note.cpp" compile="1" resource="0" file="Source/Note.cpp"/>
-      <FILE id="wHjlDr" name="Note.h" compile="0" resource="0" file="Source/Note.h"/>
+      <FILE id="GvYSKY" name="ProjectListener.h" compile="0" resource="0"
+            file="Source/ProjectListener.h"/>
       <FILE id="rkfhtY" name="InternalPlugins.cpp" compile="1" resource="0"
             file="Source/InternalPlugins.cpp"/>
       <FILE id="NnANeP" name="InternalPlugins.h" compile="0" resource="0"

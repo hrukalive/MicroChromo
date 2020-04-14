@@ -102,5 +102,5 @@ private:
     };
     std::unique_ptr<PluginListWindow> pluginListWindow;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MicroChromoAudioProcessorEditor)
 };

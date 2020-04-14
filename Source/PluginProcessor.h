@@ -62,6 +62,10 @@ public:
     void finishLoadingPlugin();
 
     //==============================================================================
+    //ValueTree serialize() const;
+    //void deserialize(const ValueTree& tree);
+    //void reset();
+
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
@@ -99,7 +103,7 @@ public:
     std::shared_ptr<PluginBundle> getPSBundlePtr() { return psBundle; }
     int getNumInstances() { return numInstancesParameter; }
     AudioProcessorValueTreeState& getValueTreeState() { return parameters; }
-    UndoManager* getUndoManager() noexcept { return &undoManager; }
+    UndoManager& getUndoManager() noexcept { return undoManager; }
     int getParameterSlotNumber() { return parameterSlotNumber; }
     int getMidiChannel() { return midiChannel; }
     int getCcBase() { return ccBase; }

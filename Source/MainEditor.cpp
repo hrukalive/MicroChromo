@@ -11,6 +11,8 @@
 #include "MainEditor.h"
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "MidiTrack.h"
+#include "Note.h"
 
 //==============================================================================
 MainEditor::TextButtonDropTarget::TextButtonDropTarget(String text, MainEditor& owner) :
@@ -213,7 +215,7 @@ void MainEditor::itemDroppedCallback(const StringArray& files)
         auto* evt = seq.getEventPointer(i);
         DBG(evt->message.getDescription());
         if (evt->message.isNoteOn())
-            processor.addNote(Note(
+            processor.addNote(Note(nullptr,
                 evt->message.getNoteNumber(),
                 evt->message.getTimeStamp(),
                 evt->noteOffObject->message.getTimeStamp() - evt->message.getTimeStamp(),

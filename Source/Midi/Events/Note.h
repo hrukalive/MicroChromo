@@ -19,7 +19,11 @@
 
 #define MIDDLE_C 60
 
-class Note final
+#include "MidiEvent.h"
+
+class MidiTrack;
+
+class Note final : public MidiEvent
 {
 public:
 
@@ -31,14 +35,18 @@ public:
     Note(Note &&other) noexcept = default;
     Note &operator= (Note &&other) noexcept = default;
 
-    explicit Note(int keyVal, float beatVal = 0.f,
+    Note(WeakReference<MidiTrack> owner, const Note& parametersToCopy) noexcept;
+    explicit Note(WeakReference<MidiTrack> owner, int keyVal = MIDDLE_C, float beatVal = 0.f,
          float lengthVal = 1.f, float velocityVal = 1.f, String pitchColorVal = "0") noexcept;
 
+    void exportMessages(MidiMessageSequence& outSequence, double timeOffset, double timeFactor) const noexcept;
+
     Note withKey(int newKey) const noexcept;
+    Note withDeltaKey(int deltaKey) const noexcept;
     Note withBeat(float newBeat) const noexcept;
+    Note withDeltaBeat(float deltaPosition) const noexcept;
     Note withKeyBeat(int newKey, float newBeat) const noexcept;
     Note withKeyLength(int newKey, float newLength) const noexcept;
-    Note withDeltaKey(int deltaKey) const noexcept;
     Note withLength(float newLength) const noexcept;
     Note withDeltaLength(float deltaLength) const noexcept;
     Note withVelocity(float newVelocity) const noexcept;
@@ -48,9 +56,7 @@ public:
     // Accessors
     //===------------------------------------------------------------------===//
 
-    uint32 getId() const noexcept;
     int getKey() const noexcept;
-    float getBeat() const noexcept;
     float getLength() const noexcept;
     float getVelocity() const noexcept;
     String getPitchColor() const noexcept;
@@ -62,23 +68,26 @@ public:
     void setPitchColor(String newPitchColor) noexcept;
 
     //===------------------------------------------------------------------===//
+    // Serializable
+    //===------------------------------------------------------------------===//
+    ValueTree serialize() const noexcept override;
+    void deserialize(const ValueTree& tree) noexcept override;
+    void reset() noexcept override;
+
+    //===------------------------------------------------------------------===//
     // Helpers
     //===------------------------------------------------------------------===//
 
     void applyChanges(const Note& parameters) noexcept;
 
 protected:
-
-    uint32 id;
     int key = MIDDLE_C;
+    float length = 1.f;
+    float velocity = 1.f;
     String pitchColor = "+0";
-    float beat = 0.f, length = 1.f, velocity = 1.f;
 
 private:
-
-    static inline std::atomic<uint32> nidCounter{ 0 };
-
-    JUCE_LEAK_DETECTOR(Note);
+    JUCE_LEAK_DETECTOR(Note)
 };
 
 struct NoteComparator

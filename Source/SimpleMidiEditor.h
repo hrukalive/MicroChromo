@@ -12,6 +12,7 @@
 
 #include "Common.h"
 
+class MidiTrack;
 class Note;
 class MicroChromoAudioProcessorEditor;
 
