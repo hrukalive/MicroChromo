@@ -13,16 +13,24 @@
     </GROUP>
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
       <GROUP id="{3F7CE1B1-FD61-D094-2023-FB9A45CA3564}" name="Actions">
+        <FILE id="lftNkR" name="ProcessorActions.cpp" compile="1" resource="0"
+              file="Source/Action/ProcessorActions.cpp"/>
+        <FILE id="LuIjAA" name="ProcessorActions.h" compile="0" resource="0"
+              file="Source/Action/ProcessorActions.h"/>
         <FILE id="XDciBn" name="ColorMapActions.cpp" compile="1" resource="0"
               file="Source/Action/ColorMapActions.cpp"/>
         <FILE id="z5hQZw" name="ColorMapActions.h" compile="0" resource="0"
               file="Source/Action/ColorMapActions.h"/>
         <FILE id="E3kU2s" name="NoteActions.cpp" compile="1" resource="0" file="Source/Action/NoteActions.cpp"/>
         <FILE id="TF1XCM" name="NoteActions.h" compile="0" resource="0" file="Source/Action/NoteActions.h"/>
-        <FILE id="lftNkR" name="ProcessorActions.cpp" compile="1" resource="0"
-              file="Source/Action/ProcessorActions.cpp"/>
-        <FILE id="LuIjAA" name="ProcessorActions.h" compile="0" resource="0"
-              file="Source/Action/ProcessorActions.h"/>
+        <FILE id="d2khHJ" name="TempoMarkerEventActions.cpp" compile="1" resource="0"
+              file="Source/Action/TempoMarkerEventActions.cpp"/>
+        <FILE id="uDwMF1" name="TempoMarkerEventActions.h" compile="0" resource="0"
+              file="Source/Action/TempoMarkerEventActions.h"/>
+        <FILE id="Bk8kqf" name="TimeSignatureEventActions.cpp" compile="1"
+              resource="0" file="Source/Action/TimeSignatureEventActions.cpp"/>
+        <FILE id="gfYmz5" name="TimeSignatureEventActions.h" compile="0" resource="0"
+              file="Source/Action/TimeSignatureEventActions.h"/>
       </GROUP>
       <GROUP id="{B436B0A7-EB34-18D9-AC55-3E262AA2531A}" name="Midi">
         <GROUP id="{A861206A-C5A1-8D5D-44A8-33610242E901}" name="Events">
