@@ -62,6 +62,7 @@ private:
     ApplicationProperties& appProperties;
     AudioPluginFormatManager& formatManager;
     ApplicationCommandManager commandManager;
+    UndoManager& undoManager;
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
 
     KnownPluginList& knownPluginList;

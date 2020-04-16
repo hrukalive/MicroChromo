@@ -65,7 +65,7 @@ ValueTree TempoMarkerEvent::serialize() const noexcept
 {
     using namespace Serialization;
     ValueTree tree(Midi::tempoMarker);
-    tree.setProperty(Midi::id, this->id, nullptr);
+    //tree.setProperty(Midi::id, this->id, nullptr);
     tree.setProperty(Midi::timestamp, int(this->beat * TICKS_PER_BEAT), nullptr);
     tree.setProperty(Midi::bpm, this->bpm, nullptr);
     return tree;
@@ -75,7 +75,7 @@ void TempoMarkerEvent::deserialize(const ValueTree& tree) noexcept
 {
     this->reset();
     using namespace Serialization;
-    this->id = tree.getProperty(Midi::id);
+    //this->id = tree.getProperty(Midi::id);
     this->beat = float(tree.getProperty(Midi::timestamp)) / TICKS_PER_BEAT;
     this->bpm = tree.getProperty(Midi::bpm, TEMPO_DEFAULT_BPM);
 }

@@ -15,6 +15,8 @@
 #include "PluginInstance.h"
 #include "PluginBundle.h"
 
+#include "Project.h"
+
 using GUICallback = std::function<void()>;
 
 //==============================================================================
@@ -156,6 +158,8 @@ private:
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
 
     OwnedArray<ParameterLinker> synthParamPtr, psParamPtr;
+
+    std::shared_ptr<Project> project;
 
     Array<Note> notes;
     HashMap<String, ColorPitchBendRecord> noteColorMap;

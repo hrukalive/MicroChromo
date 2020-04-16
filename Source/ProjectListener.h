@@ -19,6 +19,7 @@
 
 class MidiTrack;
 class MidiEvent;
+class PitchColorMapEntry;
 
 class ProjectListener
 {
@@ -28,13 +29,23 @@ public:
     virtual ~ProjectListener() {}
 
     virtual void onAddMidiEvent(const MidiEvent &event) = 0;
+    virtual void onPostAddMidiEvent() = 0;
     virtual void onChangeMidiEvent(const MidiEvent &oldEvent, const MidiEvent &newEvent) = 0;
+    virtual void onPostChangeMidiEvent() = 0;
     virtual void onRemoveMidiEvent(const MidiEvent &event) = 0;
     virtual void onPostRemoveMidiEvent(MidiTrack *const layer) {}
 
     virtual void onAddTrack(MidiTrack *const track) = 0;
-    virtual void onRemoveTrack(MidiTrack *const track) = 0;
     virtual void onChangeTrackProperties(MidiTrack *const track) = 0;
+    virtual void onRemoveTrack(MidiTrack* const track) = 0;
+    virtual void onPostRemoveTrack() = 0;
+
+    virtual void onAddPitchColorMapEntry(const PitchColorMapEntry& entry) = 0;
+    virtual void onPostAddPitchColorMapEntry() = 0;
+    virtual void onChangePitchColorMapEntry(const PitchColorMapEntry& oldEntry, const PitchColorMapEntry& newEntry) = 0;
+    virtual void onPostChangePitchColorMapEntry() = 0;
+    virtual void onRemovePitchColorMapEntry(const PitchColorMapEntry& entry) = 0;
+    virtual void onPostRemovePitchColorMapEntry() = 0;
 
     virtual void onChangeProjectBeatRange(float firstBeat, float lastBeat) = 0;
     virtual void onChangeViewBeatRange(float firstBeat, float lastBeat) = 0;

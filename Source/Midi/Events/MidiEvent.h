@@ -46,7 +46,7 @@ public:
     bool isValid() const noexcept;
 
     MidiTrack* getTrack() const noexcept;
-    uint32 getId() const noexcept;
+    IdGenerator::Id getId() const noexcept;
     float getBeat() const noexcept;
 
     static int compareElements(const MidiEvent* const first, const MidiEvent* const second) noexcept;
@@ -57,15 +57,4 @@ protected:
     IdGenerator::Id id;
     Type type;
     float beat;
-};
-
-struct MidiEventComparator
-{
-    MidiEventComparator() = default;
-
-    static int compareElements(const MidiEvent& first, const MidiEvent& second) noexcept
-    {
-        const float timeDiff = first.getBeat() - second.getBeat();
-        return (timeDiff > 0.f) - (timeDiff < 0.f);
-    }
 };

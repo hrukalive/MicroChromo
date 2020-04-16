@@ -2,14 +2,19 @@
 #include "PluginProcessor.h"
 #include "ProjectListener.h"
 
-#include "MidiTrack.h"
-#include "NoteTrack.h"
-#include "TempoTrack.h"
-#include "TimeSignatureTrack.h"
+#include "ProjectActions.h"
 
 Project::Project(MicroChromoAudioProcessor& p, String title) :
     FileBasedDocument(".mcmproj", "*.mcmproj", "Open", "Save"),
-    processor(p), undoManager(p.getUndoManager()), _title(title) {}
+    processor(p), undoManager(p.getUndoManager()), _title(title)
+{
+    tempoMarkerTrack.reset(new TempoTrack(*this));
+    tempoMarkerTrack->insert(TempoMarkerEvent(tempoMarkerTrack.get()), false);
+    timeSignatureTrack.reset(new TimeSignatureTrack(*this));
+    timeSignatureTrack->insert(TimeSignatureEvent(timeSignatureTrack.get()), false);
+    addTrack(ValueTree(), "empty", 1, false);
+    pitchColorMap.reset(new PitchColorMap(*this));
+}
 
 std::unique_ptr<XmlElement> Project::createXml()
 {
@@ -19,6 +24,46 @@ std::unique_ptr<XmlElement> Project::createXml()
 void Project::loadFromXml(XmlElement* xml)
 {
 
+}
+
+MidiTrack* Project::addTrack(ValueTree& serializedState, const String& name, int channel, bool undoable)
+{
+    if (undoable)
+    {
+        getUndoManager().
+            perform(new NoteTrackInsertAction(*this, serializedState, name, channel));
+    }
+    else
+    {
+        auto* track = new NoteTrack(*this, name, channel);
+        track->deserialize(serializedState);
+        noteTracks.addSorted(*track, track);
+        broadcastAddTrack(track);
+        return track;
+    }
+    return nullptr;
+}
+
+bool Project::removeTrack(IdGenerator::Id trackId, bool undoable)
+{
+    if (undoable)
+    {
+        getUndoManager().
+            perform(new NoteTrackRemoveAction(*this, trackId));
+    }
+    else
+    {
+        auto* track = findTrackById<NoteTrack>(trackId);
+        if (track == nullptr)
+            return false;
+        const int index = noteTracks.indexOfSorted(*track, track);
+        if (index == -1)
+            return false;
+        broadcastRemoveTrack(track);
+        noteTracks.remove(index, true);
+        broadcastPostRemoveTrack();
+    }
+    return true;
 }
 
 Array<MidiTrack*> Project::getTracks() const
@@ -59,6 +104,36 @@ Point<float> Project::getProjectRangeInBeats() const
     return { firstBeat, lastBeat };
 }
 
+MidiTrack* Project::getTrackById(IdGenerator::Id id)
+{
+    if (tempoMarkerTrack->getTrackId() == id)
+        return tempoMarkerTrack.get();
+    else if (timeSignatureTrack->getTrackId() == id)
+        return timeSignatureTrack.get();
+    else
+    {
+        for (auto* track : noteTracks)
+            if (track->getTrackId() == id)
+                return track;
+    }
+    return nullptr;
+}
+
+MidiTrack* Project::getTrackByName(const String& name)
+{
+    if (tempoMarkerTrack->getTrackName() == name)
+        return tempoMarkerTrack.get();
+    else if (timeSignatureTrack->getTrackName() == name)
+        return timeSignatureTrack.get();
+    else
+    {
+        for (auto* track : noteTracks)
+            if (track->getTrackName() == name)
+                return track;
+    }
+    return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // ProjectListeners management
 //===----------------------------------------------------------------------===//
@@ -84,6 +159,18 @@ void Project::removeAllListeners()
 //===----------------------------------------------------------------------===//
 // Broadcaster
 //===----------------------------------------------------------------------===//
+void Project::broadcastAddEvent(const MidiEvent& event)
+{
+    jassert(event.isValid());
+    changeListeners.call(&ProjectListener::onAddMidiEvent, event);
+    sendChangeMessage();
+}
+
+void Project::broadcastPostAddEvent()
+{
+    changeListeners.call(&ProjectListener::onPostAddMidiEvent);
+}
+
 void Project::broadcastChangeEvent(const MidiEvent& oldEvent, const MidiEvent& newEvent)
 {
     jassert(newEvent.isValid());
@@ -91,11 +178,9 @@ void Project::broadcastChangeEvent(const MidiEvent& oldEvent, const MidiEvent& n
     sendChangeMessage();
 }
 
-void Project::broadcastAddEvent(const MidiEvent& event)
+void Project::broadcastPostChangeEvent()
 {
-    jassert(event.isValid());
-    changeListeners.call(&ProjectListener::onAddMidiEvent, event);
-    sendChangeMessage();
+    changeListeners.call(&ProjectListener::onPostChangeMidiEvent);
 }
 
 void Project::broadcastRemoveEvent(const MidiEvent& event)
@@ -123,9 +208,50 @@ void Project::broadcastRemoveTrack(MidiTrack* const track)
     sendChangeMessage();
 }
 
+void Project::broadcastPostRemoveTrack()
+{
+    changeListeners.call(&ProjectListener::onPostRemoveTrack);
+    sendChangeMessage();
+}
+
 void Project::broadcastChangeTrackProperties(MidiTrack* const track)
 {
     changeListeners.call(&ProjectListener::onChangeTrackProperties, track);
+    sendChangeMessage();
+}
+
+void Project::broadcastAddPitchColorMapEntry(const PitchColorMapEntry& entry)
+{
+    changeListeners.call(&ProjectListener::onAddPitchColorMapEntry, entry);
+    sendChangeMessage();
+}
+
+void Project::broadcastPostAddPitchColorMapEntry()
+{
+    changeListeners.call(&ProjectListener::onPostAddPitchColorMapEntry);
+}
+
+void Project::broadcastChangePitchColorMapEntry(const PitchColorMapEntry& oldEntry,
+    const PitchColorMapEntry& newEntry)
+{
+    changeListeners.call(&ProjectListener::onChangePitchColorMapEntry, oldEntry, newEntry);
+    sendChangeMessage();
+}
+
+void Project::broadcastPostChangePitchColorMapEntry()
+{
+    changeListeners.call(&ProjectListener::onPostChangePitchColorMapEntry);
+}
+
+void Project::broadcastRemovePitchColorMapEntry(const PitchColorMapEntry& entry)
+{
+    changeListeners.call(&ProjectListener::onRemovePitchColorMapEntry, entry);
+    sendChangeMessage();
+}
+
+void Project::broadcastPostRemovePitchColorMapEntry()
+{
+    changeListeners.call(&ProjectListener::onPostRemovePitchColorMapEntry);
     sendChangeMessage();
 }
 
@@ -152,6 +278,14 @@ void Project::broadcastChangeViewBeatRange(float firstBeat, float lastBeat)
 {
     changeListeners.call(&ProjectListener::onChangeViewBeatRange, firstBeat, lastBeat);
     // sendChangeMessage(); the project itself didn't change, so dont call this
+}
+
+void Project::sort()
+{
+    if (noteTracks.size() > 0)
+    {
+        noteTracks.sort(*noteTracks.getFirst(), true);
+    }
 }
 
 String Project::getDocumentTitle()

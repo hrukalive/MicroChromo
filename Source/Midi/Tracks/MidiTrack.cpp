@@ -10,6 +10,7 @@
 
 #include "MidiTrack.h"
 #include "Project.h"
+#include "NoteTrackActions.h"
 
 MidiTrack::MidiTrack(Project& owner) noexcept :
     project(owner),
@@ -21,14 +22,6 @@ MidiTrack::MidiTrack(Project& owner) noexcept :
     id = IdGenerator::generateId();
 }
 
-template<typename T>
-void MidiTrack::importMidiEvent(const MidiEvent& eventToImport)
-{
-    const auto& event = static_cast<const T&>(eventToImport);
-
-    static T comparator;
-    this->midiEvents.addSorted(comparator, new T(this, event));
-}
 //===----------------------------------------------------------------------===//
 // Import/export
 //===----------------------------------------------------------------------===//
@@ -60,6 +53,12 @@ float MidiTrack::midiTicksToBeats(double ticks, int timeFormat) noexcept
 //===----------------------------------------------------------------------===//
 // Accessors
 //===----------------------------------------------------------------------===//
+IdGenerator::Id MidiTrack::getTrackId() const noexcept
+{
+    return id;
+}
+
+
 float MidiTrack::getFirstBeat() const noexcept
 {
     if (this->midiEvents.size() == 0)
@@ -84,18 +83,46 @@ int MidiTrack::getTrackChannel() const noexcept
 {
     return channel;
 }
-void MidiTrack::setTrackChannel(int val, bool sendNotifications)
+void MidiTrack::setTrackChannel(int val, bool sendNotifications, bool undoable)
 {
-    channel = val;
+    if (channel == val)
+        return;
+    if (undoable)
+    {
+        project.getUndoManager().
+            perform(new MidiTrackChannelChangeAction(project,
+                getTrackId(), val));
+    }
+    else
+    {
+        channel = val;
+
+        if (sendNotification)
+            project.broadcastChangeTrackProperties(this);
+    }
 }
 
 String MidiTrack::getTrackName() const noexcept
 {
     return name;
 }
-void MidiTrack::setTrackName(const String& val, bool sendNotifications)
+void MidiTrack::setTrackName(const String& val, bool sendNotifications, bool undoable)
 {
-    name = val;
+    if (name == val)
+        return;
+    if (undoable)
+    {
+        project.getUndoManager().
+            perform(new MidiTrackRenameAction(project,
+                getTrackId(), val));
+    }
+    else
+    {
+        name = val;
+
+        if (sendNotification)
+            project.broadcastChangeTrackProperties(this);
+    }
 }
 
 void MidiTrack::sort()
@@ -120,4 +147,20 @@ void MidiTrack::updateBeatRange(bool shouldNotifyIfChanged)
 void MidiTrack::reset()
 {
     midiEvents.clear();
+}
+
+int MidiTrack::compareElements(const MidiTrack* const first, const MidiTrack* const second) noexcept
+{
+    if (first == second)
+        return 0;
+
+    const float nameResult = first->name.compare(second->name);
+    if (nameResult != 0) return nameResult;
+
+    const float channelDiff = first->channel - second->channel;
+    const int channelResult = (channelDiff > 0.f) - (channelDiff < 0.f);
+    if (channelResult != 0) return channelResult;
+
+    const float idDiff = first->id - second->id;
+    return (idDiff > 0.f) - (idDiff < 0.f);
 }

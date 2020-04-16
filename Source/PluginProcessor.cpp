@@ -12,7 +12,6 @@
 #include "PluginEditor.h"
 #include "InternalPlugins.h"
 
-#include "MidiTrack.h"
 #include "Note.h"
 
 //==============================================================================
@@ -75,6 +74,8 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
     psBundle->loadPluginSync(internalTypes[2], numInstancesParameter);
 
     controllerStateMessage.ensureStorageAllocated(128);
+
+    project.reset(new Project(*this, "Untitled"));
 
     startTimer(10);
 

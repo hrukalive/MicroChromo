@@ -16,10 +16,10 @@
 
 class Project;
 
-class TimeSignaturesTrack final : public MidiTrack
+class TimeSignatureTrack final : public MidiTrack
 {
 public:
-    explicit TimeSignaturesTrack(Project& project) noexcept;
+    explicit TimeSignatureTrack(Project& project) noexcept;
 
     //===------------------------------------------------------------------===//
     // Import/export
@@ -49,5 +49,5 @@ public:
     void reset() override;
 
 private:
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TimeSignaturesTrack);
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TimeSignatureTrack);
 };

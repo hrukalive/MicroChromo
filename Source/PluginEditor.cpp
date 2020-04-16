@@ -68,6 +68,7 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     appProperties(p.getApplicationProperties()),
     knownPluginList(p.getKnownPluginList()),
     formatManager(p.getAudioPluginFormatManager()),
+    undoManager(p.getUndoManager()),
     synthBundle(p.getSynthBundlePtr()),
     psBundle(p.getPSBundlePtr())
 {
@@ -371,7 +372,8 @@ void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, Applic
         result.setInfo("Export MIDI", "Export MIDI file", "File", 0);
         break;
     case CommandIDs::undoAction:
-        result.setInfo("Undo", "Undo", "Edit", 0);
+        result.setInfo("Undo " + undoManager.getUndoDescription(), "Undo", "Edit", 
+            undoManager.canUndo() ? 0 : ApplicationCommandInfo::CommandFlags::isDisabled);
 #if JUCE_MAC
         result.addDefaultKeypress('z', ModifierKeys::commandModifier);
 #else
@@ -379,7 +381,8 @@ void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, Applic
 #endif
         break;
     case CommandIDs::redoAction:
-        result.setInfo("Redo", "Redo", "Edit", 0);
+        result.setInfo("Redo " + undoManager.getRedoDescription(), "Redo", "Edit",
+            undoManager.canRedo() ? 0 : ApplicationCommandInfo::CommandFlags::isDisabled);
 #if JUCE_MAC
         result.addDefaultKeypress('r', ModifierKeys::commandModifier);
 #else
@@ -413,9 +416,9 @@ bool MicroChromoAudioProcessorEditor::perform(const InvocationInfo& info)
     case CommandIDs::saveProject:
     case CommandIDs::saveAsProject:
     case CommandIDs::importMidi:
-    case CommandIDs::exportMidi:
-    case CommandIDs::undoAction:
-    case CommandIDs::redoAction: break;
+    case CommandIDs::exportMidi: break;
+    case CommandIDs::undoAction: undoManager.undo(); break;
+    case CommandIDs::redoAction: undoManager.redo(); break;
     default:
         return false;
     }

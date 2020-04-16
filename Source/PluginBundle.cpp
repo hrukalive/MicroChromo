@@ -221,7 +221,7 @@ void PluginBundle::linkParameters()
             overrideIndices.add(x);
     overrideIndices.sort(PairComparator(), true);
 
-    int linkedCount = 0, j = 0;
+    int linkedCount = 0;
     for (auto index : linkParameterIndices)
     {
         if (linkedCount >= processor.getParameterSlotNumber())

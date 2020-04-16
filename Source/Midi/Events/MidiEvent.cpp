@@ -33,7 +33,7 @@ MidiTrack* MidiEvent::getTrack() const noexcept
     return track;
 }
 
-uint32 MidiEvent::getId() const noexcept
+IdGenerator::Id MidiEvent::getId() const noexcept
 {
     return id;
 }
@@ -45,6 +45,13 @@ float MidiEvent::getBeat() const noexcept
 
 int MidiEvent::compareElements(const MidiEvent* const first, const MidiEvent* const second) noexcept
 {
-    const float timeDiff = first->getBeat() - second->getBeat();
-    return (timeDiff > 0.f) - (timeDiff < 0.f);
+    if (first == second) { return 0; }
+
+    const float beatDiff = first->beat - second->beat;
+    const int beatResult = (beatDiff > 0.f) - (beatDiff < 0.f);
+    if (beatResult != 0) { return beatResult; }
+
+    const int idDiff = first->id - second->id;
+    const int idResult = (idDiff > 0) - (idDiff < 0);
+    return idResult;
 }

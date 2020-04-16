@@ -279,8 +279,8 @@ String SimpleMidiMessage::toString() const
 
 ColorPitchBendRecord::ColorPitchBendRecord() :
     name("Original"), value(0), color(Colours::grey) {}
-ColorPitchBendRecord::ColorPitchBendRecord(String name, int value, Colour color) :
-    name(name), value(value), color(color) {}
+ColorPitchBendRecord::ColorPitchBendRecord(String name, int value, Colour color, int defaultKey) :
+    name(name), value(value), color(color), defaultKey(defaultKey) {}
 
 ColorPitchBendRecordCollection::ColorPitchBendRecordCollection() :
     name("---INIT---"), collection({ ColorPitchBendRecord("0", 0, Colours::grey) }) {}

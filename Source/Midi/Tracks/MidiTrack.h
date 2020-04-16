@@ -26,7 +26,13 @@ public:
     // Track editing
     //===------------------------------------------------------------------===//
     template<typename T>
-    void importMidiEvent(const MidiEvent& eventToImport);
+    void importMidiEvent(const MidiEvent& eventToImport)
+    {
+        const auto& event = static_cast<const T&>(eventToImport);
+
+        static T comparator;
+        this->midiEvents.addSorted(comparator, new T(this, event));
+    }
 
     //===------------------------------------------------------------------===//
     // Import/export
@@ -38,14 +44,16 @@ public:
     //===------------------------------------------------------------------===//
     // Accessors
     //===------------------------------------------------------------------===//
+    IdGenerator::Id getTrackId() const noexcept;
+
     virtual float getFirstBeat() const noexcept;
     virtual float getLastBeat() const noexcept;
 
     virtual int getTrackChannel() const noexcept;
-    virtual void setTrackChannel(int val, bool sendNotifications);
+    virtual void setTrackChannel(int val, bool sendNotifications, bool undoable);
 
     virtual String getTrackName() const noexcept;
-    virtual void setTrackName(const String& val, bool sendNotifications);
+    virtual void setTrackName(const String& val, bool sendNotifications, bool undoable);
 
     //===------------------------------------------------------------------===//
     // OwnedArray wrapper
@@ -84,13 +92,14 @@ public:
     void updateBeatRange(bool shouldNotifyIfChanged);
     void reset();
 
+    static int compareElements(const MidiTrack* const first, const MidiTrack* const second) noexcept;
 
 protected:
     Project& project;
 
     IdGenerator::Id id;
     String name;
-    int channel;
+    int channel = 1;
     OwnedArray<MidiEvent> midiEvents;
 
     float lastEndBeat;

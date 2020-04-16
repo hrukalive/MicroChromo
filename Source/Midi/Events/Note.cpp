@@ -172,7 +172,7 @@ ValueTree Note::serialize() const noexcept
 {
     using namespace Serialization;
     ValueTree tree(Midi::note);
-    tree.setProperty(Midi::id, this->id, nullptr);
+    //tree.setProperty(Midi::id, this->id, nullptr);
     tree.setProperty(Midi::key, this->key, nullptr);
     tree.setProperty(Midi::timestamp, int(this->beat * TICKS_PER_BEAT), nullptr);
     tree.setProperty(Midi::length, int(this->length * TICKS_PER_BEAT), nullptr);
@@ -185,7 +185,7 @@ void Note::deserialize(const ValueTree& tree) noexcept
 {
     this->reset();
     using namespace Serialization;
-    this->id = tree.getProperty(Midi::id);
+    //this->id = tree.getProperty(Midi::id);
     this->key = tree.getProperty(Midi::key);
     this->beat = float(tree.getProperty(Midi::timestamp)) / TICKS_PER_BEAT;
     this->length = float(tree.getProperty(Midi::length)) / TICKS_PER_BEAT;
@@ -204,4 +204,21 @@ void Note::applyChanges(const Note& other) noexcept
     this->length = other.length;
     this->velocity = other.velocity;
     this->pitchColor = other.pitchColor;
+}
+
+int Note::compareElements(const Note* const first, const Note* const second) noexcept
+{
+    if (first == second) { return 0; }
+
+    const float beatDiff = first->beat - second->beat;
+    const int beatResult = (beatDiff > 0.f) - (beatDiff < 0.f);
+    if (beatResult != 0) { return beatResult; }
+
+    const int keyDiff = first->key - second->key;
+    const int keyResult = (keyDiff > 0) - (keyDiff < 0);
+    if (keyResult != 0) { return keyResult; }
+
+    const int idDiff = first->id - second->id;
+    const int idResult = (idDiff > 0) - (idDiff < 0);
+    return idResult;
 }

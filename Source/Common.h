@@ -291,11 +291,12 @@ class ColorPitchBendRecord
 {
 public:
     ColorPitchBendRecord();
-    ColorPitchBendRecord(String name, int value, Colour color);
+    ColorPitchBendRecord(String name, int value, Colour color, int defaultKey = -1);
 
     String name;
     int value;
     Colour color;
+    int defaultKey;
 };
 
 struct ColorPitchBendRecordComparator

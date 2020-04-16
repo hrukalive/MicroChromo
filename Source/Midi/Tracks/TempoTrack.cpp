@@ -9,6 +9,7 @@
 */
 
 #include "TempoTrack.h"
+#include "TempoMarkerEventActions.h"
 #include "Project.h"
 
 TempoTrack::TempoTrack(Project& project) noexcept :
@@ -20,7 +21,7 @@ TempoTrack::TempoTrack(Project& project) noexcept :
 
 void TempoTrack::importMidi(const MidiMessageSequence& sequence, short timeFormat)
 {
-    this->reset();
+    reset();
     for (int i = 0; i < sequence.getNumEvents(); ++i)
     {
         const MidiMessage& message = sequence.getEventPointer(i)->message;
@@ -31,11 +32,11 @@ void TempoTrack::importMidi(const MidiMessageSequence& sequence, short timeForma
             auto bpm = int(60.0f / message.getTempoSecondsPerQuarterNote());
             const float startBeat = MidiTrack::midiTicksToBeats(message.getTimeStamp(), timeFormat);
             const TempoMarkerEvent marker(this, startBeat, bpm);
-            this->importMidiEvent<TempoMarkerEvent>(marker);
+            importMidiEvent<TempoMarkerEvent>(marker);
         }
     }
 
-    this->updateBeatRange(false);
+    updateBeatRange(false);
 }
 
 //===----------------------------------------------------------------------===//
@@ -46,9 +47,9 @@ MidiEvent* TempoTrack::insert(const TempoMarkerEvent& eventParams, bool undoable
 {
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventInsertAction(*this->getProject(),
-                this->getTrackId(), eventParams));
+        project.getUndoManager().
+            perform(new TempoMarkerEventInsertAction(project,
+                getTrackId(), eventParams));
     }
     else
     {
@@ -56,6 +57,7 @@ MidiEvent* TempoTrack::insert(const TempoMarkerEvent& eventParams, bool undoable
         midiEvents.addSorted(*ownedEvent, ownedEvent);
         project.broadcastAddEvent(*ownedEvent);
         updateBeatRange(true);
+        project.broadcastPostAddEvent();
         return ownedEvent;
     }
 
@@ -66,19 +68,19 @@ bool TempoTrack::remove(const TempoMarkerEvent& signature, bool undoable)
 {
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventRemoveAction(*this->getProject(),
-                this->getTrackId(), signature));
+        project.getUndoManager().
+            perform(new TempoMarkerEventRemoveAction(project,
+                getTrackId(), signature));
     }
     else
     {
-        const int index = this->midiEvents.indexOfSorted(signature, &signature);
+        const int index = midiEvents.indexOfSorted(signature, &signature);
         if (index >= 0)
         {
-            auto* removedEvent = this->midiEvents.getUnchecked(index);
+            auto* removedEvent = midiEvents.getUnchecked(index);
             project.broadcastRemoveEvent(*removedEvent);
-            this->midiEvents.remove(index, true);
-            this->updateBeatRange(true);
+            midiEvents.remove(index, true);
+            updateBeatRange(true);
             project.broadcastPostRemoveEvent(this);
             return true;
         }
@@ -94,21 +96,22 @@ bool TempoTrack::change(const TempoMarkerEvent& oldParams,
 {
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventChangeAction(*this->getProject(),
-                this->getTrackId(), oldParams, newParams));
+        project.getUndoManager().
+            perform(new TempoMarkerEventChangeAction(project,
+                getTrackId(), oldParams, newParams));
     }
     else
     {
-        const int index = this->midiEvents.indexOfSorted(oldParams, &oldParams);
+        const int index = midiEvents.indexOfSorted(oldParams, &oldParams);
         if (index >= 0)
         {
-            auto* changedEvent = static_cast<TempoMarkerEvent*>(this->midiEvents.getUnchecked(index));
+            auto* changedEvent = static_cast<TempoMarkerEvent*>(midiEvents.getUnchecked(index));
             changedEvent->applyChanges(newParams);
-            this->midiEvents.remove(index, false);
-            this->midiEvents.addSorted(*changedEvent, changedEvent);
+            midiEvents.remove(index, false);
+            midiEvents.addSorted(*changedEvent, changedEvent);
             project.broadcastChangeEvent(oldParams, *changedEvent);
-            this->updateBeatRange(true);
+            updateBeatRange(true);
+            project.broadcastPostChangeEvent();
             return true;
         }
 
@@ -122,9 +125,9 @@ bool TempoTrack::insertGroup(Array<TempoMarkerEvent>& signatures, bool undoable)
 {
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventsGroupInsertAction(*this->getProject(),
-                this->getTrackId(), signatures));
+        project.getUndoManager().
+            perform(new TempoMarkerEventsGroupInsertAction(project,
+                getTrackId(), signatures));
     }
     else
     {
@@ -135,8 +138,8 @@ bool TempoTrack::insertGroup(Array<TempoMarkerEvent>& signatures, bool undoable)
             midiEvents.addSorted(*ownedEvent, ownedEvent);
             project.broadcastAddEvent(*ownedEvent);
         }
-
-        this->updateBeatRange(true);
+        updateBeatRange(true);
+        project.broadcastPostAddEvent();
     }
 
     return true;
@@ -146,25 +149,25 @@ bool TempoTrack::removeGroup(Array<TempoMarkerEvent>& signatures, bool undoable)
 {
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventsGroupRemoveAction(*this->getProject(),
-                this->getTrackId(), signatures));
+        project.getUndoManager().
+            perform(new TempoMarkerEventsGroupRemoveAction(project,
+                getTrackId(), signatures));
     }
     else
     {
         for (int i = 0; i < signatures.size(); ++i)
         {
             const TempoMarkerEvent& signature = signatures.getReference(i);
-            const int index = this->midiEvents.indexOfSorted(signature, &signature);
+            const int index = midiEvents.indexOfSorted(signature, &signature);
             if (index >= 0)
             {
-                auto* removedSignature = this->midiEvents.getUnchecked(index);
+                auto* removedSignature = midiEvents.getUnchecked(index);
                 project.broadcastRemoveEvent(*removedSignature);
-                this->midiEvents.remove(index, true);
+                midiEvents.remove(index, true);
             }
         }
 
-        this->updateBeatRange(true);
+        updateBeatRange(true);
         project.broadcastPostRemoveEvent(this);
     }
 
@@ -178,9 +181,9 @@ bool TempoTrack::changeGroup(Array<TempoMarkerEvent>& groupBefore,
 
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventsGroupChangeAction(*this->getProject(),
-                this->getTrackId(), groupBefore, groupAfter));
+        project.getUndoManager().
+            perform(new TempoMarkerEventsGroupChangeAction(project,
+                getTrackId(), groupBefore, groupAfter));
     }
     else
     {
@@ -188,18 +191,18 @@ bool TempoTrack::changeGroup(Array<TempoMarkerEvent>& groupBefore,
         {
             const TempoMarkerEvent& oldParams = groupBefore.getReference(i);
             const TempoMarkerEvent& newParams = groupAfter.getReference(i);
-            const int index = this->midiEvents.indexOfSorted(oldParams, &oldParams);
+            const int index = midiEvents.indexOfSorted(oldParams, &oldParams);
             if (index >= 0)
             {
-                auto* changedEvent = static_cast<TempoMarkerEvent*>(this->midiEvents.getUnchecked(index));
+                auto* changedEvent = static_cast<TempoMarkerEvent*>(midiEvents.getUnchecked(index));
                 changedEvent->applyChanges(newParams);
-                this->midiEvents.remove(index, false);
-                this->midiEvents.addSorted(*changedEvent, changedEvent);
+                midiEvents.remove(index, false);
+                midiEvents.addSorted(*changedEvent, changedEvent);
                 project.broadcastChangeEvent(oldParams, *changedEvent);
             }
         }
-
-        this->updateBeatRange(true);
+        updateBeatRange(true);
+        project.broadcastPostChangeEvent();
     }
 
     return true;
@@ -215,7 +218,7 @@ ValueTree TempoTrack::serialize() const
 
     for (int i = 0; i < midiEvents.size(); ++i)
     {
-        const MidiEvent* event = this->midiEvents.getUnchecked(i);
+        const MidiEvent* event = midiEvents.getUnchecked(i);
         tree.appendChild(event->serialize(), nullptr); // faster than addChildElement
     }
 
@@ -244,18 +247,18 @@ void TempoTrack::deserialize(const ValueTree& tree)
             TempoMarkerEvent* marker = new TempoMarkerEvent(this);
             marker->deserialize(e);
 
-            this->midiEvents.add(marker);
+            midiEvents.add(marker);
 
             lastBeat = jmax(lastBeat, marker->getBeat());
             firstBeat = jmin(firstBeat, marker->getBeat());
         }
     }
 
-    this->sort();
-    this->updateBeatRange(false);
+    sort();
+    updateBeatRange(false);
 }
 
 void TempoTrack::reset()
 {
-    this->midiEvents.clear();
+    midiEvents.clear();
 }

@@ -9,18 +9,19 @@
 */
 
 #include "TimeSignatureTrack.h"
+#include "TimeSignatureEventActions.h"
 #include "Project.h"
 
-TimeSignaturesTrack::TimeSignaturesTrack(Project& project) noexcept :
+TimeSignatureTrack::TimeSignatureTrack(Project& project) noexcept :
     MidiTrack(project) {}
 
 //===----------------------------------------------------------------------===//
 // Import/export
 //===----------------------------------------------------------------------===//
 
-void TimeSignaturesTrack::importMidi(const MidiMessageSequence& sequence, short timeFormat)
+void TimeSignatureTrack::importMidi(const MidiMessageSequence& sequence, short timeFormat)
 {
-    this->reset();
+    reset();
     for (int i = 0; i < sequence.getNumEvents(); ++i)
     {
         const MidiMessage& message = sequence.getEventPointer(i)->message;
@@ -31,24 +32,24 @@ void TimeSignaturesTrack::importMidi(const MidiMessageSequence& sequence, short 
             message.getTimeSignatureInfo(numerator, denominator);
             const float startBeat = MidiTrack::midiTicksToBeats(message.getTimeStamp(), timeFormat);
             const TimeSignatureEvent signature(this, startBeat, numerator, denominator);
-            this->importMidiEvent<TimeSignatureEvent>(signature);
+            importMidiEvent<TimeSignatureEvent>(signature);
         }
     }
 
-    this->updateBeatRange(false);
+    updateBeatRange(false);
 }
 
 //===----------------------------------------------------------------------===//
 // Undoable track editing
 //===----------------------------------------------------------------------===//
 
-MidiEvent* TimeSignaturesTrack::insert(const TimeSignatureEvent& eventParams, bool undoable)
+MidiEvent* TimeSignatureTrack::insert(const TimeSignatureEvent& eventParams, bool undoable)
 {
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventInsertAction(*this->getProject(),
-                this->getTrackId(), eventParams));
+        project.getUndoManager().
+            perform(new TimeSignatureEventInsertAction(project,
+                getTrackId(), eventParams));
     }
     else
     {
@@ -56,29 +57,30 @@ MidiEvent* TimeSignaturesTrack::insert(const TimeSignatureEvent& eventParams, bo
         midiEvents.addSorted(*ownedEvent, ownedEvent);
         project.broadcastAddEvent(*ownedEvent);
         updateBeatRange(true);
+        project.broadcastPostAddEvent();
         return ownedEvent;
     }
 
     return nullptr;
 }
 
-bool TimeSignaturesTrack::remove(const TimeSignatureEvent& signature, bool undoable)
+bool TimeSignatureTrack::remove(const TimeSignatureEvent& signature, bool undoable)
 {
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventRemoveAction(*this->getProject(),
-                this->getTrackId(), signature));
+        project.getUndoManager().
+            perform(new TimeSignatureEventRemoveAction(project,
+                getTrackId(), signature));
     }
     else
     {
-        const int index = this->midiEvents.indexOfSorted(signature, &signature);
+        const int index = midiEvents.indexOfSorted(signature, &signature);
         if (index >= 0)
         {
-            auto* removedEvent = this->midiEvents.getUnchecked(index);
+            auto* removedEvent = midiEvents.getUnchecked(index);
             project.broadcastRemoveEvent(*removedEvent);
-            this->midiEvents.remove(index, true);
-            this->updateBeatRange(true);
+            midiEvents.remove(index, true);
+            updateBeatRange(true);
             project.broadcastPostRemoveEvent(this);
             return true;
         }
@@ -89,26 +91,27 @@ bool TimeSignaturesTrack::remove(const TimeSignatureEvent& signature, bool undoa
     return true;
 }
 
-bool TimeSignaturesTrack::change(const TimeSignatureEvent& oldParams,
+bool TimeSignatureTrack::change(const TimeSignatureEvent& oldParams,
     const TimeSignatureEvent& newParams, bool undoable)
 {
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventChangeAction(*this->getProject(),
-                this->getTrackId(), oldParams, newParams));
+        project.getUndoManager().
+            perform(new TimeSignatureEventChangeAction(project,
+                getTrackId(), oldParams, newParams));
     }
     else
     {
-        const int index = this->midiEvents.indexOfSorted(oldParams, &oldParams);
+        const int index = midiEvents.indexOfSorted(oldParams, &oldParams);
         if (index >= 0)
         {
-            auto* changedEvent = static_cast<TimeSignatureEvent*>(this->midiEvents.getUnchecked(index));
+            auto* changedEvent = static_cast<TimeSignatureEvent*>(midiEvents.getUnchecked(index));
             changedEvent->applyChanges(newParams);
-            this->midiEvents.remove(index, false);
-            this->midiEvents.addSorted(*changedEvent, changedEvent);
+            midiEvents.remove(index, false);
+            midiEvents.addSorted(*changedEvent, changedEvent);
             project.broadcastChangeEvent(oldParams, *changedEvent);
-            this->updateBeatRange(true);
+            updateBeatRange(true);
+            project.broadcastPostChangeEvent();
             return true;
         }
 
@@ -118,13 +121,13 @@ bool TimeSignaturesTrack::change(const TimeSignatureEvent& oldParams,
     return true;
 }
 
-bool TimeSignaturesTrack::insertGroup(Array<TimeSignatureEvent>& signatures, bool undoable)
+bool TimeSignatureTrack::insertGroup(Array<TimeSignatureEvent>& signatures, bool undoable)
 {
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventsGroupInsertAction(*this->getProject(),
-                this->getTrackId(), signatures));
+        project.getUndoManager().
+            perform(new TimeSignatureEventsGroupInsertAction(project,
+                getTrackId(), signatures));
     }
     else
     {
@@ -135,52 +138,51 @@ bool TimeSignaturesTrack::insertGroup(Array<TimeSignatureEvent>& signatures, boo
             midiEvents.addSorted(*ownedEvent, ownedEvent);
             project.broadcastAddEvent(*ownedEvent);
         }
-
-        this->updateBeatRange(true);
+        updateBeatRange(true);
+        project.broadcastPostAddEvent();
     }
 
     return true;
 }
 
-bool TimeSignaturesTrack::removeGroup(Array<TimeSignatureEvent>& signatures, bool undoable)
+bool TimeSignatureTrack::removeGroup(Array<TimeSignatureEvent>& signatures, bool undoable)
 {
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventsGroupRemoveAction(*this->getProject(),
-                this->getTrackId(), signatures));
+        project.getUndoManager().
+            perform(new TimeSignatureEventsGroupRemoveAction(project,
+                getTrackId(), signatures));
     }
     else
     {
         for (int i = 0; i < signatures.size(); ++i)
         {
             const TimeSignatureEvent& signature = signatures.getReference(i);
-            const int index = this->midiEvents.indexOfSorted(signature, &signature);
+            const int index = midiEvents.indexOfSorted(signature, &signature);
             if (index >= 0)
             {
-                auto* removedSignature = this->midiEvents.getUnchecked(index);
+                auto* removedSignature = midiEvents.getUnchecked(index);
                 project.broadcastRemoveEvent(*removedSignature);
-                this->midiEvents.remove(index, true);
+                midiEvents.remove(index, true);
             }
         }
-
-        this->updateBeatRange(true);
+        updateBeatRange(true);
         project.broadcastPostRemoveEvent(this);
     }
 
     return true;
 }
 
-bool TimeSignaturesTrack::changeGroup(Array<TimeSignatureEvent>& groupBefore,
+bool TimeSignatureTrack::changeGroup(Array<TimeSignatureEvent>& groupBefore,
     Array<TimeSignatureEvent>& groupAfter, bool undoable)
 {
     jassert(groupBefore.size() == groupAfter.size());
 
     if (undoable)
     {
-        this->getUndoStack()->
-            perform(new TimeSignatureEventsGroupChangeAction(*this->getProject(),
-                this->getTrackId(), groupBefore, groupAfter));
+        project.getUndoManager().
+            perform(new TimeSignatureEventsGroupChangeAction(project,
+                getTrackId(), groupBefore, groupAfter));
     }
     else
     {
@@ -188,18 +190,18 @@ bool TimeSignaturesTrack::changeGroup(Array<TimeSignatureEvent>& groupBefore,
         {
             const TimeSignatureEvent& oldParams = groupBefore.getReference(i);
             const TimeSignatureEvent& newParams = groupAfter.getReference(i);
-            const int index = this->midiEvents.indexOfSorted(oldParams, &oldParams);
+            const int index = midiEvents.indexOfSorted(oldParams, &oldParams);
             if (index >= 0)
             {
-                auto* changedEvent = static_cast<TimeSignatureEvent*>(this->midiEvents.getUnchecked(index));
+                auto* changedEvent = static_cast<TimeSignatureEvent*>(midiEvents.getUnchecked(index));
                 changedEvent->applyChanges(newParams);
-                this->midiEvents.remove(index, false);
-                this->midiEvents.addSorted(*changedEvent, changedEvent);
+                midiEvents.remove(index, false);
+                midiEvents.addSorted(*changedEvent, changedEvent);
                 project.broadcastChangeEvent(oldParams, *changedEvent);
             }
         }
-
-        this->updateBeatRange(true);
+        updateBeatRange(true);
+        project.broadcastPostChangeEvent();
     }
 
     return true;
@@ -209,20 +211,20 @@ bool TimeSignaturesTrack::changeGroup(Array<TimeSignatureEvent>& groupBefore,
 // Serializable
 //===----------------------------------------------------------------------===//
 
-ValueTree TimeSignaturesTrack::serialize() const
+ValueTree TimeSignatureTrack::serialize() const
 {
     ValueTree tree(Serialization::Midi::timeSignatures);
 
     for (int i = 0; i < midiEvents.size(); ++i)
     {
-        const MidiEvent* event = this->midiEvents.getUnchecked(i);
+        const MidiEvent* event = midiEvents.getUnchecked(i);
         tree.appendChild(event->serialize(), nullptr); // faster than addChildElement
     }
 
     return tree;
 }
 
-void TimeSignaturesTrack::deserialize(const ValueTree& tree)
+void TimeSignatureTrack::deserialize(const ValueTree& tree)
 {
     reset();
     using namespace Serialization;
@@ -244,18 +246,18 @@ void TimeSignaturesTrack::deserialize(const ValueTree& tree)
             TimeSignatureEvent* signature = new TimeSignatureEvent(this);
             signature->deserialize(e);
 
-            this->midiEvents.add(signature);
+            midiEvents.add(signature);
 
             lastBeat = jmax(lastBeat, signature->getBeat());
             firstBeat = jmin(firstBeat, signature->getBeat());
         }
     }
 
-    this->sort();
-    this->updateBeatRange(false);
+    sort();
+    updateBeatRange(false);
 }
 
-void TimeSignaturesTrack::reset()
+void TimeSignatureTrack::reset()
 {
-    this->midiEvents.clear();
+    midiEvents.clear();
 }

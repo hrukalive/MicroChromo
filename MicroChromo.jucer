@@ -12,25 +12,33 @@
             file="Resources/MicroChromoKontaktScript.txt"/>
     </GROUP>
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
-      <GROUP id="{3F7CE1B1-FD61-D094-2023-FB9A45CA3564}" name="Actions">
-        <FILE id="lftNkR" name="ProcessorActions.cpp" compile="1" resource="0"
-              file="Source/Action/ProcessorActions.cpp"/>
-        <FILE id="LuIjAA" name="ProcessorActions.h" compile="0" resource="0"
-              file="Source/Action/ProcessorActions.h"/>
-        <FILE id="XDciBn" name="ColorMapActions.cpp" compile="1" resource="0"
-              file="Source/Action/ColorMapActions.cpp"/>
-        <FILE id="z5hQZw" name="ColorMapActions.h" compile="0" resource="0"
-              file="Source/Action/ColorMapActions.h"/>
-        <FILE id="E3kU2s" name="NoteActions.cpp" compile="1" resource="0" file="Source/Action/NoteActions.cpp"/>
-        <FILE id="TF1XCM" name="NoteActions.h" compile="0" resource="0" file="Source/Action/NoteActions.h"/>
-        <FILE id="d2khHJ" name="TempoMarkerEventActions.cpp" compile="1" resource="0"
-              file="Source/Action/TempoMarkerEventActions.cpp"/>
-        <FILE id="uDwMF1" name="TempoMarkerEventActions.h" compile="0" resource="0"
-              file="Source/Action/TempoMarkerEventActions.h"/>
-        <FILE id="Bk8kqf" name="TimeSignatureEventActions.cpp" compile="1"
-              resource="0" file="Source/Action/TimeSignatureEventActions.cpp"/>
-        <FILE id="gfYmz5" name="TimeSignatureEventActions.h" compile="0" resource="0"
-              file="Source/Action/TimeSignatureEventActions.h"/>
+      <GROUP id="{A4813C48-85DE-5CF9-E7E9-C97BFCDCAE71}" name="Actions">
+        <FILE id="hgHljg" name="ColorMapActions.cpp" compile="1" resource="0"
+              file="Source/Actions/ColorMapActions.cpp"/>
+        <FILE id="AmLuh1" name="ColorMapActions.h" compile="0" resource="0"
+              file="Source/Actions/ColorMapActions.h"/>
+        <FILE id="yRmcsI" name="NoteActions.cpp" compile="1" resource="0" file="Source/Actions/NoteActions.cpp"/>
+        <FILE id="KK6Cjl" name="NoteActions.h" compile="0" resource="0" file="Source/Actions/NoteActions.h"/>
+        <FILE id="xAGL2X" name="NoteTrackActions.cpp" compile="1" resource="0"
+              file="Source/Actions/NoteTrackActions.cpp"/>
+        <FILE id="WILN8K" name="NoteTrackActions.h" compile="0" resource="0"
+              file="Source/Actions/NoteTrackActions.h"/>
+        <FILE id="eW8Dam" name="ProcessorActions.cpp" compile="1" resource="0"
+              file="Source/Actions/ProcessorActions.cpp"/>
+        <FILE id="dfL63q" name="ProcessorActions.h" compile="0" resource="0"
+              file="Source/Actions/ProcessorActions.h"/>
+        <FILE id="vjmd97" name="ProjectActions.cpp" compile="1" resource="0"
+              file="Source/Actions/ProjectActions.cpp"/>
+        <FILE id="HY06Vh" name="ProjectActions.h" compile="0" resource="0"
+              file="Source/Actions/ProjectActions.h"/>
+        <FILE id="qFVeFZ" name="TempoMarkerEventActions.cpp" compile="1" resource="0"
+              file="Source/Actions/TempoMarkerEventActions.cpp"/>
+        <FILE id="pPMTOH" name="TempoMarkerEventActions.h" compile="0" resource="0"
+              file="Source/Actions/TempoMarkerEventActions.h"/>
+        <FILE id="XHLVw9" name="TimeSignatureEventActions.cpp" compile="1"
+              resource="0" file="Source/Actions/TimeSignatureEventActions.cpp"/>
+        <FILE id="EURMWC" name="TimeSignatureEventActions.h" compile="0" resource="0"
+              file="Source/Actions/TimeSignatureEventActions.h"/>
       </GROUP>
       <GROUP id="{B436B0A7-EB34-18D9-AC55-3E262AA2531A}" name="Midi">
         <GROUP id="{A861206A-C5A1-8D5D-44A8-33610242E901}" name="Events">
@@ -69,6 +77,9 @@
       <FILE id="jyos2R" name="Project.h" compile="0" resource="0" file="Source/Project.h"/>
       <FILE id="GvYSKY" name="ProjectListener.h" compile="0" resource="0"
             file="Source/ProjectListener.h"/>
+      <FILE id="Ojf3wr" name="PitchColorMap.cpp" compile="1" resource="0"
+            file="Source/PitchColorMap.cpp"/>
+      <FILE id="hyvGtC" name="PitchColorMap.h" compile="0" resource="0" file="Source/PitchColorMap.h"/>
       <FILE id="rkfhtY" name="InternalPlugins.cpp" compile="1" resource="0"
             file="Source/InternalPlugins.cpp"/>
       <FILE id="NnANeP" name="InternalPlugins.h" compile="0" resource="0"
