@@ -1,17 +1,31 @@
 /*
-  ==============================================================================
-
-    Common.cpp
-    Created: 25 Mar 2020 9:36:47pm
-    Author:  bowen
-
-  ==============================================================================
-*/
+ * This file is part of the MicroChromo distribution
+ * (https://github.com/hrukalive/MicroChromo).
+ * Copyright (c) 2020 UIUC.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "Common.h"
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "PluginBundle.h"
+
+//__________________________________________________________________________
+//                                                                          |\
+// AudioParameterFloatVariant                                               | |
+//__________________________________________________________________________| |
+//___________________________________________________________________________\|
 
 AudioParameterFloatVariant::AudioParameterFloatVariant(const String& parameterID,
     const String& parameterName,
@@ -45,8 +59,11 @@ void AudioParameterFloatVariant::valueChanged(float newValue)
     sendValueChangedMessageToListeners(convertTo0to1(newValue));
 }
 
-
-ComponentWithTable::ComponentWithTable() {}
+//__________________________________________________________________________
+//                                                                          |\
+// EditableTextCustomComponent                                              | |
+//__________________________________________________________________________| |
+//___________________________________________________________________________\|
 
 EditableTextCustomComponent::EditableTextCustomComponent(ComponentWithTable& td)
     : owner(td)
@@ -68,6 +85,12 @@ void EditableTextCustomComponent::setRowAndColumn(const int newRow, const int ne
     columnId = newColumn;
     setText(owner.getText(rowId, columnId), dontSendNotification);
 }
+
+//__________________________________________________________________________
+//                                                                          |\
+// ComboBoxCustomComponent                                                  | |
+//__________________________________________________________________________| |
+//___________________________________________________________________________\|
 
 ComboBoxCustomComponent::ComboBoxCustomComponent(ComponentWithTable& td)
     : owner(td)

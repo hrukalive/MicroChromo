@@ -1,20 +1,26 @@
 /*
-  ==============================================================================
-
-    Common.h
-    Created: 25 Mar 2020 9:36:47pm
-    Author:  bowen
-
-  ==============================================================================
-*/
+ * This file is part of the MicroChromo distribution
+ * (https://github.com/hrukalive/MicroChromo).
+ * Copyright (c) 2020 UIUC.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #pragma once
-
 
 //===----------------------------------------------------------------------===//
 // Pragmas
 //===----------------------------------------------------------------------===//
-
 // unreferenced formal parameter
 #pragma warning(disable: 4100)
 // hides class member
@@ -34,11 +40,17 @@
 #define TICKS_PER_BEAT 16
 #define VELOCITY_SAVE_ACCURACY 1024
 
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
 inline float roundBeat(float beat)
 {
     return jmax(0.0f, roundf(beat * static_cast<float>(TICKS_PER_BEAT)) / static_cast<float>(TICKS_PER_BEAT));
 }
 
+//===----------------------------------------------------------------------===//
+// Enumerations
+//===----------------------------------------------------------------------===//
 enum
 {
     mainMenuIdBase = 0x2717,
@@ -103,9 +115,10 @@ enum CommandIDs
     redoAction
 };
 
+//==============================================================================
 struct IdGenerator final
 {
-    using Id = int64;
+    using Id = int;
 
     static Id generateId()
     {
@@ -115,6 +128,7 @@ struct IdGenerator final
     static inline std::atomic<Id> idCounter{ 1 };
 };
 
+//==============================================================================
 class AudioParameterFloatVariant : public AudioParameterFloat
 {
 public:
@@ -134,11 +148,11 @@ protected:
     void valueChanged(float newValue) override;
 };
 
-
+//==============================================================================
 class ComponentWithTable : public Component, public TableListBoxModel
 {
 public:
-    ComponentWithTable();
+    ComponentWithTable() {}
     ~ComponentWithTable() = default;
 
     virtual String getText(const int rowNumber, const int columnNumber) const { return ""; };

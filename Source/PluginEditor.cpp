@@ -1,24 +1,40 @@
 /*
-  ==============================================================================
-
-    This file was auto-generated!
-
-    It contains the basic framework code for a JUCE plugin editor.
-
-  ==============================================================================
-*/
+ * This file is part of the MicroChromo distribution
+ * (https://github.com/hrukalive/MicroChromo).
+ * Copyright (c) 2020 UIUC.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "PluginEditor.h"
 
 #include "PluginProcessor.h"
 #include "PluginInstance.h"
 #include "PluginBundle.h"
+
+#include "ParameterCcLearn.h"
+
 #include "MainEditor.h"
+#include "ColorEditor.h"
 #include "SimpleNoteEditor.h"
 #include "SimpleTimeEditor.h"
-#include "ColorEditor.h"
 
-//==============================================================================
+//__________________________________________________________________________
+//                                                                          |\
+// PluginListWindow                                                         | |
+//__________________________________________________________________________| |
+//___________________________________________________________________________\|
+
 MicroChromoAudioProcessorEditor::PluginListWindow::PluginListWindow(MicroChromoAudioProcessorEditor &mw, AudioPluginFormatManager& pluginFormatManager)
     : DocumentWindow("Available Plugins",
         LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId),
@@ -46,7 +62,12 @@ void MicroChromoAudioProcessorEditor::PluginListWindow::closeButtonPressed()
     owner.pluginListWindow = nullptr;
 }
 
-//==============================================================================
+//__________________________________________________________________________
+//                                                                          |\
+// CustomTabbedComponent                                                    | |
+//__________________________________________________________________________| |
+//___________________________________________________________________________\|
+
 MicroChromoAudioProcessorEditor::CustomTabbedComponent::CustomTabbedComponent(TabbedButtonBar::Orientation orientation, MicroChromoAudioProcessorEditor& owner) :
     TabbedComponent(orientation), _owner(owner) {}
 
@@ -63,7 +84,12 @@ void MicroChromoAudioProcessorEditor::CustomTabbedComponent::currentTabChanged(i
     }
 }
 
-//==============================================================================
+//__________________________________________________________________________
+//                                                                          |\
+// MicroChromoAudioProcessorEditor                                          | |
+//__________________________________________________________________________| |
+//___________________________________________________________________________\|
+
 MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor& p)
     : AudioProcessorEditor (&p), 
     processor (p), 
@@ -157,72 +183,120 @@ MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
     mainEditor = nullptr;
 }
 
-//==============================================================================
-
-bool MicroChromoAudioProcessorEditor::keyPressed(const KeyPress& key)
+//===------------------------------------------------------------------===//
+// ApplicationCommandTarget
+//===------------------------------------------------------------------===//
+ApplicationCommandTarget* MicroChromoAudioProcessorEditor::getNextCommandTarget()
 {
-    if (key.isKeyCode(KeyPress::spaceKey))
-    {
-        playTransportBtn.triggerClick();
-        return true;
-    }
-    return false;
+    return findFirstTargetParentComponent();
 }
 
-void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* changed)
+void MicroChromoAudioProcessorEditor::getAllCommands(Array<CommandID>& c)
 {
-    if (changed == &knownPluginList)
-    {
-        if (auto savedPluginList = std::unique_ptr<XmlElement>(knownPluginList.createXml()))
-        {
-            appProperties.getUserSettings()->setValue("pluginList", savedPluginList.get());
-            appProperties.saveIfNeeded();
-        }
-    }
+    Array<CommandID> commands{
+        CommandIDs::openPluginScanner,
+        CommandIDs::openProject,
+        CommandIDs::saveProject,
+        CommandIDs::saveAsProject,
+        CommandIDs::importMidi,
+        CommandIDs::exportMidi,
+        CommandIDs::undoAction,
+        CommandIDs::redoAction
+    };
+    c.addArray(commands);
 }
 
-void MicroChromoAudioProcessorEditor::timerCallback()
+void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, ApplicationCommandInfo& result)
 {
-    switch (processor.getTransportState())
+    switch (commandID)
     {
-    case PLUGIN_PLAYING:
-    {
-        playTransportBtn.setEnabled(true);
-        stopTransportBtn.setEnabled(true);
-        transportSlider.setEnabled(true);
-        playTransportBtn.setButtonText("Pause");
+    case CommandIDs::openProject:
+        result.setInfo("Open Project", "Open project", "File", 0);
+#if JUCE_MAC
+        result.addDefaultKeypress('o', ModifierKeys::commandModifier);
+#else
+        result.addDefaultKeypress('o', ModifierKeys::ctrlModifier);
+#endif
         break;
-    }
-    case PLUGIN_PAUSED: case PLUGIN_STOPPED:
-    {
-        playTransportBtn.setEnabled(true);
-        stopTransportBtn.setEnabled(true);
-        transportSlider.setEnabled(true);
-        playTransportBtn.setButtonText("Play");
+    case CommandIDs::saveProject:
+        result.setInfo("Save Project", "Save project", "File", 0);
+#if JUCE_MAC
+        result.addDefaultKeypress('s', ModifierKeys::commandModifier);
+#else
+        result.addDefaultKeypress('s', ModifierKeys::ctrlModifier);
+#endif
         break;
-    }
+    case CommandIDs::saveAsProject:
+        result.setInfo("Save As", "Save as", "File", 0);
+#if JUCE_MAC
+        result.addDefaultKeypress('s', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
+#else
+        result.addDefaultKeypress('s', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
+#endif
+        break;
+    case CommandIDs::importMidi:
+        result.setInfo("Import MIDI", "Import MIDI file", "File", 0);
+        break;
+    case CommandIDs::exportMidi:
+        result.setInfo("Export MIDI", "Export MIDI file", "File", 0);
+        break;
+    case CommandIDs::undoAction:
+        result.setInfo("Undo " + undoManager.getUndoDescription(), "Undo", "Edit",
+            undoManager.canUndo() ? 0 : ApplicationCommandInfo::CommandFlags::isDisabled);
+#if JUCE_MAC
+        result.addDefaultKeypress('z', ModifierKeys::commandModifier);
+#else
+        result.addDefaultKeypress('z', ModifierKeys::ctrlModifier);
+#endif
+        break;
+    case CommandIDs::redoAction:
+        result.setInfo("Redo " + undoManager.getRedoDescription(), "Redo", "Edit",
+            undoManager.canRedo() ? 0 : ApplicationCommandInfo::CommandFlags::isDisabled);
+#if JUCE_MAC
+        result.addDefaultKeypress('z', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
+#else
+        result.addDefaultKeypress('z', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
+#endif
+        break;
+    case CommandIDs::openPluginScanner:
+        result.setInfo("Open Scanner", "Open the scanner for plugins", "Plugin", 0);
+#if JUCE_MAC
+        result.addDefaultKeypress('q', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
+#else
+        result.addDefaultKeypress('q', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
+#endif
+        break;
     default:
-    {
-        playTransportBtn.setEnabled(false);
-        stopTransportBtn.setEnabled(false);
-        transportSlider.setEnabled(false);
         break;
     }
+}
+bool MicroChromoAudioProcessorEditor::perform(const InvocationInfo& info)
+{
+    switch (info.commandID)
+    {
+    case CommandIDs::openPluginScanner:
+    {
+        if (pluginListWindow == nullptr)
+            pluginListWindow.reset(new PluginListWindow(*this, formatManager));
+        pluginListWindow->toFront(true);
+        break;
     }
-
-    auto seconds = processor.getTimeElapsed();
-    if (!transportSliderDragging)
-        transportSlider.setValue(seconds / processor.getMidiSequenceEndTime(), dontSendNotification);
-
-    std::ostringstream ss;
-    ss << std::setfill('0') << std::setw(2) << int(floor(seconds / 3600)) % 24
-        << std::setw(1) << ":" << std::setw(2) << int(floor(seconds / 60)) % 60
-        << std::setw(1) << ":" << std::setw(2) << int(floor(seconds)) % 60
-        << std::setw(1) << "." << std::setw(3) << int(floor(seconds * 1000)) % 1000;
-    transportLabel.setText(ss.str(), dontSendNotification);
+    case CommandIDs::openProject: processor.loadFromUserSpecifiedFile(true); break;
+    case CommandIDs::saveProject: processor.setChangedFlag(true); processor.save(true, true); break;
+    case CommandIDs::saveAsProject: processor.saveAsInteractive(true); break;
+    case CommandIDs::importMidi: mainEditor->dropButton->triggerClick(); break;
+    case CommandIDs::exportMidi: mainEditor->exportMidiDialog(); break;
+    case CommandIDs::undoAction: undoManager.undo(); break;
+    case CommandIDs::redoAction: undoManager.redo(); break;
+    default:
+        return false;
+    }
+    return true;
 }
 
-//==============================================================================
+//===------------------------------------------------------------------===//
+// MenuBarModel
+//===------------------------------------------------------------------===//
 StringArray MicroChromoAudioProcessorEditor::getMenuBarNames()
 {
     return { "File", "Edit", "Synth", "Effect", "Plugin" };
@@ -320,116 +394,86 @@ void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLe
     }
 }
 
-//==============================================================================
-ApplicationCommandTarget* MicroChromoAudioProcessorEditor::getNextCommandTarget()
+//===------------------------------------------------------------------===//
+// Keyboard Listeners
+//===------------------------------------------------------------------===//
+bool MicroChromoAudioProcessorEditor::keyPressed(const KeyPress& key)
 {
-    return findFirstTargetParentComponent();
-}
-
-void MicroChromoAudioProcessorEditor::getAllCommands(Array<CommandID>& c)
-{
-    Array<CommandID> commands{
-        CommandIDs::openPluginScanner,
-        CommandIDs::openProject,
-        CommandIDs::saveProject,
-        CommandIDs::saveAsProject,
-        CommandIDs::importMidi,
-        CommandIDs::exportMidi,
-        CommandIDs::undoAction,
-        CommandIDs::redoAction
-    };
-    c.addArray(commands);
-}
-
-void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, ApplicationCommandInfo& result)
-{
-    switch (commandID)
+    if (key.isKeyCode(KeyPress::spaceKey))
     {
-    case CommandIDs::openProject:
-        result.setInfo("Open Project", "Open project", "File", 0);
-#if JUCE_MAC
-        result.addDefaultKeypress('o', ModifierKeys::commandModifier);
-#else
-        result.addDefaultKeypress('o', ModifierKeys::ctrlModifier);
-#endif
+        playTransportBtn.triggerClick();
+        return true;
+    }
+    return false;
+}
+
+//===------------------------------------------------------------------===//
+// Callbacks
+//===------------------------------------------------------------------===//
+void MicroChromoAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* changed)
+{
+    if (changed == &knownPluginList)
+    {
+        if (auto savedPluginList = std::unique_ptr<XmlElement>(knownPluginList.createXml()))
+        {
+            appProperties.getUserSettings()->setValue("pluginList", savedPluginList.get());
+            appProperties.saveIfNeeded();
+        }
+    }
+}
+
+void MicroChromoAudioProcessorEditor::timerCallback()
+{
+    switch (processor.getTransportState())
+    {
+    case PLUGIN_PLAYING:
+    {
+        playTransportBtn.setEnabled(true);
+        stopTransportBtn.setEnabled(true);
+        transportSlider.setEnabled(true);
+        playTransportBtn.setButtonText("Pause");
         break;
-    case CommandIDs::saveProject:
-        result.setInfo("Save Project", "Save project", "File", 0);
-#if JUCE_MAC
-        result.addDefaultKeypress('s', ModifierKeys::commandModifier);
-#else
-        result.addDefaultKeypress('s', ModifierKeys::ctrlModifier);
-#endif
+    }
+    case PLUGIN_PAUSED: case PLUGIN_STOPPED:
+    {
+        playTransportBtn.setEnabled(true);
+        stopTransportBtn.setEnabled(true);
+        transportSlider.setEnabled(true);
+        playTransportBtn.setButtonText("Play");
         break;
-    case CommandIDs::saveAsProject:
-        result.setInfo("Save As", "Save as", "File", 0);
-#if JUCE_MAC
-        result.addDefaultKeypress('s', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
-#else
-        result.addDefaultKeypress('s', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
-#endif
-        break;
-    case CommandIDs::importMidi:
-        result.setInfo("Import MIDI", "Import MIDI file", "File", 0);
-        break;
-    case CommandIDs::exportMidi:
-        result.setInfo("Export MIDI", "Export MIDI file", "File", 0);
-        break;
-    case CommandIDs::undoAction:
-        result.setInfo("Undo " + undoManager.getUndoDescription(), "Undo", "Edit", 
-            undoManager.canUndo() ? 0 : ApplicationCommandInfo::CommandFlags::isDisabled);
-#if JUCE_MAC
-        result.addDefaultKeypress('z', ModifierKeys::commandModifier);
-#else
-        result.addDefaultKeypress('z', ModifierKeys::ctrlModifier);
-#endif
-        break;
-    case CommandIDs::redoAction:
-        result.setInfo("Redo " + undoManager.getRedoDescription(), "Redo", "Edit",
-            undoManager.canRedo() ? 0 : ApplicationCommandInfo::CommandFlags::isDisabled);
-#if JUCE_MAC
-        result.addDefaultKeypress('z', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
-#else
-        result.addDefaultKeypress('z', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
-#endif
-        break;
-    case CommandIDs::openPluginScanner:
-        result.setInfo("Open Scanner", "Open the scanner for plugins", "Plugin", 0);
-#if JUCE_MAC
-        result.addDefaultKeypress('q', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
-#else
-        result.addDefaultKeypress('q', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
-#endif
-        break;
+    }
     default:
+    {
+        playTransportBtn.setEnabled(false);
+        stopTransportBtn.setEnabled(false);
+        transportSlider.setEnabled(false);
         break;
     }
-}
-bool MicroChromoAudioProcessorEditor::perform(const InvocationInfo& info)
-{
-    switch (info.commandID)
-    {
-    case CommandIDs::openPluginScanner:
-    {
-        if (pluginListWindow == nullptr)
-            pluginListWindow.reset(new PluginListWindow(*this, formatManager));
-        pluginListWindow->toFront(true);
-        break;
     }
-    case CommandIDs::openProject: processor.loadFromUserSpecifiedFile(true); break;
-    case CommandIDs::saveProject: processor.setChangedFlag(true); processor.save(true, true); break;
-    case CommandIDs::saveAsProject: processor.saveAsInteractive(true); break;
-    case CommandIDs::importMidi: mainEditor->dropButton->triggerClick(); break;
-    case CommandIDs::exportMidi: mainEditor->exportMidiDialog(); break;
-    case CommandIDs::undoAction: undoManager.undo(); break;
-    case CommandIDs::redoAction: undoManager.redo(); break;
-    default:
-        return false;
-    }
-    return true;
+
+    auto seconds = processor.getTimeElapsed();
+    if (!transportSliderDragging)
+        transportSlider.setValue(seconds / processor.getMidiSequenceEndTime(), dontSendNotification);
+
+    std::ostringstream ss;
+    ss << std::setfill('0') << std::setw(2) << int(floor(seconds / 3600)) % 24
+        << std::setw(1) << ":" << std::setw(2) << int(floor(seconds / 60)) % 60
+        << std::setw(1) << ":" << std::setw(2) << int(floor(seconds)) % 60
+        << std::setw(1) << "." << std::setw(3) << int(floor(seconds * 1000)) % 1000;
+    transportLabel.setText(ss.str(), dontSendNotification);
 }
 
-//==============================================================================
+//===------------------------------------------------------------------===//
+// Project Listener
+//===------------------------------------------------------------------===//
+void MicroChromoAudioProcessorEditor::onReloadProjectContent(const Array<MidiTrack*>& tracks)
+{
+    AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon, "Done", "Project loaded.");
+}
+
+//===------------------------------------------------------------------===//
+// Components
+//===------------------------------------------------------------------===//
 void MicroChromoAudioProcessorEditor::paint (Graphics& g)
 {
     g.fillAll (getLookAndFeel().findColour (ResizableWindow::backgroundColourId));
@@ -454,9 +498,4 @@ void MicroChromoAudioProcessorEditor::resized()
 
     menuBar->setBounds(b.removeFromTop(LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight()));
     tabComp->setBounds(b);
-}
-
-void MicroChromoAudioProcessorEditor::onReloadProjectContent(const Array<MidiTrack*>& tracks)
-{
-    AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon, "Done", "Project loaded.");
 }

@@ -1,18 +1,26 @@
 /*
-  ==============================================================================
-
-    This file was auto-generated!
-
-    It contains the basic framework code for a JUCE plugin processor.
-
-  ==============================================================================
-*/
+ * This file is part of the MicroChromo distribution
+ * (https://github.com/hrukalive/MicroChromo).
+ * Copyright (c) 2020 UIUC.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "PluginProcessor.h"
-#include "PluginEditor.h"
-#include "InternalPlugins.h"
 
-#include "Note.h"
+#include "InternalPlugins.h"
+#include "ParameterCcLearn.h"
+#include "PluginEditor.h"
 
 //==============================================================================
 MicroChromoAudioProcessor::MicroChromoAudioProcessor()
@@ -101,10 +109,12 @@ MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
 }
 
 //==============================================================================
-const String MicroChromoAudioProcessor::getName() const
-{
-    return JucePlugin_Name;
-}
+bool MicroChromoAudioProcessor::hasEditor() const { return true; }
+
+AudioProcessorEditor* MicroChromoAudioProcessor::createEditor() { return new MicroChromoAudioProcessorEditor(*this); }
+
+//==============================================================================
+const String MicroChromoAudioProcessor::getName() const { return JucePlugin_Name; }
 
 bool MicroChromoAudioProcessor::acceptsMidi() const
 {
@@ -133,36 +143,35 @@ bool MicroChromoAudioProcessor::isMidiEffect() const
    #endif
 }
 
-double MicroChromoAudioProcessor::getTailLengthSeconds() const
-{
-    return 0.0;
-}
-
-int MicroChromoAudioProcessor::getNumPrograms()
-{
-    return 1;   // NB: some hosts don't cope very well if you tell them there are 0 programs,
-                // so this should be at least 1, even if you're not really implementing programs.
-}
-
-int MicroChromoAudioProcessor::getCurrentProgram()
-{
-    return 0;
-}
-
-void MicroChromoAudioProcessor::setCurrentProgram (int /*index*/)
-{
-}
-
-const String MicroChromoAudioProcessor::getProgramName (int /*index*/)
-{
-    return {};
-}
-
-void MicroChromoAudioProcessor::changeProgramName (int /*index*/, const String& /*newName*/)
-{
-}
+double MicroChromoAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
 //==============================================================================
+int MicroChromoAudioProcessor::getNumPrograms() { return 1; }
+
+int MicroChromoAudioProcessor::getCurrentProgram() { return 0; }
+
+void MicroChromoAudioProcessor::setCurrentProgram(int /*index*/) {}
+
+const String MicroChromoAudioProcessor::getProgramName(int /*index*/) { return {}; }
+
+void MicroChromoAudioProcessor::changeProgramName(int /*index*/, const String& /*newName*/) {}
+
+//===------------------------------------------------------------------===//
+// AudioProcessor
+//===------------------------------------------------------------------===//
+#ifndef JucePlugin_PreferredChannelConfigurations
+bool MicroChromoAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+{
+    if (layouts.getMainInputChannelSet() != AudioChannelSet::disabled()
+        && layouts.getMainInputChannelSet() != AudioChannelSet::stereo())
+        return false;
+    if (layouts.getMainOutputChannelSet() != AudioChannelSet::mono()
+        && layouts.getMainOutputChannelSet() != AudioChannelSet::stereo())
+        return false;
+    return true;
+}
+#endif
+
 void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     sampleLength = 1.0 / sampleRate;
@@ -174,6 +183,8 @@ void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     audioBufferArrayB.clear();
     midiBufferArrayA.clear();
     midiBufferArrayB.clear();
+    notesMidiSeq.clear();
+    ccMidiSeq.clear();
 
     synthBundleTotalNumInputChannels = synthBundle->getTotalNumInputChannels();
     synthBundleMainBusNumInputChannels = synthBundle->getMainBusNumInputChannels();
@@ -190,6 +201,8 @@ void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
         audioBufferArrayB.add(new AudioBuffer<float>(bChannelNum, samplesPerBlock));
         midiBufferArrayA.add(new MidiBuffer());
         midiBufferArrayB.add(new MidiBuffer());
+        notesMidiSeq.add(new MidiMessageSequence());
+        ccMidiSeq.add(new MidiMessageSequence());
     }
 
     synthBundle->prepareToPlay(sampleRate, samplesPerBlock);
@@ -208,109 +221,8 @@ void MicroChromoAudioProcessor::releaseResources()
     audioBufferArrayB.clear();
     midiBufferArrayA.clear();
     midiBufferArrayB.clear();
-}
-
-void MicroChromoAudioProcessor::addMessageToAllBuffer(OwnedArray<MidiBuffer>& midiBuffers, MidiMessage& msg, int sampleOffset)
-{
-    for (auto* midiBuffer : midiBuffers)
-        midiBuffer->addEvent(msg, sampleOffset);
-}
-
-void MicroChromoAudioProcessor::sendAllNotesOff()
-{
-    for (auto* midiBuffer : midiBufferArrayA)
-    {
-        midiBuffer->clear();
-        for (auto j = 1; j <= 16; j++)
-        {
-            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 16);
-            for (auto& n : playingNotes)
-                midiBuffer->addEvent(MidiMessage::noteOff(j, n.first), 18);
-            playingNotes.clear();
-        }
-    }
-    for (auto* midiBuffer : midiBufferArrayB)
-    {
-        midiBuffer->clear();
-        for (auto j = 1; j <= 16; j++)
-        {
-            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 16);
-        }
-    }
-    DBG("All note off");
-
-    isPlayingNote = false;
-}
-
-void MicroChromoAudioProcessor::sendAllNotesOffPanic()
-{
-    for (auto* midiBuffer : midiBufferArrayA)
-    {
-        midiBuffer->clear();
-        for (auto j = 1; j <= 16; j++)
-        {
-            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 18);
-            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 18);
-            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 18);
-            for (int k = 0; k < 128; k++)
-                midiBuffer->addEvent(MidiMessage::noteOff(j, k), 18);
-            playingNotes.clear();
-        }
-    }
-    for (auto* midiBuffer : midiBufferArrayB)
-    {
-        midiBuffer->clear();
-        for (auto j = 1; j <= 16; j++)
-        {
-            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 16);
-            for (int k = 0; k < 128; k++)
-                midiBuffer->addEvent(MidiMessage::noteOff(j, k), 18);
-        }
-    }
-    DBG("All note off (panic)");
-
-    isPlayingNote = false;
-}
-
-#ifndef JucePlugin_PreferredChannelConfigurations
-bool MicroChromoAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
-{
-    if (layouts.getMainInputChannelSet() != AudioChannelSet::disabled()
-        && layouts.getMainInputChannelSet() != AudioChannelSet::stereo())
-        return false;
-    if (layouts.getMainOutputChannelSet() != AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != AudioChannelSet::stereo())
-        return false;
-    return true;
-}
-#endif
-
-void MicroChromoAudioProcessor::hiResTimerCallback()
-{
-    if (!isHostPlaying)
-    {
-        ScopedLock lock(transportLock);
-        switch (transportState)
-        {
-        case HOST_PLAYING: transportState = PLUGIN_PAUSED; break;
-        case PLUGIN_PLAYING: transportTimeElasped += getTimerInterval() / 1000.0; break;
-        case PLUGIN_QUERY_PLAY: transportState = PLUGIN_PLAYING; break;
-        case PLUGIN_QUERY_PAUSE: transportState = PLUGIN_PAUSED; break;
-        case PLUGIN_QUERY_STOP: transportTimeElasped = 0; transportState = PLUGIN_STOPPED; break;
-        default:
-            break;
-        }
-        if (transportTimeElasped > rangeEndTime)
-            transportState = PLUGIN_QUERY_STOP;
-    }
-    else
-        transportState = HOST_PLAYING;
+    notesMidiSeq.clear();
+    ccMidiSeq.clear();
 }
 
 void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
@@ -396,14 +308,13 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
     {
         bool noteOffSent = false;
         //DBG("[PROC_BLOCK] " << startTime << " " << endTime << " | " << nextStartTime);
-        if (nextStartTime > 0.0 && std::abs(startTime - nextStartTime) > bufferLength)
+        if ((isHostPlaying && nextStartTime > 0.0 && std::abs(startTime - nextStartTime) > bufferLength)
+            || (!isHostPlaying && hasSeeked))
         {
-            if (!noteOffSent)
-            {
-                sendAllNotesOff();
-                ensureCcValue();
-                noteOffSent = true;
-            }
+            sendAllNotesOff();
+            ensureCcValue();
+            noteOffSent = true;
+            hasSeeked = false;
             DBG("[PROC_BLOCK] Playhead moved by cursor or looping");
         }
         nextStartTime = endTime;
@@ -517,12 +428,12 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
                         if (evt->message.getTimeStamp() >= startTime && evt->message.getTimeStamp() < endTime)
                         {
                             midiBufferArrayA[i]->addEvent(evt->message, roundDoubleToInt((evt->message.getTimeStamp() - startTime) * sampleLength));
-                            if (evt->message.isNoteOn())
+                            if (evt->message.isNoteOn() && playingNotes.find(evt->message.getNoteNumber()) == playingNotes.end())
                             {
                                 playingNotes[evt->message.getNoteNumber()] = evt->message.getTimeStamp();
                                 DBG("[PROC_BLOCK] Play note: " << evt->message.getNoteNumber() << " at " << evt->message.getTimeStamp());
                             }
-                            else if (evt->message.isNoteOff())
+                            else if (evt->message.isNoteOff() && playingNotes.find(evt->message.getNoteNumber()) != playingNotes.end())
                             {
                                 playingNotes.erase(evt->message.getNoteNumber());
                                 DBG("[PROC_BLOCK] Stop note: " << evt->message.getNoteNumber() << " at " << evt->message.getTimeStamp());
@@ -595,6 +506,317 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
         buffer.clear(i, 0, buffer.getNumSamples());
 }
 
+//===------------------------------------------------------------------===//
+// Private Helpers
+//===------------------------------------------------------------------===//
+void MicroChromoAudioProcessor::addMessageToAllBuffer(OwnedArray<MidiBuffer>& midiBuffers, MidiMessage& msg, int sampleOffset)
+{
+    for (auto* midiBuffer : midiBuffers)
+        midiBuffer->addEvent(msg, sampleOffset);
+}
+
+void MicroChromoAudioProcessor::sendAllNotesOff()
+{
+    for (auto* midiBuffer : midiBufferArrayA)
+    {
+        midiBuffer->clear();
+        for (auto j = 1; j <= 16; j++)
+        {
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 16);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 16);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 16);
+            for (auto& n : playingNotes)
+                midiBuffer->addEvent(MidiMessage::noteOff(j, n.first), 18);
+            playingNotes.clear();
+        }
+    }
+    for (auto* midiBuffer : midiBufferArrayB)
+    {
+        midiBuffer->clear();
+        for (auto j = 1; j <= 16; j++)
+        {
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 16);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 16);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 16);
+        }
+    }
+    DBG("All note off");
+
+    isPlayingNote = false;
+}
+
+void MicroChromoAudioProcessor::sendAllNotesOffPanic()
+{
+    for (auto* midiBuffer : midiBufferArrayA)
+    {
+        midiBuffer->clear();
+        for (auto j = 1; j <= 16; j++)
+        {
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 18);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 18);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 18);
+            for (int k = 0; k < 128; k++)
+                midiBuffer->addEvent(MidiMessage::noteOff(j, k), 18);
+            playingNotes.clear();
+        }
+    }
+    for (auto* midiBuffer : midiBufferArrayB)
+    {
+        midiBuffer->clear();
+        for (auto j = 1; j <= 16; j++)
+        {
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 16);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 16);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 16);
+            for (int k = 0; k < 128; k++)
+                midiBuffer->addEvent(MidiMessage::noteOff(j, k), 18);
+        }
+    }
+    DBG("All note off (panic)");
+
+    isPlayingNote = false;
+}
+
+//==============================================================================
+void MicroChromoAudioProcessor::resetState()
+{
+    undoManager.clearUndoHistory();
+    numInstancesParameter = 1;
+    parameterSlotNumber = 16;
+    selectedPreset = "---INIT---";
+
+    notesMidiSeq.clear();
+    ccMidiSeq.clear();
+
+    ccBase = 102;
+    psModSource = USE_NONE;
+    midiChannel = 0;
+
+    properlyPrepared = false;
+    isPlayingNote = false;
+    panicNoteOff = false;
+    isWithIn = -1;
+    wasStopped = true;
+    playingNotes.clear();
+
+    isHostPlaying = false;
+    transportTimeElasped = 0;
+    transportState = PLUGIN_STOPPED;
+
+    nextStartTime = -1.0;
+    rangeStartTime = FLT_MAX;
+    rangeEndTime = -FLT_MAX;
+    sampleLength = -1;
+    bufferLength = -1;
+    updateMidSeqSus = false;
+    updateModSrcSus = false;
+    pluginLoadSus = false;
+}
+
+void MicroChromoAudioProcessor::getStateInformation (MemoryBlock& destData)
+{
+    auto validDesc = [](PluginDescription desc) {
+        return desc.name.isNotEmpty() && desc.uid != 0;
+    };
+
+    //auto state = parameters.copyState();
+
+    std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>("root");
+    xml->setAttribute("lastDocumentFilename", lastDocumentFilename);
+    xml->setAttribute("numInstances", numInstancesParameter);
+    xml->setAttribute("midiChannel", midiChannel);
+    xml->setAttribute("ccBase", ccBase);
+    xml->setAttribute("isModSrcKontakt", psModSource == USE_KONTAKT ? 1 : 0);
+    xml->setAttribute("selectedPreset", selectedPreset);
+
+    //xml->addChildElement(new XmlElement(*state.createXml()));
+    xml->addChildElement(new XmlElement(*synthBundle->createXml("synthBundle")));
+    xml->addChildElement(new XmlElement(*psBundle->createXml("pitchshiftBundle")));
+
+    auto* projectNode = new XmlElement(*project.serialize().createXml());
+    xml->addChildElement(projectNode);
+
+    copyXmlToBinary(*xml, destData);
+}
+
+void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+{
+    auto validDesc = [](PluginDescription desc) {
+        return desc.name.isNotEmpty() && desc.uid != 0;
+    };
+
+    std::unique_ptr<XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
+    if (xml.get() != nullptr)
+    {
+        if (xml->hasTagName("root"))
+        {
+            lastDocumentFilename = xml->getStringAttribute("lastDocumentFilename", "");
+            synthBundle->closeAllWindows();
+            psBundle->closeAllWindows();
+            numInstancesParameter = xml->getIntAttribute("numInstances", 1);
+            updateMidiChannel(xml->getIntAttribute("midiChannel", 1));
+            updateCcMidiSequenceWithNewBase(xml->getIntAttribute("ccBase", 102));
+            selectedPreset = xml->getStringAttribute("selectedPreset", "---INIT---");
+
+            auto isModSrcKontakt = xml->getIntAttribute("isModSrcKontakt", 0);
+            if (auto* child = xml->getChildByName("synthBundle"))
+            {
+                PluginDescription desc;
+                desc.loadFromXml(*(child->getChildByName("PLUGIN")));
+                if (validDesc(desc))
+                {
+                    this->addPlugin(desc, true, [copyChild = *child, isModSrcKontakt, this](PluginBundle& bundle) {
+                        bundle.loadFromXml(&copyChild, "synthBundle");
+                        if (isModSrcKontakt)
+                            this->toggleUseKontakt(true);
+                        });
+                }
+            }
+
+            if (auto* child = xml->getChildByName("pitchshiftBundle"))
+            {
+                PluginDescription desc;
+                desc.loadFromXml(*(child->getChildByName("PLUGIN")));
+                if (validDesc(desc))
+                {
+                    this->addPlugin(desc, false, [copyChild = *child](PluginBundle& bundle) {
+                        bundle.loadFromXml(&copyChild, "pitchshiftBundle");
+                        });
+                }
+            }
+
+            if (auto* child = xml->getChildByName("project"))
+            {
+                project.deserialize(ValueTree::fromXml(*child));
+            }
+        }
+    }
+}
+
+//===------------------------------------------------------------------===//
+// Callbacks
+//===------------------------------------------------------------------===//
+void MicroChromoAudioProcessor::changeListenerCallback(ChangeBroadcaster* changed)
+{
+    if (changed == &knownPluginList)
+    {
+        synthKnownPluginList.clear();
+        psKnownPluginList.clear();
+        for (auto& type : knownPluginList.getTypes())
+        {
+            if (type.isInstrument)
+                synthKnownPluginList.addType(type);
+            else
+                psKnownPluginList.addType(type);
+        }
+    }
+}
+
+void MicroChromoAudioProcessor::startLoadingPlugin()
+{
+    pluginLoadSus = true;
+    suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
+}
+
+void MicroChromoAudioProcessor::finishLoadingPlugin()
+{
+    if (synthBundle->finishedLoading() && psBundle->finishedLoading())
+    {
+        if (properlyPrepared.load())
+        {
+            prepareToPlay(getSampleRate(), getBlockSize());
+            updateHostDisplay();
+        }
+
+        updatePitchShiftModulationSource();
+
+        pluginLoadSus = false;
+        suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
+    }
+}
+
+//===------------------------------------------------------------------===//
+// Internal Playback
+//===------------------------------------------------------------------===//
+void MicroChromoAudioProcessor::hiResTimerCallback()
+{
+    if (!isHostPlaying)
+    {
+        ScopedLock lock(transportLock);
+        switch (transportState)
+        {
+        case HOST_PLAYING: transportState = PLUGIN_PAUSED; break;
+        case PLUGIN_PLAYING: transportTimeElasped += getTimerInterval() / 1000.0; break;
+        case PLUGIN_QUERY_PLAY: transportState = PLUGIN_PLAYING; break;
+        case PLUGIN_QUERY_PAUSE: transportState = PLUGIN_PAUSED; break;
+        case PLUGIN_QUERY_STOP: transportTimeElasped = 0; transportState = PLUGIN_STOPPED; break;
+        default:
+            break;
+        }
+        if (transportTimeElasped > rangeEndTime)
+            transportState = PLUGIN_QUERY_STOP;
+    }
+    else
+        transportState = HOST_PLAYING;
+}
+
+void MicroChromoAudioProcessor::togglePlayback()
+{
+    ScopedLock lock(transportLock);
+    if (transportState == PLUGIN_PAUSED || transportState == PLUGIN_STOPPED)
+        transportState = PLUGIN_QUERY_PLAY;
+    else if (transportState == PLUGIN_PLAYING)
+        transportState = PLUGIN_QUERY_PAUSE;
+}
+
+void MicroChromoAudioProcessor::stopPlayback()
+{
+    ScopedLock lock(transportLock);
+    if (transportState == PLUGIN_PLAYING || transportState == PLUGIN_PAUSED)
+        transportState = PLUGIN_QUERY_STOP;
+}
+
+void MicroChromoAudioProcessor::setTimeForPlayback(double time)
+{
+    ScopedLock lock(transportLock);
+    transportTimeElasped = time;
+    hasSeeked = true;
+}
+
+int MicroChromoAudioProcessor::getTransportState()
+{
+    return transportState;
+}
+
+double MicroChromoAudioProcessor::getTimeElapsed()
+{
+    return transportTimeElasped;
+}
+
+//===------------------------------------------------------------------===//
+// Accessors
+//===------------------------------------------------------------------===//
+bool MicroChromoAudioProcessor::canLearnCc(const PluginBundle* bundle)
+{
+    if (psModSource == USE_KONTAKT)
+        return false;
+    if (synthBundle.get() == bundle && psBundle->getCcLearnModule().hasLearned())
+        return false;
+    if (psBundle.get() == bundle && synthBundle->getCcLearnModule().hasLearned())
+        return false;
+    return true;
+}
+
+bool MicroChromoAudioProcessor::canChooseKontakt()
+{
+    if (!synthBundle->getCcLearnModule().hasLearned() && !psBundle->getCcLearnModule().hasLearned())
+        return true;
+    return false;
+}
+
+//===------------------------------------------------------------------===//
+// Helpers
+//===------------------------------------------------------------------===//
 void MicroChromoAudioProcessor::adjustInstanceNumber(int newNumInstances)
 {
     psBundle->adjustInstanceNumber(newNumInstances);
@@ -603,6 +825,26 @@ void MicroChromoAudioProcessor::adjustInstanceNumber(int newNumInstances)
             this->numInstancesParameter = newNumInstances;
             updateMidiSequence();
         });
+}
+
+void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool isSynth, std::function<void(PluginBundle&)> callback)
+{
+    if (isSynth)
+    {
+        synthBundle->loadPlugin(desc, numInstancesParameter, [callback, this](PluginBundle& bundle)
+            {
+                if (callback)
+                    callback(bundle);
+            });
+    }
+    else
+    {
+        psBundle->loadPlugin(desc, numInstancesParameter, [callback, this](PluginBundle& bundle)
+            {
+                if (callback)
+                    callback(bundle);
+            });
+    }
 }
 
 void MicroChromoAudioProcessor::updateMidiSequence(int newBase)
@@ -676,223 +918,22 @@ void MicroChromoAudioProcessor::updateCcMidiSequenceWithNewBase(int newBase)
     DBG("CC base updated to " << newBase);
 }
 
-//==============================================================================
-bool MicroChromoAudioProcessor::hasEditor() const
+void MicroChromoAudioProcessor::updateMidiChannel(int newMidiChannel)
 {
-    return true;
+    if (midiChannel == newMidiChannel)
+        return;
+
+    midiChannel = newMidiChannel;
 }
 
-AudioProcessorEditor* MicroChromoAudioProcessor::createEditor()
+void MicroChromoAudioProcessor::updateKontaktCcBase(int newCcBase)
 {
-    return new MicroChromoAudioProcessorEditor (*this);
-}
-
-//==============================================================================
-void MicroChromoAudioProcessor::reset()
-{
-    undoManager.clearUndoHistory();
-    numInstancesParameter = 1;
-    parameterSlotNumber = 16;
-    selectedPreset = "---INIT---";
-
-    notesMidiSeq.clear();
-    ccMidiSeq.clear();
-
-    ccBase = 102;
-    psModSource = USE_NONE;
-    midiChannel = 0;
-
-    properlyPrepared = false;
-    isPlayingNote = false;
-    panicNoteOff = false;
-    isWithIn = -1;
-    wasStopped = true;
-    playingNotes.clear();
-
-    isHostPlaying = false;
-    transportTimeElasped = 0;
-    transportState = PLUGIN_STOPPED;
-
-    nextStartTime = -1.0;
-    rangeStartTime = FLT_MAX;
-    rangeEndTime = -FLT_MAX;
-    sampleLength = -1;
-    bufferLength = -1;
-    updateMidSeqSus = false;
-    updateModSrcSus = false;
-    pluginLoadSus = false;
-}
-
-void MicroChromoAudioProcessor::getStateInformation (MemoryBlock& destData)
-{
-    auto validDesc = [](PluginDescription desc) {
-        return desc.name.isNotEmpty() && desc.uid != 0;
-    };
-
-    //auto state = parameters.copyState();
-
-    std::unique_ptr<XmlElement> xml = std::make_unique<XmlElement>("root");
-    xml->setAttribute("lastDocumentFilename", lastDocumentFilename);
-    xml->setAttribute("numInstances", numInstancesParameter);
-    xml->setAttribute("midiChannel", midiChannel);
-    xml->setAttribute("ccBase", ccBase);
-    xml->setAttribute("isModSrcKontakt", psModSource == USE_KONTAKT ? 1 : 0);
-    xml->setAttribute("selectedPreset", selectedPreset);
-
-    //xml->addChildElement(new XmlElement(*state.createXml()));
-    xml->addChildElement(new XmlElement(*synthBundle->createXml("synthBundle")));
-    xml->addChildElement(new XmlElement(*psBundle->createXml("pitchshiftBundle")));
-
-    auto* projectNode = new XmlElement(*project.serialize().createXml());
-    xml->addChildElement(projectNode);
-
-    copyXmlToBinary(*xml, destData);
-    xml->writeTo(File("J:\\TEMPS\\13-SP20\\MUS 499\\Test.xml"));
-}
-
-void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
-{
-    auto validDesc = [](PluginDescription desc) {
-        return desc.name.isNotEmpty() && desc.uid != 0;
-    };
-
-    std::unique_ptr<XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
-    if (xml.get() != nullptr)
+    if (psModSource != USE_KONTAKT)
     {
-        if (xml->hasTagName("root"))
-        {
-            lastDocumentFilename = xml->getStringAttribute("lastDocumentFilename", "");
-            synthBundle->closeAllWindows();
-            psBundle->closeAllWindows();
-            numInstancesParameter = xml->getIntAttribute("numInstances", 1);
-            updateMidiChannel(xml->getIntAttribute("midiChannel", 1));
-            updateCcMidiSequenceWithNewBase(xml->getIntAttribute("ccBase", 102));
-            selectedPreset = xml->getStringAttribute("selectedPreset", "---INIT---");
-
-            auto isModSrcKontakt = xml->getIntAttribute("isModSrcKontakt", 0);
-            if (auto* child = xml->getChildByName("synthBundle"))
-            {
-                PluginDescription desc;
-                desc.loadFromXml(*(child->getChildByName("PLUGIN")));
-                if (validDesc(desc))
-                {
-                    this->addPlugin(desc, true, [copyChild = *child, isModSrcKontakt, this](PluginBundle& bundle) {
-                        bundle.loadFromXml(&copyChild, "synthBundle");
-                        if (isModSrcKontakt)
-                            this->toggleUseKontakt(true);
-                        });
-                }
-            }
-
-            if (auto* child = xml->getChildByName("pitchshiftBundle"))
-            {
-                PluginDescription desc;
-                desc.loadFromXml(*(child->getChildByName("PLUGIN")));
-                if (validDesc(desc))
-                {
-                    this->addPlugin(desc, false, [copyChild = *child](PluginBundle& bundle) {
-                        bundle.loadFromXml(&copyChild, "pitchshiftBundle");
-                        });
-                }
-            }
-
-            if (auto* child = xml->getChildByName("project"))
-            {
-                project.deserialize(ValueTree::fromXml(*child));
-            }
-        }
+        AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Error", "Not using Kontakt but trying to specifying CC Base");
+        return;
     }
-}
-
-void MicroChromoAudioProcessor::changeListenerCallback(ChangeBroadcaster* changed)
-{
-    if (changed == &knownPluginList)
-    {
-        synthKnownPluginList.clear();
-        psKnownPluginList.clear();
-        for (auto& type : knownPluginList.getTypes())
-        {
-            if (type.isInstrument)
-                synthKnownPluginList.addType(type);
-            else
-                psKnownPluginList.addType(type);
-        }
-    }
-}
-
-void MicroChromoAudioProcessor::addPlugin(const PluginDescription& desc, bool isSynth, std::function<void(PluginBundle&)> callback)
-{
-    if (isSynth)
-    {
-        synthBundle->loadPlugin(desc, numInstancesParameter, [callback, this](PluginBundle& bundle)
-            {
-                if (callback)
-                    callback(bundle);
-            });
-    }
-    else
-    {
-        psBundle->loadPlugin(desc, numInstancesParameter, [callback, this](PluginBundle& bundle)
-            {
-                if (callback)
-                    callback(bundle);
-            });
-    }
-}
-
-void MicroChromoAudioProcessor::startLoadingPlugin()
-{
-    pluginLoadSus = true;
-    suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
-}
-
-void MicroChromoAudioProcessor::finishLoadingPlugin()
-{
-    if (synthBundle->finishedLoading() && psBundle->finishedLoading())
-    {
-        if (properlyPrepared.load())
-        {
-            prepareToPlay(getSampleRate(), getBlockSize());
-            updateHostDisplay();
-        }
-
-        updatePitchShiftModulationSource();
-
-        pluginLoadSus = false;
-        suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
-    }
-}
-
-void MicroChromoAudioProcessor::togglePlayback()
-{
-    ScopedLock lock(transportLock);
-    if (transportState == PLUGIN_PAUSED || transportState == PLUGIN_STOPPED)
-        transportState = PLUGIN_QUERY_PLAY;
-    else if (transportState == PLUGIN_PLAYING)
-        transportState = PLUGIN_QUERY_PAUSE;
-}
-
-void MicroChromoAudioProcessor::stopPlayback()
-{
-    ScopedLock lock(transportLock);
-    if (transportState == PLUGIN_PLAYING || transportState == PLUGIN_PAUSED)
-        transportState = PLUGIN_QUERY_STOP;
-}
-
-void MicroChromoAudioProcessor::setTimeForPlayback(double time)
-{
-    ScopedLock lock(transportLock);
-    transportTimeElasped = time;
-}
-
-int MicroChromoAudioProcessor::getTransportState()
-{
-    return transportState;
-}
-
-double MicroChromoAudioProcessor::getTimeElapsed()
-{
-    return transportTimeElasped;
+    updateCcMidiSequenceWithNewBase(newCcBase);
 }
 
 void MicroChromoAudioProcessor::updatePitchShiftModulationSource(int useKontakt)
@@ -954,24 +995,6 @@ void MicroChromoAudioProcessor::updatePitchShiftModulationSource(int useKontakt)
     suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
 }
 
-bool MicroChromoAudioProcessor::canLearnCc(const PluginBundle* bundle)
-{
-    if (psModSource == USE_KONTAKT)
-        return false;
-    if (synthBundle.get() == bundle && psBundle->getCcLearnModule().hasLearned())
-        return false;
-    if (psBundle.get() == bundle && synthBundle->getCcLearnModule().hasLearned())
-        return false;
-    return true;
-}
-
-bool MicroChromoAudioProcessor::canChooseKontakt()
-{
-    if (!synthBundle->getCcLearnModule().hasLearned() && !psBundle->getCcLearnModule().hasLearned())
-        return true;
-    return false;
-}
-
 void MicroChromoAudioProcessor::toggleUseKontakt(bool isOn)
 {
     if (!synthBundle->isKontakt())
@@ -980,29 +1003,6 @@ void MicroChromoAudioProcessor::toggleUseKontakt(bool isOn)
         updatePitchShiftModulationSource(1);
     else
         updatePitchShiftModulationSource(-1);
-}
-
-int MicroChromoAudioProcessor::getPitchShiftModulationSource()
-{
-    return psModSource;
-}
-
-void MicroChromoAudioProcessor::updateMidiChannel(int newMidiChannel)
-{
-    if (midiChannel == newMidiChannel)
-        return;
-
-    midiChannel = newMidiChannel;
-}
-
-void MicroChromoAudioProcessor::updateKontaktCcBase(int newCcBase)
-{
-    if (psModSource != USE_KONTAKT)
-    {
-        AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::WarningIcon, "Error", "Not using Kontakt but trying to specifying CC Base");
-        return;
-    }
-    updateCcMidiSequenceWithNewBase(newCcBase);
 }
 
 //===------------------------------------------------------------------===//
@@ -1025,7 +1025,7 @@ Result MicroChromoAudioProcessor::loadDocument(const File& file)
         suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
 
         stopTimer();
-        reset();
+        resetState();
         setStateInformation(block.getData(), block.getSize());
         project.broadcastReloadProjectContent();
 

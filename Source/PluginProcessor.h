@@ -1,12 +1,20 @@
 /*
-  ==============================================================================
-
-    This file was auto-generated!
-
-    It contains the basic framework code for a JUCE plugin processor.
-
-  ==============================================================================
-*/
+ * This file is part of the MicroChromo distribution
+ * (https://github.com/hrukalive/MicroChromo).
+ * Copyright (c) 2020 UIUC.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #pragma once
 
@@ -18,23 +26,21 @@
 #include "Note.h"
 
 //==============================================================================
-/**
-*/
 class MicroChromoAudioProcessor : public AudioProcessor, public ChangeListener, public FileBasedDocument, public HighResolutionTimer
 {
 public:
-    //==============================================================================
     MicroChromoAudioProcessor();
     ~MicroChromoAudioProcessor();
 
-    //==============================================================================
+    //===------------------------------------------------------------------===//
+    // AudioProcessor
+    //===------------------------------------------------------------------===//
+#ifndef JucePlugin_PreferredChannelConfigurations
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
+#endif
+
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
-
-   #ifndef JucePlugin_PreferredChannelConfigurations
-    bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
-   #endif
-    void hiResTimerCallback() override;
     void processBlock (AudioBuffer<float>&, MidiBuffer&) override;
 
     //==============================================================================
@@ -57,65 +63,77 @@ public:
     void changeProgramName (int index, const String& newName) override;
 
     //==============================================================================
-    void addPlugin(const PluginDescription& desc, bool isSynth, std::function<void(PluginBundle&)> callback = nullptr);
-    void startLoadingPlugin();
-    void finishLoadingPlugin();
+    void resetState();
+    void getStateInformation(MemoryBlock& destData) override;
+    void setStateInformation(const void* data, int sizeInBytes) override;
 
-    //==============================================================================
-    void reset();
-    void getStateInformation (MemoryBlock& destData) override;
-    void setStateInformation (const void* data, int sizeInBytes) override;
-
-    void changeListenerCallback(ChangeBroadcaster* changed) override;
-    void adjustInstanceNumber(int newNumInstances);
-
-    void updateMidiSequence(int newBase = -1);
-    void updateCcMidiSequenceWithNewBase(int newBase);
-
-    //==============================================================================
+    //===------------------------------------------------------------------===//
+    // Internal Playback
+    //===------------------------------------------------------------------===//
+    void hiResTimerCallback() override;
     void togglePlayback();
     void stopPlayback();
     void setTimeForPlayback(double time);
     int getTransportState();
     double getTimeElapsed();
 
-    //==============================================================================
+    //===------------------------------------------------------------------===//
+    // Callbacks
+    //===------------------------------------------------------------------===//
+    void changeListenerCallback(ChangeBroadcaster* changed) override;
+    void startLoadingPlugin();
+    void finishLoadingPlugin();
+
+    //===------------------------------------------------------------------===//
+    // Accessors
+    //===------------------------------------------------------------------===//
     ApplicationProperties& getApplicationProperties() { return appProperties; }
     AudioPluginFormatManager& getAudioPluginFormatManager() { return formatManager; }
+    UndoManager& getUndoManager() noexcept { return undoManager; }
+
     KnownPluginList& getKnownPluginList() { return knownPluginList; }
     KnownPluginList& getSynthKnownPluginList() { return synthKnownPluginList; }
     KnownPluginList& getPsKnownPluginList() { return psKnownPluginList; }
-    std::shared_ptr<PluginBundle> getSynthBundlePtr() { return synthBundle; }
-    std::shared_ptr<PluginBundle> getPSBundlePtr() { return psBundle; }
-    int getNumInstances() { return numInstancesParameter; }
-    AudioProcessorValueTreeState& getValueTreeState() { return parameters; }
-    UndoManager& getUndoManager() noexcept { return undoManager; }
-    int getParameterSlotNumber() { return parameterSlotNumber; }
-    int getMidiChannel() { return midiChannel; }
-    int getCcBase() { return ccBase; }
-    String getSelectedColorPresetName() { return selectedPreset; }
-    void setSelectedColorPresetName(String name) { selectedPreset = name; }
-    double getMidiSequenceEndTime() { return rangeEndTime; }
 
+    AudioProcessorValueTreeState& getValueTreeState() { return parameters; }
     Project& getProject() { return project; }
 
-    OwnedArray<MidiMessageSequence>& getNoteMidiSequence() { return notesMidiSeq; }
-    OwnedArray<MidiMessageSequence>& getCcMidiSequence() { return ccMidiSeq; }
+    std::shared_ptr<PluginBundle> getSynthBundlePtr() { return synthBundle; }
+    std::shared_ptr<PluginBundle> getPSBundlePtr() { return psBundle; }
+    int getNumInstances() const noexcept { return numInstancesParameter; }
+    int getParameterSlotNumber() const noexcept { return parameterSlotNumber; }
+    int getMidiChannel() const noexcept { return midiChannel; }
+    int getCcBase() const noexcept { return ccBase; }
+    double getMidiSequenceEndTime() const noexcept { return rangeEndTime; }
+    int getPitchShiftModulationSource() const noexcept { return psModSource; }
 
-    void updatePitchShiftModulationSource(int useKontakt = 0);
-    int getPitchShiftModulationSource();
     bool canLearnCc(const PluginBundle* bundle);
     bool canChooseKontakt();
-    void toggleUseKontakt(bool isOn);
+    String getSelectedColorPresetName() const noexcept { return selectedPreset; }
+    void setSelectedColorPresetName(String name) { selectedPreset = name; }
 
+    //===------------------------------------------------------------------===//
+    // Helpers
+    //===------------------------------------------------------------------===//
+    void adjustInstanceNumber(int newNumInstances);
+    void addPlugin(const PluginDescription& desc, bool isSynth, std::function<void(PluginBundle&)> callback = nullptr);
+
+    void updateMidiSequence(int newBase = -1);
+    void updateCcMidiSequenceWithNewBase(int newBase);
     void updateMidiChannel(int newMidiChannel);
     void updateKontaktCcBase(int newCcBase);
+
+    void updatePitchShiftModulationSource(int useKontakt = 0);
+    void toggleUseKontakt(bool isOn);
 
     void triggerPanic() { panicNoteOff = true; }
 
     static const int MAX_INSTANCES = 8;
 
 private:
+    //===------------------------------------------------------------------===//
+    // Private Helpers
+    //===------------------------------------------------------------------===//
     void addMessageToAllBuffer(OwnedArray<MidiBuffer>& midiBuffers, MidiMessage& msg, int sampleOffset);
     void sendAllNotesOff();
     void sendAllNotesOffPanic();
@@ -169,6 +187,7 @@ private:
     std::atomic<bool> isHostPlaying{ false };
     std::atomic<int> transportState{ PLUGIN_PAUSED };
     std::atomic<double> transportTimeElasped{ 0.0 };
+    std::atomic<bool> hasSeeked{ false };
     CriticalSection transportLock;
 
     float nextStartTime = -1.0, rangeStartTime = FLT_MAX, rangeEndTime = -FLT_MAX;

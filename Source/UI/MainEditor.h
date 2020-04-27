@@ -22,24 +22,26 @@
 #include "ProjectListener.h"
 
 class MicroChromoAudioProcessor;
+class MicroChromoAudioProcessorEditor;
+
 class PluginBundle;
-class MainEditor;
-class ColorEditor;
-class SimpleNoteEditor;
-class SimpleTimeEditor;
+
+class MidiEvent;
+class MidiTrack;
+class PitchColorMapEntry;
+class PitchColorMap;
 
 //==============================================================================
-class MicroChromoAudioProcessorEditor  : 
+class MainEditor :
     public AudioProcessorEditor,
-    public ApplicationCommandTarget,
-    public ProjectListener,
-    public MenuBarModel,
     public ChangeListener,
-    public Timer
+    public ProjectListener,
+    public Timer,
+    public DragAndDropContainer
 {
 public:
-    MicroChromoAudioProcessorEditor (MicroChromoAudioProcessor&);
-    ~MicroChromoAudioProcessorEditor();
+    MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEditor& parent);
+    ~MainEditor();
 
     //===------------------------------------------------------------------===//
     // Components
@@ -48,36 +50,17 @@ public:
     void resized() override;
 
     //===------------------------------------------------------------------===//
-    // ApplicationCommandTarget
-    //===------------------------------------------------------------------===//
-    ApplicationCommandTarget* getNextCommandTarget() override;
-    void getAllCommands(Array<CommandID>& c) override;
-    void getCommandInfo(CommandID commandID, ApplicationCommandInfo& result) override;
-    bool perform(const InvocationInfo& info) override;
-
-    //===------------------------------------------------------------------===//
-    // MenuBarModel
-    //===------------------------------------------------------------------===//
-    StringArray getMenuBarNames() override;
-    PopupMenu getMenuForIndex(int menuIndex, const String& /*menuName*/) override;
-    void menuItemSelected(int menuItemID, int topLevelMenuIndex) override;
-
-    //===------------------------------------------------------------------===//
-    // Accessors
-    //===------------------------------------------------------------------===//
-    MicroChromoAudioProcessor& getProcessor() { return processor; }
-    KnownPluginList::SortMethod getPluginSortMethod() { return pluginSortMethod; }
-
-    //===------------------------------------------------------------------===//
-    // Keyboard Listeners
-    //===------------------------------------------------------------------===//
-    bool keyPressed(const KeyPress& key) override;
-
-    //===------------------------------------------------------------------===//
     // Callbacks
     //===------------------------------------------------------------------===//
     void changeListenerCallback(ChangeBroadcaster*) override;
     void timerCallback() override;
+    void itemDroppedCallback(const Array<File>& files);
+
+    //===------------------------------------------------------------------===//
+    // Mouse Listeners
+    //===------------------------------------------------------------------===//
+    void mouseDoubleClick(const MouseEvent& event) override;
+    void mouseDrag(const MouseEvent&) override;
 
     //===------------------------------------------------------------------===//
     // Project Listener
@@ -108,58 +91,47 @@ public:
     void onReloadProjectContent(const Array<MidiTrack*>& tracks) override;
 
 private:
+    //===------------------------------------------------------------------===//
+    // Helpers
+    //===------------------------------------------------------------------===//
+    void exportMidiDialog();
+
     MicroChromoAudioProcessor& processor;
+    MicroChromoAudioProcessorEditor& _parent;
     ApplicationProperties& appProperties;
-    AudioPluginFormatManager& formatManager;
-    ApplicationCommandManager commandManager;
-    UndoManager& undoManager;
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
 
     //==============================================================================
-    KnownPluginList& knownPluginList;
-    KnownPluginList::SortMethod pluginSortMethod;
+    friend class MicroChromoAudioProcessorEditor;
 
     //==============================================================================
-    std::unique_ptr<MainEditor> mainEditor;
-    std::unique_ptr<SimpleNoteEditor> noteEditor;
-    std::unique_ptr<SimpleTimeEditor> timeEditor;
-    std::unique_ptr<ColorEditor> colorEditor;
-
-    //==============================================================================
-    std::unique_ptr<MenuBarComponent> menuBar;
-    TextButton playTransportBtn{ "Play" }, stopTransportBtn{ "Stop" }, panicBtn{ "!" };
-    Slider transportSlider;
-    Label transportLabel;
-    std::atomic<bool> transportSliderDragging{ false };
-
-    //==============================================================================
-    class CustomTabbedComponent : public TabbedComponent
+    class TextButtonDropTarget : public TextButton, public FileDragAndDropTarget
     {
     public:
-        CustomTabbedComponent(TabbedButtonBar::Orientation orientation, MicroChromoAudioProcessorEditor& owner);
-        ~CustomTabbedComponent() = default;
+        TextButtonDropTarget(String text, MainEditor& owner);
+        ~TextButtonDropTarget() = default;
 
-        virtual void currentTabChanged(int newCurrentTabIndex, const String& /*newCurrentTabName*/) override;
+        bool isInterestedInFileDrag(const StringArray& files) override;
+        void filesDropped(const StringArray& files, int x, int y) override;
 
     private:
-        MicroChromoAudioProcessorEditor& _owner;
+        MainEditor& _owner;
     };
-    std::unique_ptr<CustomTabbedComponent> tabComp;
 
     //==============================================================================
-    class PluginListWindow : public DocumentWindow
-    {
-    public:
-        PluginListWindow(MicroChromoAudioProcessorEditor& mw, AudioPluginFormatManager& pluginFormatManager);
-        ~PluginListWindow();
+    std::unique_ptr<Button> synthButton, effectButton, dragButton, dropButton;
+    std::unique_ptr<Label> synthLabel, effectLabel;
+    std::unique_ptr<Label> numInstancesLabel, numParameterLabel, midiChannelLabel;
+    std::unique_ptr<ComboBox> numInstancesBox, midiChannelComboBox;
+    std::unique_ptr<TextEditor> numParameterSlot;
+    std::unique_ptr<PopupMenu> floatMenu;
 
-        void closeButtonPressed();
-    private:
-        MicroChromoAudioProcessorEditor& owner;
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginListWindow)
-    };
-    std::unique_ptr<PluginListWindow> pluginListWindow;
+    std::function<void(int, bool)> bundlePopupMenuSelected;
 
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MicroChromoAudioProcessorEditor)
+    String lastOpenedLocation = "", lastSavedLocation = "";
+    bool canDrop = true;
+
+    //==============================================================================
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainEditor)
 };

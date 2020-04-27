@@ -5,127 +5,133 @@
               pluginVST3Category="Instrument" cppLanguageStandard="latest"
               pluginManufacturer="NyLP" pluginManufacturerCode="Nylp" pluginCode="Aaaa"
               aaxIdentifier="com.nylp.MicroChromo" pluginVSTCategory="kPlugCategSynth"
-              pluginAAXCategory="2048" pluginRTASCategory="2048" headerPath="../../soundtouch/include&#10;../../Source/&#10;../../Source/Actions&#10;../../Source/Midi&#10;../../Source/Midi/Events&#10;../../Source/Midi/Tracks"
-              reportAppUsage="0" displaySplashScreen="0">
+              pluginAAXCategory="2048" pluginRTASCategory="2048" headerPath="../../soundtouch/include&#10;../../Source/&#10;../../Source/Core/Actions&#10;../../Source/Core/Midi&#10;../../Source/Core/Midi/Events&#10;../../Source/Core/Midi/Tracks&#10;../../Source/Core/Plugin&#10;../../Source/Core/Project&#10;../../Source/Core/Serialization&#10;../../Source/UI"
+              reportAppUsage="0" displaySplashScreen="0" companyName="NyLP">
   <MAINGROUP id="YsAiD7" name="MicroChromo">
     <GROUP id="{32A9BA9B-4C0F-B1C1-2CB7-430912355187}" name="Resources">
       <FILE id="Oe9g92" name="MicroChromoKontaktScript.txt" compile="0" resource="1"
             file="Resources/MicroChromoKontaktScript.txt"/>
     </GROUP>
     <GROUP id="{147DAED3-3237-A712-1E2B-D10AEC95543C}" name="Source">
-      <GROUP id="{A4813C48-85DE-5CF9-E7E9-C97BFCDCAE71}" name="Actions">
-        <FILE id="hgHljg" name="ColorMapActions.cpp" compile="1" resource="0"
-              file="Source/Actions/ColorMapActions.cpp"/>
-        <FILE id="AmLuh1" name="ColorMapActions.h" compile="0" resource="0"
-              file="Source/Actions/ColorMapActions.h"/>
-        <FILE id="yRmcsI" name="NoteActions.cpp" compile="1" resource="0" file="Source/Actions/NoteActions.cpp"/>
-        <FILE id="KK6Cjl" name="NoteActions.h" compile="0" resource="0" file="Source/Actions/NoteActions.h"/>
-        <FILE id="xAGL2X" name="NoteTrackActions.cpp" compile="1" resource="0"
-              file="Source/Actions/NoteTrackActions.cpp"/>
-        <FILE id="WILN8K" name="NoteTrackActions.h" compile="0" resource="0"
-              file="Source/Actions/NoteTrackActions.h"/>
-        <FILE id="eW8Dam" name="ProcessorActions.cpp" compile="1" resource="0"
-              file="Source/Actions/ProcessorActions.cpp"/>
-        <FILE id="dfL63q" name="ProcessorActions.h" compile="0" resource="0"
-              file="Source/Actions/ProcessorActions.h"/>
-        <FILE id="vjmd97" name="ProjectActions.cpp" compile="1" resource="0"
-              file="Source/Actions/ProjectActions.cpp"/>
-        <FILE id="HY06Vh" name="ProjectActions.h" compile="0" resource="0"
-              file="Source/Actions/ProjectActions.h"/>
-        <FILE id="qFVeFZ" name="TempoMarkerEventActions.cpp" compile="1" resource="0"
-              file="Source/Actions/TempoMarkerEventActions.cpp"/>
-        <FILE id="pPMTOH" name="TempoMarkerEventActions.h" compile="0" resource="0"
-              file="Source/Actions/TempoMarkerEventActions.h"/>
-        <FILE id="XHLVw9" name="TimeSignatureEventActions.cpp" compile="1"
-              resource="0" file="Source/Actions/TimeSignatureEventActions.cpp"/>
-        <FILE id="EURMWC" name="TimeSignatureEventActions.h" compile="0" resource="0"
-              file="Source/Actions/TimeSignatureEventActions.h"/>
-      </GROUP>
-      <GROUP id="{B436B0A7-EB34-18D9-AC55-3E262AA2531A}" name="Midi">
-        <GROUP id="{A861206A-C5A1-8D5D-44A8-33610242E901}" name="Events">
-          <FILE id="rpXc38" name="MidiEvent.cpp" compile="1" resource="0" file="Source/Midi/Events/MidiEvent.cpp"/>
-          <FILE id="KZ47ox" name="MidiEvent.h" compile="0" resource="0" file="Source/Midi/Events/MidiEvent.h"/>
-          <FILE id="gH9zT4" name="Note.cpp" compile="1" resource="0" file="Source/Midi/Events/Note.cpp"/>
-          <FILE id="j820Ao" name="Note.h" compile="0" resource="0" file="Source/Midi/Events/Note.h"/>
-          <FILE id="fuTgRQ" name="TempoMarkerEvent.cpp" compile="1" resource="0"
-                file="Source/Midi/Events/TempoMarkerEvent.cpp"/>
-          <FILE id="cMf2ZI" name="TempoMarkerEvent.h" compile="0" resource="0"
-                file="Source/Midi/Events/TempoMarkerEvent.h"/>
-          <FILE id="Vt7zCx" name="TimeSignatureEvent.cpp" compile="1" resource="0"
-                file="Source/Midi/Events/TimeSignatureEvent.cpp"/>
-          <FILE id="sVxOne" name="TimeSignatureEvent.h" compile="0" resource="0"
-                file="Source/Midi/Events/TimeSignatureEvent.h"/>
+      <GROUP id="{E1FBEF04-BBAC-5DA3-10C4-B9253D1AA65F}" name="Core">
+        <GROUP id="{112F8E3F-216F-5146-8346-F8A39C804700}" name="Actions">
+          <FILE id="Ec1IsA" name="ColorMapActions.cpp" compile="1" resource="0"
+                file="Source/Core/Actions/ColorMapActions.cpp"/>
+          <FILE id="D7gEhb" name="ColorMapActions.h" compile="0" resource="0"
+                file="Source/Core/Actions/ColorMapActions.h"/>
+          <FILE id="v0eU0n" name="NoteActions.cpp" compile="1" resource="0" file="Source/Core/Actions/NoteActions.cpp"/>
+          <FILE id="UhLzLJ" name="NoteActions.h" compile="0" resource="0" file="Source/Core/Actions/NoteActions.h"/>
+          <FILE id="EJXDVW" name="MidiTrackActions.cpp" compile="1" resource="0"
+                file="Source/Core/Actions/MidiTrackActions.cpp"/>
+          <FILE id="TccreA" name="MidiTrackActions.h" compile="0" resource="0"
+                file="Source/Core/Actions/MidiTrackActions.h"/>
+          <FILE id="EsD7Sd" name="ProjectActions.cpp" compile="1" resource="0"
+                file="Source/Core/Actions/ProjectActions.cpp"/>
+          <FILE id="oX8vQD" name="ProjectActions.h" compile="0" resource="0"
+                file="Source/Core/Actions/ProjectActions.h"/>
+          <FILE id="ltlOgj" name="TempoMarkerEventActions.cpp" compile="1" resource="0"
+                file="Source/Core/Actions/TempoMarkerEventActions.cpp"/>
+          <FILE id="pXRb1D" name="TempoMarkerEventActions.h" compile="0" resource="0"
+                file="Source/Core/Actions/TempoMarkerEventActions.h"/>
+          <FILE id="DwUU7K" name="TimeSignatureEventActions.cpp" compile="1"
+                resource="0" file="Source/Core/Actions/TimeSignatureEventActions.cpp"/>
+          <FILE id="WU2Rn1" name="TimeSignatureEventActions.h" compile="0" resource="0"
+                file="Source/Core/Actions/TimeSignatureEventActions.h"/>
         </GROUP>
-        <GROUP id="{AF71CB1E-5317-ED3B-D7B8-29E3C6EAE1A9}" name="Tracks">
-          <FILE id="gzoKJj" name="MidiTrack.cpp" compile="1" resource="0" file="Source/Midi/Tracks/MidiTrack.cpp"/>
-          <FILE id="sLgYbK" name="MidiTrack.h" compile="0" resource="0" file="Source/Midi/Tracks/MidiTrack.h"/>
-          <FILE id="xf5yM4" name="NoteTrack.cpp" compile="1" resource="0" file="Source/Midi/Tracks/NoteTrack.cpp"/>
-          <FILE id="Na0OW7" name="NoteTrack.h" compile="0" resource="0" file="Source/Midi/Tracks/NoteTrack.h"/>
-          <FILE id="SpeDUb" name="TempoTrack.cpp" compile="1" resource="0" file="Source/Midi/Tracks/TempoTrack.cpp"/>
-          <FILE id="Yh5DdL" name="TempoTrack.h" compile="0" resource="0" file="Source/Midi/Tracks/TempoTrack.h"/>
-          <FILE id="ZjKXYL" name="TimeSignatureTrack.cpp" compile="1" resource="0"
-                file="Source/Midi/Tracks/TimeSignatureTrack.cpp"/>
-          <FILE id="P2zpIe" name="TimeSignatureTrack.h" compile="0" resource="0"
-                file="Source/Midi/Tracks/TimeSignatureTrack.h"/>
+        <GROUP id="{EFADDE95-D7EC-2F65-AD9D-0C859BDB0274}" name="Midi">
+          <GROUP id="{49872BC2-1AC0-4E95-6C89-F2B738DA3E5D}" name="Events">
+            <FILE id="AMTJ2y" name="MidiEvent.cpp" compile="1" resource="0" file="Source/Core/Midi/Events/MidiEvent.cpp"/>
+            <FILE id="BwrGx7" name="MidiEvent.h" compile="0" resource="0" file="Source/Core/Midi/Events/MidiEvent.h"/>
+            <FILE id="VtnMo4" name="Note.cpp" compile="1" resource="0" file="Source/Core/Midi/Events/Note.cpp"/>
+            <FILE id="jRZUg7" name="Note.h" compile="0" resource="0" file="Source/Core/Midi/Events/Note.h"/>
+            <FILE id="yhzIuZ" name="TempoMarkerEvent.cpp" compile="1" resource="0"
+                  file="Source/Core/Midi/Events/TempoMarkerEvent.cpp"/>
+            <FILE id="c8QhHM" name="TempoMarkerEvent.h" compile="0" resource="0"
+                  file="Source/Core/Midi/Events/TempoMarkerEvent.h"/>
+            <FILE id="xzan5B" name="TimeSignatureEvent.cpp" compile="1" resource="0"
+                  file="Source/Core/Midi/Events/TimeSignatureEvent.cpp"/>
+            <FILE id="kber5y" name="TimeSignatureEvent.h" compile="0" resource="0"
+                  file="Source/Core/Midi/Events/TimeSignatureEvent.h"/>
+          </GROUP>
+          <GROUP id="{F9CEA27C-5714-90E2-D1F6-D6ECAC75189A}" name="Tracks">
+            <FILE id="FfPF9B" name="MidiTrack.cpp" compile="1" resource="0" file="Source/Core/Midi/Tracks/MidiTrack.cpp"/>
+            <FILE id="I0jQh1" name="MidiTrack.h" compile="0" resource="0" file="Source/Core/Midi/Tracks/MidiTrack.h"/>
+            <FILE id="tDhZ4I" name="NoteTrack.cpp" compile="1" resource="0" file="Source/Core/Midi/Tracks/NoteTrack.cpp"/>
+            <FILE id="iJUwQR" name="NoteTrack.h" compile="0" resource="0" file="Source/Core/Midi/Tracks/NoteTrack.h"/>
+            <FILE id="mpmWFe" name="TempoTrack.cpp" compile="1" resource="0" file="Source/Core/Midi/Tracks/TempoTrack.cpp"/>
+            <FILE id="NXyWtO" name="TempoTrack.h" compile="0" resource="0" file="Source/Core/Midi/Tracks/TempoTrack.h"/>
+            <FILE id="bKBF1p" name="TimeSignatureTrack.cpp" compile="1" resource="0"
+                  file="Source/Core/Midi/Tracks/TimeSignatureTrack.cpp"/>
+            <FILE id="IKYnx7" name="TimeSignatureTrack.h" compile="0" resource="0"
+                  file="Source/Core/Midi/Tracks/TimeSignatureTrack.h"/>
+          </GROUP>
+          <FILE id="W5UqVn" name="PitchColorMap.cpp" compile="1" resource="0"
+                file="Source/Core/Midi/PitchColorMap.cpp"/>
+          <FILE id="BrfgXa" name="PitchColorMap.h" compile="0" resource="0" file="Source/Core/Midi/PitchColorMap.h"/>
+          <FILE id="MkcInY" name="VoiceScheduler.cpp" compile="1" resource="0"
+                file="Source/Core/Midi/VoiceScheduler.cpp"/>
+          <FILE id="AvKxFQ" name="VoiceScheduler.h" compile="0" resource="0"
+                file="Source/Core/Midi/VoiceScheduler.h"/>
+        </GROUP>
+        <GROUP id="{9284E853-5FD0-1622-1B94-AE78F648A7BA}" name="Plugin">
+          <FILE id="l9IqgB" name="PluginInstance.h" compile="0" resource="0"
+                file="Source/Core/Plugin/PluginInstance.h"/>
+          <FILE id="lH6jsg" name="InternalPlugins.cpp" compile="1" resource="0"
+                file="Source/Core/Plugin/InternalPlugins.cpp"/>
+          <FILE id="OQMWMB" name="InternalPlugins.h" compile="0" resource="0"
+                file="Source/Core/Plugin/InternalPlugins.h"/>
+          <FILE id="XoQYkd" name="ParameterCcLearn.cpp" compile="1" resource="0"
+                file="Source/Core/Plugin/ParameterCcLearn.cpp"/>
+          <FILE id="FMRlVk" name="ParameterCcLearn.h" compile="0" resource="0"
+                file="Source/Core/Plugin/ParameterCcLearn.h"/>
+          <FILE id="bAvcp0" name="ParameterLinker.cpp" compile="1" resource="0"
+                file="Source/Core/Plugin/ParameterLinker.cpp"/>
+          <FILE id="C6N3XU" name="ParameterLinker.h" compile="0" resource="0"
+                file="Source/Core/Plugin/ParameterLinker.h"/>
+          <FILE id="fs0sNy" name="PluginBundle.cpp" compile="1" resource="0"
+                file="Source/Core/Plugin/PluginBundle.cpp"/>
+          <FILE id="dWHRSo" name="PluginBundle.h" compile="0" resource="0" file="Source/Core/Plugin/PluginBundle.h"/>
+        </GROUP>
+        <GROUP id="{DA01F160-203F-923D-F09F-A9F5CECE344D}" name="Project">
+          <FILE id="wOyEcy" name="Project.cpp" compile="1" resource="0" file="Source/Core/Project/Project.cpp"/>
+          <FILE id="ysK7MT" name="Project.h" compile="0" resource="0" file="Source/Core/Project/Project.h"/>
+          <FILE id="DtqTAP" name="ProjectListener.h" compile="0" resource="0"
+                file="Source/Core/Project/ProjectListener.h"/>
+        </GROUP>
+        <GROUP id="{26DA3DBA-E580-820D-654A-8E855A292ED4}" name="Serialization">
+          <FILE id="FYIw7h" name="Serializable.h" compile="0" resource="0" file="Source/Core/Serialization/Serializable.h"/>
+          <FILE id="HMD9PM" name="SerializationKeys.h" compile="0" resource="0"
+                file="Source/Core/Serialization/SerializationKeys.h"/>
         </GROUP>
       </GROUP>
-      <FILE id="DdEe8x" name="Common.cpp" compile="1" resource="0" file="Source/Common.cpp"/>
-      <FILE id="KS8Ulu" name="Common.h" compile="0" resource="0" file="Source/Common.h"/>
-      <FILE id="ou1GuU" name="Serializable.h" compile="0" resource="0" file="Source/Serializable.h"/>
-      <FILE id="eGTiS8" name="SerializationKeys.h" compile="0" resource="0"
-            file="Source/SerializationKeys.h"/>
-      <FILE id="sBHjoK" name="Project.cpp" compile="1" resource="0" file="Source/Project.cpp"/>
-      <FILE id="jyos2R" name="Project.h" compile="0" resource="0" file="Source/Project.h"/>
-      <FILE id="GvYSKY" name="ProjectListener.h" compile="0" resource="0"
-            file="Source/ProjectListener.h"/>
-      <FILE id="Ojf3wr" name="PitchColorMap.cpp" compile="1" resource="0"
-            file="Source/PitchColorMap.cpp"/>
-      <FILE id="hyvGtC" name="PitchColorMap.h" compile="0" resource="0" file="Source/PitchColorMap.h"/>
-      <FILE id="FuF3UI" name="VoiceScheduler.cpp" compile="1" resource="0"
-            file="Source/VoiceScheduler.cpp"/>
-      <FILE id="XKSg3r" name="VoiceScheduler.h" compile="0" resource="0"
-            file="Source/VoiceScheduler.h"/>
-      <FILE id="Wwm7Lf" name="ParameterLinker.cpp" compile="1" resource="0"
-            file="Source/ParameterLinker.cpp"/>
-      <FILE id="lho4P0" name="ParameterLinker.h" compile="0" resource="0"
-            file="Source/ParameterLinker.h"/>
-      <FILE id="rkfhtY" name="InternalPlugins.cpp" compile="1" resource="0"
-            file="Source/InternalPlugins.cpp"/>
-      <FILE id="NnANeP" name="InternalPlugins.h" compile="0" resource="0"
-            file="Source/InternalPlugins.h"/>
-      <FILE id="Z1ZimM" name="PluginInstance.h" compile="0" resource="0"
-            file="Source/PluginInstance.h"/>
-      <FILE id="AUEOJz" name="ParameterCcLearn.cpp" compile="1" resource="0"
-            file="Source/ParameterCcLearn.cpp"/>
-      <FILE id="Si3N2C" name="ParameterCcLearn.h" compile="0" resource="0"
-            file="Source/ParameterCcLearn.h"/>
-      <FILE id="fZXg4x" name="ParameterLinkEditor.cpp" compile="1" resource="0"
-            file="Source/ParameterLinkEditor.cpp"/>
-      <FILE id="K4vpvQ" name="ParameterLinkEditor.h" compile="0" resource="0"
-            file="Source/ParameterLinkEditor.h"/>
-      <FILE id="uNIWbV" name="PluginBundle.cpp" compile="1" resource="0"
-            file="Source/PluginBundle.cpp"/>
-      <FILE id="yFSpZJ" name="PluginBundle.h" compile="0" resource="0" file="Source/PluginBundle.h"/>
-      <FILE id="WcOkwD" name="PluginProcessor.cpp" compile="1" resource="0"
-            file="Source/PluginProcessor.cpp"/>
-      <FILE id="bbuHO5" name="PluginProcessor.h" compile="0" resource="0"
-            file="Source/PluginProcessor.h"/>
-      <FILE id="Zymonl" name="PluginEditor.cpp" compile="1" resource="0"
+      <GROUP id="{F3AF7136-64D6-3869-17F4-B7F32D42CC07}" name="UI">
+        <FILE id="RYzgsv" name="ColorEditor.cpp" compile="1" resource="0" file="Source/UI/ColorEditor.cpp"/>
+        <FILE id="EfwkLa" name="ColorEditor.h" compile="0" resource="0" file="Source/UI/ColorEditor.h"/>
+        <FILE id="XftMhD" name="MainEditor.cpp" compile="1" resource="0" file="Source/UI/MainEditor.cpp"/>
+        <FILE id="fFNong" name="MainEditor.h" compile="0" resource="0" file="Source/UI/MainEditor.h"/>
+        <FILE id="sRQ0re" name="ParameterLinkEditor.cpp" compile="1" resource="0"
+              file="Source/UI/ParameterLinkEditor.cpp"/>
+        <FILE id="UmcbjO" name="ParameterLinkEditor.h" compile="0" resource="0"
+              file="Source/UI/ParameterLinkEditor.h"/>
+        <FILE id="GkM4cK" name="PluginWindow.h" compile="0" resource="0" file="Source/UI/PluginWindow.h"/>
+        <FILE id="d4C84T" name="SimpleNoteEditor.cpp" compile="1" resource="0"
+              file="Source/UI/SimpleNoteEditor.cpp"/>
+        <FILE id="D5kB1o" name="SimpleNoteEditor.h" compile="0" resource="0"
+              file="Source/UI/SimpleNoteEditor.h"/>
+        <FILE id="J3pfsi" name="SimpleTimeEditor.cpp" compile="1" resource="0"
+              file="Source/UI/SimpleTimeEditor.cpp"/>
+        <FILE id="vYomCT" name="SimpleTimeEditor.h" compile="0" resource="0"
+              file="Source/UI/SimpleTimeEditor.h"/>
+      </GROUP>
+      <FILE id="m8jVPX" name="Common.cpp" compile="1" resource="0" file="Source/Common.cpp"/>
+      <FILE id="pY9Nty" name="Common.h" compile="0" resource="0" file="Source/Common.h"/>
+      <FILE id="iT575b" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
-      <FILE id="fD4vtN" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
-      <FILE id="VZzcob" name="MainEditor.cpp" compile="1" resource="0" file="Source/MainEditor.cpp"/>
-      <FILE id="uz28GU" name="MainEditor.h" compile="0" resource="0" file="Source/MainEditor.h"/>
-      <FILE id="G6L6vJ" name="ColorEditor.cpp" compile="1" resource="0" file="Source/ColorEditor.cpp"/>
-      <FILE id="cviOKq" name="ColorEditor.h" compile="0" resource="0" file="Source/ColorEditor.h"/>
-      <FILE id="LrAIvd" name="SimpleNoteEditor.cpp" compile="1" resource="0"
-            file="Source/SimpleNoteEditor.cpp"/>
-      <FILE id="YhryuO" name="SimpleNoteEditor.h" compile="0" resource="0"
-            file="Source/SimpleNoteEditor.h"/>
-      <FILE id="t04Rcq" name="SimpleTimeEditor.cpp" compile="1" resource="0"
-            file="Source/SimpleTimeEditor.cpp"/>
-      <FILE id="TsNhDk" name="SimpleTimeEditor.h" compile="0" resource="0"
-            file="Source/SimpleTimeEditor.h"/>
-      <FILE id="Yz8b1b" name="PluginWindow.h" compile="0" resource="0" file="Source/PluginWindow.h"/>
+      <FILE id="uopyVu" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="cme9JX" name="PluginProcessor.cpp" compile="1" resource="0"
+            file="Source/PluginProcessor.cpp"/>
+      <FILE id="mwWdFW" name="PluginProcessor.h" compile="0" resource="0"
+            file="Source/PluginProcessor.h"/>
     </GROUP>
     <GROUP id="{D7A887BC-F737-252E-9A4A-2A38B9EC6D5A}" name="SoundTouch">
       <FILE id="NqGvHZ" name="AAFilter.cpp" compile="1" resource="0" file="soundtouch/source/SoundTouch/AAFilter.cpp"/>
