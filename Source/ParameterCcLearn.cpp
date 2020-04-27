@@ -133,9 +133,9 @@ ParameterCcLearn::StatusComponent::StatusComponent(ParameterCcLearn& parent) : _
     addAndMakeVisible(setBtn);
 
     removeBtn.onClick = [&]() {
-        if (lastRow > -1)
+        if (table.getLastRowSelected() > -1)
         {
-            _parent.removeCcLearn(items[lastRow].paramIndex);
+            _parent.removeCcLearn(items[table.getLastRowSelected()].paramIndex);
             table.updateContent();
         }
     };
@@ -308,7 +308,7 @@ bool ParameterCcLearn::validLearn()
 {
     return tmpParamIndex >= 0 && tmpParamIndex < (*_parameters).size()
         && tmpCcSource >= 0 && tmpCcSource < 128
-        && tmpLearnedCcMin != FP_INFINITE && tmpLearnedCcMax != -FP_INFINITE
+        && tmpLearnedCcMin != FLT_MAX && tmpLearnedCcMax != -FLT_MAX
         && tmpLearnedCcMin < tmpLearnedCcMax;
 }
 
@@ -351,7 +351,7 @@ void ParameterCcLearn::removeCcLearn(int parameterIndex)
         return;
     if (learnedIndices.size() == 1)
     {
-        reset(true);
+        resetCcLearn(true);
         return;
     }
     if (_parameters)
@@ -364,8 +364,8 @@ void ParameterCcLearn::resetTempValues()
 {
     tmpCcSource = ccSource.load();
     tmpParamIndex = -1;
-    tmpLearnedCcMin = FP_INFINITE;
-    tmpLearnedCcMax = -FP_INFINITE;
+    tmpLearnedCcMin = FLT_MAX;
+    tmpLearnedCcMax = -FLT_MAX;
     progressWindow->updateText(updateProgressNote());
     progressWindow->updateCc(tmpCcSource);
 }
@@ -379,7 +379,7 @@ void ParameterCcLearn::setCcSource(int newCcSource)
     }
 }
 
-void ParameterCcLearn::reset(bool notify)
+void ParameterCcLearn::resetCcLearn(bool notify)
 {
     _hasLearned = false;
     _isLearning = false;
@@ -463,8 +463,8 @@ void ParameterCcLearn::parameterValueChanged(int parameterIndex, float newValue)
                 progressWindow->updateCc(tmpCcSource);
                 return;
             }
-            tmpLearnedCcMin = FP_INFINITE;
-            tmpLearnedCcMax = -FP_INFINITE;
+            tmpLearnedCcMin = FLT_MAX;
+            tmpLearnedCcMax = -FLT_MAX;
         }
         tmpParamIndex = parameterIndex;
         if (newValue > tmpLearnedCcMax)
@@ -499,12 +499,13 @@ void ParameterCcLearn::loadFromXml(const XmlElement* xml)
         auto src = xml->getIntAttribute("ccSource", -1);
         if (src > -1)
         {
+            resetCcLearn();
             forEachXmlChildElementWithTagName(*xml, child, "item")
             {
                 addCcLearn(src,
                     child->getIntAttribute("paramIndex", -1),
-                    child->getDoubleAttribute("learnedCcMin", FP_INFINITE),
-                    child->getDoubleAttribute("learnedCcMax", -FP_INFINITE));
+                    child->getDoubleAttribute("learnedCcMin", FLT_MAX),
+                    child->getDoubleAttribute("learnedCcMax", -FLT_MAX));
             }
             items.sort(CcItemComparator());
         }
@@ -522,11 +523,11 @@ String ParameterCcLearn::updateProgressNote(String otherMsg)
         progressNote.append("Parameter: " + ((*_parameters)[tmpParamIndex]->getName(256)) + " (" + String(tmpParamIndex) + ")" + newLine.getDefault(), 256);
     else
         progressNote.append("Parameter: ?" + String(newLine.getDefault()), 256);
-    if (tmpLearnedCcMin != FP_INFINITE)
+    if (tmpLearnedCcMin != FLT_MAX)
         progressNote.append("Value min: " + String(tmpLearnedCcMin.load(), 3) + newLine.getDefault(), 256);
     else
         progressNote.append("Value min: ?" + String(newLine.getDefault()), 256);
-    if (tmpLearnedCcMax != -FP_INFINITE)
+    if (tmpLearnedCcMax != -FLT_MAX)
         progressNote.append("Value max: " + String(tmpLearnedCcMax.load(), 3) + newLine.getDefault(), 256);
     else
         progressNote.append("Value max: ?" + String(newLine.getDefault()), 256);

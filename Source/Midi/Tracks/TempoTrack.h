@@ -42,6 +42,16 @@ public:
         bool undoable);
 
     //===------------------------------------------------------------------===//
+    // Accessors
+    //===------------------------------------------------------------------===//
+    float getLastBeat() const noexcept override;
+
+    inline TempoMarkerEvent* operator[] (int index) const noexcept
+    {
+        return dynamic_cast<TempoMarkerEvent*>(midiEvents[index]);
+    }
+
+    //===------------------------------------------------------------------===//
     // Serializable
     //===------------------------------------------------------------------===//
     ValueTree serialize() const override;
@@ -50,4 +60,5 @@ public:
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TempoTrack);
+    JUCE_DECLARE_WEAK_REFERENCEABLE(TempoTrack);
 };

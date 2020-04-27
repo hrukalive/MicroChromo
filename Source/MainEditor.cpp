@@ -10,6 +10,7 @@
 
 #include "MainEditor.h"
 #include "PluginProcessor.h"
+#include "PluginBundle.h"
 #include "PluginEditor.h"
 #include "MidiTrack.h"
 #include "Note.h"
@@ -30,7 +31,10 @@ bool MainEditor::TextButtonDropTarget::isInterestedInFileDrag(const StringArray&
 
 void MainEditor::TextButtonDropTarget::filesDropped(const StringArray& files, int x, int y)
 {
-    _owner.itemDroppedCallback(files);
+    Array<File> fs;
+    for (auto filepath : files)
+        fs.add(File(filepath));
+    _owner.itemDroppedCallback(fs);
 }
 
 //==============================================================================
@@ -103,10 +107,10 @@ MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEd
         FileChooser chooser("Import MIDI file",
             lastOpenedLocation == "" ? File::getSpecialLocation(File::userHomeDirectory) : lastOpenedLocation,
             "*.mid; *.midi");
-        if (chooser.browseForFileToOpen())
+        if (chooser.browseForMultipleFilesToOpen())
         {
-            lastOpenedLocation = chooser.getResult().getParentDirectory().getFullPathName();
-            itemDroppedCallback({ chooser.getResult().getFullPathName() });
+            lastOpenedLocation = chooser.getResults()[0].getParentDirectory().getFullPathName();
+            itemDroppedCallback(chooser.getResults());
         }
     };
     addAndMakeVisible(dropButton.get());
@@ -120,7 +124,7 @@ MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEd
     numParameterSlot->setScrollbarsShown(false);
     numParameterSlot->setCaretVisible(true);
     numParameterSlot->setPopupMenuEnabled(false);
-    numParameterSlot->setText(String(p.getParameterSlotNumber()));
+    numParameterSlot->setText(String(processor.getParameterSlotNumber()));
     numParameterSlot->onTextChange = [&]()
     {
         appProperties.getUserSettings()->setValue("parameterSlotNumber", numParameterSlot->getText().getIntValue());
@@ -134,15 +138,11 @@ MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEd
     addAndMakeVisible(numInstancesBox.get());
     for (int i = 1; i <= MicroChromoAudioProcessor::MAX_INSTANCES; i++)
         numInstancesBox->addItem(String(i), i);
-    numInstancesBox->setSelectedId(processor.getNumInstances());
+    numInstancesBox->setSelectedId(processor.getNumInstances(), dontSendNotification);
     numInstancesBox->onChange = [&]() {
-        if (!ignoreInitialChange1)
-        {
-            synthBundle->closeAllWindows();
-            psBundle->closeAllWindows();
-            processor.adjustInstanceNumber(numInstancesBox->getSelectedId());
-        }
-        ignoreInitialChange1 = false;
+        synthBundle->closeAllWindows();
+        psBundle->closeAllWindows();
+        processor.adjustInstanceNumber(numInstancesBox->getSelectedId());
     };
     numInstancesLabel.reset(new Label());
     addAndMakeVisible(numInstancesLabel.get());
@@ -150,15 +150,12 @@ MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEd
 
     midiChannelComboBox.reset(new ComboBox());
     addAndMakeVisible(midiChannelComboBox.get());
+    midiChannelComboBox->addItem("Omni", 1);
     for (int i = 1; i <= 16; i++)
-        midiChannelComboBox->addItem(String(i), i);
-    midiChannelComboBox->setSelectedId(processor.getMidiChannel());
+        midiChannelComboBox->addItem(String(i), i + 1);
+    midiChannelComboBox->setSelectedId(processor.getMidiChannel() + 1, dontSendNotification);
     midiChannelComboBox->onChange = [&]() {
-        if (!ignoreInitialChange2)
-        {
-            processor.updateMidiChannel(midiChannelComboBox->getSelectedId());
-        }
-        ignoreInitialChange2 = false;
+        processor.updateMidiChannel(midiChannelComboBox->getSelectedId() - 1);
     };
     midiChannelLabel.reset(new Label());
     addAndMakeVisible(midiChannelLabel.get());
@@ -166,6 +163,8 @@ MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEd
 
     synthBundle->addChangeListener(this);
     psBundle->addChangeListener(this);
+
+    processor.getProject().addListener(this);
 
     changeListenerCallback(synthBundle.get());
     changeListenerCallback(psBundle.get());
@@ -176,6 +175,7 @@ MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEd
 
 MainEditor::~MainEditor()
 {
+    processor.getProject().removeListener(this);
     synthButton->removeMouseListener(this);
     effectButton->removeMouseListener(this);
     dragButton->removeMouseListener(this);
@@ -199,43 +199,43 @@ void MainEditor::changeListenerCallback(ChangeBroadcaster* changed)
     }
 }
 
-void MainEditor::itemDroppedCallback(const StringArray& files)
+void MainEditor::itemDroppedCallback(const Array<File>& files)
 {
-    MidiFile midiFile;
-    String filepath(files[0]);
-    std::unique_ptr<InputStream> stream{ new FileInputStream(File(filepath)) };
-    midiFile.readFrom(*stream);
-    midiFile.convertTimestampTicksToSeconds();
+    processor.getProject().loadMidiFile(files);
+}
 
-    MidiMessageSequence seq(*midiFile.getTrack(0));
-    seq.sort();
-    seq.updateMatchedPairs();
-    for (auto i = 0; i < seq.getNumEvents(); i++)
+void MainEditor::onReloadProjectContent(const Array<MidiTrack*>& tracks)
+{
+    numParameterSlot->setText(String(processor.getParameterSlotNumber()), sendNotificationSync);
+    numInstancesBox->setSelectedId(processor.getNumInstances(), dontSendNotification);
+    midiChannelComboBox->setSelectedId(processor.getMidiChannel() + 1, dontSendNotification);
+}
+
+void MainEditor::exportMidiDialog()
+{
+    FileChooser chooser("Export MIDI file to...",
+        lastSavedLocation == "" ? File::getSpecialLocation(File::userDocumentsDirectory) : lastSavedLocation,
+        "*.mid; *.midi");
+    if (chooser.browseForDirectory())
     {
-        auto* evt = seq.getEventPointer(i);
-        DBG(evt->message.getDescription());
-        if (evt->message.isNoteOn())
-            processor.addNote(Note(nullptr,
-                evt->message.getNoteNumber(),
-                evt->message.getTimeStamp(),
-                evt->noteOffObject->message.getTimeStamp() - evt->message.getTimeStamp(),
-                evt->message.getVelocity() / 127.0f));
+        lastSavedLocation = chooser.getResult().getFullPathName();
+
+        auto tmpFilename = "temp_" + String::toHexString(Random::getSystemRandom().nextInt());
+        int i = 1;
+        for (auto& file : processor.getProject().exportMidiFiles())
+        {
+            File outf = File(chooser.getResult().getFullPathName()).getNonexistentChildFile(tmpFilename + "_" + String(i++), ".mid");
+            if (std::unique_ptr<FileOutputStream> p_os{ outf.createOutputStream() })
+                file.writeTo(*p_os, 1);
+        }
     }
-    _parent.updateMidiEditor();
 }
 
 void MainEditor::mouseDoubleClick(const MouseEvent& e)
 {
     if (e.eventComponent == dragButton.get())
     {
-        FileChooser chooser("Export MIDI file to...",
-            lastSavedLocation == "" ? File::getSpecialLocation(File::userHomeDirectory) : lastSavedLocation,
-            "*.mid; *.midi");
-        if (chooser.browseForDirectory())
-        {
-            lastSavedLocation = chooser.getResult().getFullPathName();
-            AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::NoIcon, "What", chooser.getResult().getFullPathName());
-        }
+        exportMidiDialog();
     }
 }
 
@@ -248,34 +248,13 @@ void MainEditor::mouseDrag(const MouseEvent& e)
         {
             Array<std::shared_ptr<TemporaryFile>> files;
             StringArray filenames;
-
-            auto& notesMidiSeq = processor.getNoteMidiSequence();
-            auto& ccMidiSeq = processor.getCcMidiSequence();
-
             auto tmpFilename = "temp_" + String::toHexString(Random::getSystemRandom().nextInt());
 
-            for (int i = 0; i < notesMidiSeq.size(); i++)
+            int i = 1;
+            for (auto& file : processor.getProject().exportMidiFiles())
             {
-                if (notesMidiSeq[i]->getNumEvents() == 0)
-                    continue;
-
-                MidiFile file;
-                file.setTicksPerQuarterNote(960);
-
-                MidiMessageSequence seq;
-                //seq.addEvent(MidiMessage::timeSignatureMetaEvent(4, 4));
-                //seq.addEvent(MidiMessage::tempoMetaEvent(int((60000.f / (float)(60)) * 1000.f)));
-                for (auto& evt : *notesMidiSeq[i])
-                    seq.addEvent(MidiMessage(evt->message).withTimeStamp(evt->message.getTimeStamp() * 960));
-                for (auto& evt : *ccMidiSeq[i])
-                    seq.addEvent(MidiMessage(evt->message).withTimeStamp(evt->message.getTimeStamp() * 960));
-                seq.sort();
-                seq.updateMatchedPairs();
-                seq.addEvent(MidiMessage::endOfTrack(), notesMidiSeq[i]->getEndTime() * 960);
-
-                file.addTrack(seq);
-
-                std::shared_ptr<TemporaryFile> outf = std::make_shared<TemporaryFile>(File(), File::getSpecialLocation(File::tempDirectory).getNonexistentChildFile(tmpFilename + "_" + String(i + 1), ".mid"));
+                std::shared_ptr<TemporaryFile> outf = std::make_shared<TemporaryFile>(File(), 
+                    File::getSpecialLocation(File::tempDirectory).getNonexistentChildFile(tmpFilename + "_" + String(i++), ".mid"));
                 if (std::unique_ptr<FileOutputStream> p_os{ outf->getFile().createOutputStream() })
                 {
                     file.writeTo(*p_os, 1);

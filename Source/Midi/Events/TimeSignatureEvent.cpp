@@ -78,23 +78,27 @@ int TimeSignatureEvent::getDenominator() const noexcept
 
 ValueTree TimeSignatureEvent::serialize() const noexcept
 {
-    using namespace Serialization;
-    ValueTree tree(Midi::timeSignature);
-    //tree.setProperty(Midi::id, this->id, nullptr);
-    tree.setProperty(Midi::timestamp, int(this->beat * TICKS_PER_BEAT), nullptr);
-    tree.setProperty(Midi::numerator, this->numerator, nullptr);
-    tree.setProperty(Midi::denominator, this->denominator, nullptr);
+    ValueTree tree(Serialization::Midi::timeSignature);
+    tree.setProperty(Serialization::Midi::timestamp, int(this->beat * TICKS_PER_BEAT), nullptr);
+    tree.setProperty(Serialization::Midi::numerator, this->numerator, nullptr);
+    tree.setProperty(Serialization::Midi::denominator, this->denominator, nullptr);
     return tree;
 }
 
 void TimeSignatureEvent::deserialize(const ValueTree& tree) noexcept
 {
     this->reset();
-    using namespace Serialization;
-    //this->id = tree.getProperty(Midi::id);
-    this->beat = float(tree.getProperty(Midi::timestamp)) / TICKS_PER_BEAT;
-    this->numerator = tree.getProperty(Midi::numerator, TIME_SIGNATURE_DEFAULT_NUMERATOR);
-    this->denominator = tree.getProperty(Midi::denominator, TIME_SIGNATURE_DEFAULT_DENOMINATOR);
+
+    const auto root =
+        tree.hasType(Serialization::Midi::timeSignature) ?
+        tree : tree.getChildWithName(Serialization::Midi::timeSignature);
+
+    if (!root.isValid())
+        return;
+
+    this->beat = float(tree.getProperty(Serialization::Midi::timestamp, 0)) / TICKS_PER_BEAT;
+    this->numerator = tree.getProperty(Serialization::Midi::numerator, TIME_SIGNATURE_DEFAULT_NUMERATOR);
+    this->denominator = tree.getProperty(Serialization::Midi::denominator, TIME_SIGNATURE_DEFAULT_DENOMINATOR);
 }
 
 void TimeSignatureEvent::reset() noexcept {}
@@ -105,4 +109,11 @@ void TimeSignatureEvent::applyChanges(const TimeSignatureEvent& parameters) noex
     this->beat = parameters.beat;
     this->numerator = parameters.numerator;
     this->denominator = parameters.denominator;
+}
+
+bool TimeSignatureEvent::equalWithoutId(const TimeSignatureEvent* const first, 
+    const TimeSignatureEvent* const second) noexcept
+{
+    return first->beat == second->beat && first->numerator == second->numerator &&
+        first->denominator == second->denominator;
 }

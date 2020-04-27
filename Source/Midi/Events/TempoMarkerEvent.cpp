@@ -41,10 +41,10 @@ TempoMarkerEvent TempoMarkerEvent::withBeat(float newBeat) const noexcept
     return e;
 }
 
-TempoMarkerEvent TempoMarkerEvent::withBPM(const int newBpm) const noexcept
+TempoMarkerEvent TempoMarkerEvent::withBPM(const float newBpm) const noexcept
 {
     TempoMarkerEvent e(*this);
-    e.bpm = newBpm;
+    e.bpm = jlimit(1.0f, 999.0f, newBpm);
     return e;
 }
 
@@ -52,7 +52,7 @@ TempoMarkerEvent TempoMarkerEvent::withBPM(const int newBpm) const noexcept
 // Accessors
 //===------------------------------------------------------------------===//
 
-int TempoMarkerEvent::getBPM() const noexcept
+float TempoMarkerEvent::getBPM() const noexcept
 {
     return bpm;
 }
@@ -63,21 +63,26 @@ int TempoMarkerEvent::getBPM() const noexcept
 
 ValueTree TempoMarkerEvent::serialize() const noexcept
 {
-    using namespace Serialization;
-    ValueTree tree(Midi::tempoMarker);
-    //tree.setProperty(Midi::id, this->id, nullptr);
-    tree.setProperty(Midi::timestamp, int(this->beat * TICKS_PER_BEAT), nullptr);
-    tree.setProperty(Midi::bpm, this->bpm, nullptr);
+    ValueTree tree(Serialization::Midi::tempoMarker);
+    tree.setProperty(Serialization::Midi::timestamp, int(this->beat * TICKS_PER_BEAT), nullptr);
+    tree.setProperty(Serialization::Midi::bpm, this->bpm, nullptr);
     return tree;
 }
 
 void TempoMarkerEvent::deserialize(const ValueTree& tree) noexcept
 {
     this->reset();
-    using namespace Serialization;
-    //this->id = tree.getProperty(Midi::id);
-    this->beat = float(tree.getProperty(Midi::timestamp)) / TICKS_PER_BEAT;
-    this->bpm = tree.getProperty(Midi::bpm, TEMPO_DEFAULT_BPM);
+
+    const auto root =
+        tree.hasType(Serialization::Midi::tempoMarker) ?
+        tree : tree.getChildWithName(Serialization::Midi::tempoMarker);
+
+    if (!root.isValid())
+        return;
+
+    this->beat = float(tree.getProperty(Serialization::Midi::timestamp, 0)) / TICKS_PER_BEAT;
+    this->bpm = tree.getProperty(Serialization::Midi::bpm, TEMPO_DEFAULT_BPM);
+    this->bpm = jlimit(1.0f, 999.0f, this->bpm);
 }
 
 void TempoMarkerEvent::reset() noexcept {}
@@ -86,5 +91,11 @@ void TempoMarkerEvent::applyChanges(const TempoMarkerEvent & parameters) noexcep
 {
     jassert(this->id == parameters.id);
     this->beat = parameters.beat;
-    this->bpm = parameters.bpm;
+    this->bpm = jlimit(1.0f, 999.0f, parameters.bpm);
+}
+
+bool TempoMarkerEvent::equalWithoutId(const TempoMarkerEvent* const first, const 
+    TempoMarkerEvent* const second) noexcept
+{
+    return first->beat == second->beat && first->bpm == second->bpm;
 }

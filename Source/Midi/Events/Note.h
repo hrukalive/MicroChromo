@@ -80,6 +80,18 @@ public:
 
     void applyChanges(const Note& parameters) noexcept;
 
+    static inline bool equalWithoutId(const MidiEvent* const first, const MidiEvent* const second) noexcept
+    {
+        return MidiEvent::equalWithoutId(first, second);
+    }
+
+    static inline bool equalWithoutId(const Note& first, const Note& second) noexcept
+    {
+        return Note::equalWithoutId(&first, &second);
+    }
+
+    static bool equalWithoutId(const Note* const first, const Note* const second) noexcept;
+
     static inline int compareElements(const MidiEvent* const first, const MidiEvent* const second) noexcept
     {
         return MidiEvent::compareElements(first, second);

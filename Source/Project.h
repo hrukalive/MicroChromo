@@ -10,35 +10,36 @@
 #include "TimeSignatureTrack.h"
 #include "PitchColorMap.h"
 
+#include "VoiceScheduler.h"
+
 class ProjectListener;
 class MicroChromoAudioProcessor;
 
 //==============================================================================
-class Project : public FileBasedDocument
+class Project : public Serializable, public ChangeBroadcaster
 {
 public:
     //==============================================================================
     Project(MicroChromoAudioProcessor& p, String title);
     ~Project() = default;
 
-    //==============================================================================
-    std::unique_ptr<XmlElement> createXml();
-    void loadFromXml(XmlElement* xml);
-
     //===------------------------------------------------------------------===//
     // Accessors
     //===------------------------------------------------------------------===//
-    MidiTrack* addTrack(ValueTree& serializedState, const String& name, int channel, bool undoable);
+    NoteTrack* addTrack(ValueTree& serializedState, const String& name, int channel, bool undoable);
     bool removeTrack(IdGenerator::Id trackId, bool undoable);
 
-    Array<MidiTrack*> getTracks() const;
+    Array<MidiTrack*> getAllTracks() const;
     Point<float> getProjectRangeInBeats() const;
     UndoManager& getUndoManager() noexcept { return undoManager; }
 
+    String getTitle() { return _title; }
     TempoTrack* getTempoTrack() { return tempoMarkerTrack.get(); }
     TimeSignatureTrack* getTimeSignatureTrack() { return timeSignatureTrack.get(); }
     const OwnedArray<NoteTrack>& getNoteTracks() { return noteTracks; }
     PitchColorMap* getPitchColorMap() { return pitchColorMap.get(); }
+
+    VoiceScheduler* getScheduler() { return voiceScheduler.get(); }
 
     template<typename T>
     T* findTrackById(IdGenerator::Id id)
@@ -81,10 +82,18 @@ public:
     void broadcastPostChangePitchColorMapEntry();
     void broadcastRemovePitchColorMapEntry(const PitchColorMapEntry& entry);
     void broadcastPostRemovePitchColorMapEntry();
+    void broadcastChangePitchColorMap(PitchColorMap* const colorMap);
 
     void broadcastChangeViewBeatRange(float firstBeat, float lastBeat);
     void broadcastReloadProjectContent();
     Point<float> broadcastChangeProjectBeatRange();
+
+    //===------------------------------------------------------------------===//
+    // Serializable
+    //===------------------------------------------------------------------===//
+    ValueTree serialize() const override;
+    void deserialize(const ValueTree& tree) override;
+    void reset() override;
 
     //===------------------------------------------------------------------===//
     // OwnedArray wrapper
@@ -117,15 +126,20 @@ public:
         noteTracks.indexOfSorted(*track, track);
     }
 
+    //===------------------------------------------------------------------===//
+    // Helpers
+    //===------------------------------------------------------------------===//
+    std::pair<int, float> getBarAndBeat(float timestamp);
+
+    Array<MidiFile> exportMidiFiles();
+    void loadMidiFile(const Array<File>& files);
+
 private:
     friend class NoteTrackInsertAction;
+    friend class NoteTrackRemoveAction;
 
-    //==============================================================================
-    String getDocumentTitle() override;
-    Result loadDocument(const File& file) override;
-    Result saveDocument(const File& file) override;
-    File getLastDocumentOpened() override;
-    void setLastDocumentOpened(const File& file) override;
+    void loadMidiWizard(std::shared_ptr<int> fileCounter, std::shared_ptr<int> trackCounter,
+        std::shared_ptr<OwnedArray<MidiFile>> midiFiles, std::shared_ptr<StringArray> midiFilenames);
 
     //==============================================================================
     MidiTrack* getTrackById(IdGenerator::Id id);
@@ -144,5 +158,10 @@ private:
     std::unique_ptr<TimeSignatureTrack> timeSignatureTrack{ nullptr };
     OwnedArray<NoteTrack> noteTracks;
     std::unique_ptr<PitchColorMap> pitchColorMap;
+
+    std::unique_ptr<VoiceScheduler> voiceScheduler;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Project);
+    JUCE_DECLARE_WEAK_REFERENCEABLE(Project);
 };
 

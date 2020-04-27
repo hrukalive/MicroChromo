@@ -18,10 +18,29 @@ PitchColorMapEntry::PitchColorMapEntry() noexcept :
     colorMap(nullptr),
     name("0"),
     value(0),
-    color(Colours::grey),
-    defaultKey(-1)
+    color(Colours::grey)
 {
     id = IdGenerator::generateId();
+}
+
+PitchColorMapEntry::PitchColorMapEntry(const PitchColorMapEntry& other) noexcept
+{
+    colorMap = other.colorMap;
+    id = other.id;
+    name = other.name;
+    value = other.value;
+    color = other.color;
+    defaultKeys = other.defaultKeys;
+}
+PitchColorMapEntry& PitchColorMapEntry::operator=(const PitchColorMapEntry& other)
+{
+    colorMap = other.colorMap;
+    id = other.id;
+    name = other.name;
+    value = other.value;
+    color = other.color;
+    defaultKeys = other.defaultKeys;
+    return *this;
 }
 
 PitchColorMapEntry::PitchColorMapEntry(WeakReference<PitchColorMap> owner,
@@ -31,11 +50,19 @@ PitchColorMapEntry::PitchColorMapEntry(WeakReference<PitchColorMap> owner,
     name(parametersToCopy.name),
     value(parametersToCopy.value),
     color(parametersToCopy.color),
-    defaultKey(parametersToCopy.defaultKey) {}
+    defaultKeys(parametersToCopy.defaultKeys) {}
+
 
 PitchColorMapEntry::PitchColorMapEntry(WeakReference<PitchColorMap> owner, String name,
-    int value, Colour color, int defaultKey) noexcept :
-    colorMap(owner), name(name), value(value), color(color), defaultKey(defaultKey)
+    int value, Colour color, const std::unordered_set<int>& defaultSet) noexcept :
+    colorMap(owner), name(name), value(value), color(color), defaultKeys(defaultSet)
+{
+    id = IdGenerator::generateId();
+}
+
+PitchColorMapEntry::PitchColorMapEntry(WeakReference<PitchColorMap> owner, String name,
+    int value, Colour color) noexcept :
+    colorMap(owner), name(name), value(value), color(color)
 {
     id = IdGenerator::generateId();
 }
@@ -61,10 +88,10 @@ PitchColorMapEntry PitchColorMapEntry::withColor(const Colour& newColor)
     return e;
 }
 
-PitchColorMapEntry PitchColorMapEntry::withDefaultKey(const int newKey)
+PitchColorMapEntry PitchColorMapEntry::withDefaultKeys(const std::unordered_set<int>& newKeys)
 {
     PitchColorMapEntry e(*this);
-    e.defaultKey = newKey;
+    e.defaultKeys = newKeys;
     return e;
 }
 
@@ -87,9 +114,9 @@ Colour PitchColorMapEntry::getColor() const noexcept
 {
     return color;
 }
-int PitchColorMapEntry::getDefaultKey() const noexcept
+std::unordered_set<int> PitchColorMapEntry::getDefaultKeys() const noexcept
 {
-    return defaultKey;
+    return defaultKeys;
 }
 PitchColorMap* PitchColorMapEntry::getPitchColorMap()
 {
@@ -107,7 +134,7 @@ ValueTree PitchColorMapEntry::serialize() const noexcept
     tree.setProperty(PitchColor::name, name, nullptr);
     tree.setProperty(PitchColor::value, value, nullptr);
     tree.setProperty(PitchColor::color, color.toString(), nullptr);
-    tree.setProperty(PitchColor::defaultKey, defaultKey, nullptr);
+    tree.setProperty(PitchColor::defaultKeys, defaultKeysToString(), nullptr);
     return tree;
 }
 
@@ -115,13 +142,16 @@ void PitchColorMapEntry::deserialize(const ValueTree& tree) noexcept
 {
     reset();
     using namespace Serialization;
-    name = tree.getProperty(PitchColor::name);
-    value = tree.getProperty(PitchColor::value);
-    color = Colour::fromString((StringRef)tree.getProperty(PitchColor::color));
-    defaultKey = tree.getProperty(PitchColor::defaultKey);
+    name = tree.getProperty(PitchColor::name, "0");
+    value = tree.getProperty(PitchColor::value, 0);
+    color = Colour::fromString((StringRef)tree.getProperty(PitchColor::color, "ffafafaf"));
+    defaultKeys = stringToDefaultKeys(tree.getProperty(PitchColor::defaultKeys, ""));
 }
 
-void PitchColorMapEntry::reset() noexcept {}
+void PitchColorMapEntry::reset() noexcept
+{
+    defaultKeys.clear();
+}
 
 //===------------------------------------------------------------------===//
 // Helpers
@@ -133,7 +163,25 @@ void PitchColorMapEntry::applyChanges(const PitchColorMapEntry& other) noexcept
     name = other.name;
     value = other.value;
     color = other.color;
-    defaultKey = other.defaultKey;
+    defaultKeys = other.defaultKeys;
+}
+
+String PitchColorMapEntry::defaultKeysToNoteNames() const noexcept
+{
+    Array<int> tmp;
+    for (auto k : defaultKeys)
+        tmp.add(k % 12);
+    tmp.sort();
+    StringArray tmp2;
+    for (auto k : tmp)
+        tmp2.add(MidiMessage::getMidiNoteName(k, true, false, 4));
+    return tmp2.joinIntoString(", ");
+}
+
+bool PitchColorMapEntry::equalWithoutId(const PitchColorMapEntry* const first, const PitchColorMapEntry* const second) noexcept
+{
+    return first->value == second->value && first->name == second->name &&
+        first->color == second->color && first->defaultKeysToString() == second->defaultKeysToString();
 }
 
 int PitchColorMapEntry::compareElements(const PitchColorMapEntry* const first, const PitchColorMapEntry* const second) noexcept
@@ -150,8 +198,7 @@ int PitchColorMapEntry::compareElements(const PitchColorMapEntry* const first, c
     const int colorResult = first->color.toString().compare(second->color.toString());
     if (colorResult != 0) { return colorResult; }
 
-    const float defaultKeyDiff = first->defaultKey - second->defaultKey;
-    const int defaultKeyResult = (defaultKeyDiff > 0.f) - (defaultKeyDiff < 0.f);
+    const int defaultKeyResult = first->defaultKeysToString().compare(second->defaultKeysToString());
     if (defaultKeyResult != 0) { return defaultKeyResult; }
 
     const int idDiff = first->id - second->id;
@@ -159,20 +206,46 @@ int PitchColorMapEntry::compareElements(const PitchColorMapEntry* const first, c
     return idResult;
 }
 
+String PitchColorMapEntry::defaultKeysToString() const noexcept
+{
+    StringArray tmp;
+    for (auto k : defaultKeys)
+        tmp.add(String(k % 12));
+    tmp.sort(true);
+    return tmp.joinIntoString(" ");
+}
+
+std::unordered_set<int> PitchColorMapEntry::stringToDefaultKeys(const String& str) const noexcept
+{
+    std::unordered_set<int> ret;
+    auto tmp = StringArray::fromTokens(str.retainCharacters("0123456789 "), false);
+    for (auto& s : tmp)
+        ret.insert(s.getIntValue() % 12);
+    return ret;
+}
 
 //==============================================================================
-PitchColorMap::PitchColorMap(Project& project) noexcept :
-    project(project),
+PitchColorMap::PitchColorMap() noexcept :
+    project(nullptr),
     name("---INIT---")
 {
+    id = IdGenerator::generateId();
     insert(PitchColorMapEntry(this, "0", 0, Colours::grey), false);
 }
 
-PitchColorMap::PitchColorMap(Project& project, String name, const Array<PitchColorMapEntry>& entries) noexcept :
+PitchColorMap::PitchColorMap(WeakReference<Project> project) noexcept :
+    project(project),
+    name("---INIT---")
+{
+    id = IdGenerator::generateId();
+    insert(PitchColorMapEntry(this, "0", 0, Colours::grey), false);
+}
+
+PitchColorMap::PitchColorMap(WeakReference<Project> project, String name, Array<PitchColorMapEntry>& entries) noexcept :
     project(project), name(name)
 {
-    for (auto& entry : entries)
-        insert(entry, false);
+    id = IdGenerator::generateId();
+    insertGroup(entries, true);
     if (!usedNames.contains("0"))
         insert(PitchColorMapEntry(this, "0", 0, Colours::grey), false);
 }
@@ -180,7 +253,24 @@ PitchColorMap::PitchColorMap(Project& project, String name, const Array<PitchCol
 //===------------------------------------------------------------------===//
 // Accessors
 //===------------------------------------------------------------------===//
-PitchColorMapEntry* PitchColorMap::getEntryById(IdGenerator::Id entryId)
+IdGenerator::Id PitchColorMap::getId() const noexcept
+{
+    return id;
+}
+
+String PitchColorMap::getName() const noexcept
+{
+    return name;
+}
+
+void PitchColorMap::setName(String newName, bool undoable)
+{
+    name = newName;
+    if (project)
+        project->broadcastChangePitchColorMap(this);
+}
+
+PitchColorMapEntry* PitchColorMap::findEntryById(IdGenerator::Id entryId)
 {
     for (auto* entry : collection)
         if (entry->getEntryId() == entryId)
@@ -188,12 +278,38 @@ PitchColorMapEntry* PitchColorMap::getEntryById(IdGenerator::Id entryId)
     return nullptr;
 }
 
-Array<PitchColorMapEntry> PitchColorMap::getAllEntries()
+PitchColorMapEntry* PitchColorMap::findEntryByName(String name)
+{
+    for (auto* entry : collection)
+        if (entry->getName() == name)
+            return entry;
+    return nullptr;
+}
+
+String PitchColorMap::findDefaultColorForKey(int keynum) const noexcept
+{
+    for (auto* entry : collection)
+        if (entry->getDefaultKeys().contains(keynum % 12))
+            return entry->getName();
+    return "0";
+}
+
+Array<PitchColorMapEntry> PitchColorMap::getAllEntries() const noexcept
 {
     Array<PitchColorMapEntry> result;
     for (auto* entry : collection)
         result.add(PitchColorMapEntry(*entry));
     return result;
+}
+
+std::unordered_set<int>& PitchColorMap::getUsedNotes() noexcept
+{
+    return usedNotes;
+}
+
+bool PitchColorMap::hasNamedUsed(String name)
+{
+    return usedNames.contains(name);
 }
 
 //===------------------------------------------------------------------===//
@@ -204,17 +320,23 @@ PitchColorMapEntry* PitchColorMap::insert(const PitchColorMapEntry& entry, bool 
     if (usedNames.contains(entry.getName()))
         return nullptr;
 
-    if (undoable)
+    if (undoable && project != nullptr)
     {
-        project.getUndoManager().
+        project->getUndoManager().
             perform(new PitchColorMapEntryInsertAction(*this, entry));
     }
     else
     {
         const auto ownedEntry = new PitchColorMapEntry(this, entry);
         collection.addSorted(*ownedEntry, ownedEntry);
-        project.broadcastAddPitchColorMapEntry(*ownedEntry);
-        project.broadcastPostAddPitchColorMapEntry();
+        usedNames.insert(ownedEntry->getName());
+        for (auto k : ownedEntry->getDefaultKeys())
+            usedNotes.insert(k);
+        if (project)
+        {
+            project->broadcastAddPitchColorMapEntry(*ownedEntry);
+            project->broadcastPostAddPitchColorMapEntry();
+        }
         return ownedEntry;
     }
 
@@ -222,10 +344,11 @@ PitchColorMapEntry* PitchColorMap::insert(const PitchColorMapEntry& entry, bool 
 }
 bool PitchColorMap::remove(const PitchColorMapEntry& entry, bool undoable)
 {
-    if (undoable)
+    if (undoable && project != nullptr)
     {
-        project.getUndoManager().
+        project->getUndoManager().
             perform(new PitchColorMapEntryRemoveAction(*this, entry));
+        return true;
     }
     else
     {
@@ -234,25 +357,26 @@ bool PitchColorMap::remove(const PitchColorMapEntry& entry, bool undoable)
         if (index >= 0)
         {
             auto* removedEntry = collection.getUnchecked(index);
-            project.broadcastRemovePitchColorMapEntry(*removedEntry);
-            collection.remove(index, true);
+            if (project)
+                project->broadcastRemovePitchColorMapEntry(*removedEntry);
             usedNames.erase(entry.getName());
-            project.broadcastPostRemovePitchColorMapEntry();
+            for (auto k : entry.getDefaultKeys())
+                usedNotes.erase(k);
+            collection.remove(index, true);
+            if (project)
+                project->broadcastPostRemovePitchColorMapEntry();
             return true;
         }
-
         return false;
     }
-
-    return true;
 }
 bool PitchColorMap::change(const PitchColorMapEntry& oldEntry, const PitchColorMapEntry& newEntry, bool undoable)
 {
-    if (usedNames.contains(newEntry.getName()))
-        return nullptr;
-    if (undoable)
+    if (oldEntry.getName() != newEntry.getName() && usedNames.contains(newEntry.getName()))
+        return false;
+    if (undoable && project != nullptr)
     {
-        project.getUndoManager().
+        project->getUndoManager().
             perform(new PitchColorMapEntryChangeAction(*this, oldEntry, newEntry));
     }
     else
@@ -263,12 +387,19 @@ bool PitchColorMap::change(const PitchColorMapEntry& oldEntry, const PitchColorM
         {
             auto* changedEntry = static_cast<PitchColorMapEntry*>(collection.getUnchecked(index));
             changedEntry->applyChanges(newEntry);
-            collection.remove(index, false);
             usedNames.erase(oldEntry.getName());
+            for (auto k : oldEntry.getDefaultKeys())
+                usedNotes.erase(k);
+            collection.remove(index, false);
             collection.addSorted(*changedEntry, changedEntry);
             usedNames.insert(newEntry.getName());
-            project.broadcastChangePitchColorMapEntry(oldEntry, *changedEntry);
-            project.broadcastPostChangePitchColorMapEntry();
+            for (auto k : newEntry.getDefaultKeys())
+                usedNotes.insert(k);
+            if (project)
+            {
+                project->broadcastChangePitchColorMapEntry(oldEntry, *changedEntry);
+                project->broadcastPostChangePitchColorMapEntry();
+            }
             return true;
         }
 
@@ -280,13 +411,15 @@ bool PitchColorMap::change(const PitchColorMapEntry& oldEntry, const PitchColorM
 
 bool PitchColorMap::insertGroup(Array<PitchColorMapEntry>& entries, bool undoable)
 {
-    if (undoable)
+    if (undoable && project != nullptr)
     {
-        project.getUndoManager().
+        project->getUndoManager().
             perform(new PitchColorMapEntrysGroupInsertAction(*this, entries));
+        return true;
     }
     else
     {
+        bool added = false;
         for (int i = 0; i < entries.size(); ++i)
         {
             const PitchColorMapEntry& entryParams = entries.getUnchecked(i);
@@ -295,40 +428,50 @@ bool PitchColorMap::insertGroup(Array<PitchColorMapEntry>& entries, bool undoabl
             const auto ownedEntry = new PitchColorMapEntry(this, entryParams);
             collection.addSorted(*ownedEntry, ownedEntry);
             usedNames.insert(ownedEntry->getName());
-            project.broadcastAddPitchColorMapEntry(*ownedEntry);
+            for (auto k : ownedEntry->getDefaultKeys())
+                usedNotes.insert(k);
+            if (project)
+                project->broadcastAddPitchColorMapEntry(*ownedEntry);
+            added = true;
         }
-        project.broadcastPostAddPitchColorMapEntry();
+        if (project)
+            project->broadcastPostAddPitchColorMapEntry();
+        return added;
     }
-
-    return true;
 }
 
 bool PitchColorMap::removeGroup(Array<PitchColorMapEntry>& entries, bool undoable)
 {
-    if (undoable)
+    if (undoable && project != nullptr)
     {
-        project.getUndoManager().
+        project->getUndoManager().
             perform(new PitchColorMapEntrysGroupRemoveAction(*this, entries));
+        return true;
     }
     else
     {
+        bool deleted = false;
         for (int i = 0; i < entries.size(); ++i)
         {
-            const PitchColorMapEntry& note = entries.getUnchecked(i);
-            const int index = collection.indexOfSorted(note, &note);
+            const PitchColorMapEntry& entry = entries.getUnchecked(i);
+            const int index = collection.indexOfSorted(entry, &entry);
             jassert(index >= 0);
             if (index >= 0)
             {
                 auto* removedEntry = collection.getUnchecked(index);
-                project.broadcastRemovePitchColorMapEntry(*removedEntry);
-                collection.remove(index, true);
+                if (project)
+                    project->broadcastRemovePitchColorMapEntry(*removedEntry);
                 usedNames.erase(removedEntry->getName());
+                for (auto k : removedEntry->getDefaultKeys())
+                    usedNotes.erase(k);
+                collection.remove(index, true);
+                deleted = true;
             }
         }
-        project.broadcastPostRemovePitchColorMapEntry();
+        if (project)
+            project->broadcastPostRemovePitchColorMapEntry();
+        return deleted;
     }
-
-    return true;
 }
 
 bool PitchColorMap::changeGroup(Array<PitchColorMapEntry>& entriesBefore, 
@@ -336,20 +479,22 @@ bool PitchColorMap::changeGroup(Array<PitchColorMapEntry>& entriesBefore,
 {
     jassert(entriesBefore.size() == entriesAfter.size());
 
-    if (undoable)
+    if (undoable && project != nullptr)
     {
-        project.getUndoManager().
+        project->getUndoManager().
             perform(new PitchColorMapEntrysGroupChangeAction(*this, entriesBefore, entriesAfter));
+        return true;
     }
     else
     {
+        bool changed = false;
         for (int i = 0; i < entriesBefore.size(); ++i)
         {
             const PitchColorMapEntry& oldParams = entriesBefore.getReference(i);
             const PitchColorMapEntry& newParams = entriesAfter.getReference(i);
 
-            if (usedNames.contains(newParams.getName()))
-                return nullptr;
+            if (oldParams.getName() != newParams.getName() && usedNames.contains(newParams.getName()))
+                continue;
 
             const int index = collection.indexOfSorted(oldParams, &oldParams);
 
@@ -358,17 +503,23 @@ bool PitchColorMap::changeGroup(Array<PitchColorMapEntry>& entriesBefore,
             {
                 auto* changedEntry = static_cast<PitchColorMapEntry*>(collection.getUnchecked(index));
                 changedEntry->applyChanges(newParams);
-                collection.remove(index, false);
                 usedNames.erase(oldParams.getName());
+                for (auto k : oldParams.getDefaultKeys())
+                    usedNotes.erase(k);
+                collection.remove(index, false);
                 collection.addSorted(*changedEntry, changedEntry);
                 usedNames.insert(newParams.getName());
-                project.broadcastChangePitchColorMapEntry(oldParams, *changedEntry);
+                for (auto k : newParams.getDefaultKeys())
+                    usedNotes.insert(k);
+                if (project)
+                    project->broadcastChangePitchColorMapEntry(oldParams, *changedEntry);
+                changed = true;
             }
         }
-        project.broadcastPostChangePitchColorMapEntry();
+        if (project)
+            project->broadcastPostChangePitchColorMapEntry();
+        return changed;
     }
-
-    return true;
 }
 
 //===------------------------------------------------------------------===//
@@ -377,7 +528,7 @@ bool PitchColorMap::changeGroup(Array<PitchColorMapEntry>& entriesBefore,
 ValueTree PitchColorMap::serialize() const
 {
     ValueTree tree(Serialization::PitchColor::colorMap);
-
+    tree.setProperty(Serialization::PitchColor::name, name, nullptr);
     for (int i = 0; i < collection.size(); ++i)
     {
         const PitchColorMapEntry* entry = collection.getUnchecked(i);
@@ -398,6 +549,7 @@ void PitchColorMap::deserialize(const ValueTree& tree)
     if (!root.isValid())
         return;
 
+    name = tree.getProperty(Serialization::PitchColor::name).toString();
     for (const auto& e : root)
     {
         if (e.hasType(Serialization::PitchColor::entry))
@@ -407,8 +559,10 @@ void PitchColorMap::deserialize(const ValueTree& tree)
 
             if (!usedNames.contains(entry->getName()))
             {
-                collection.add(entry);
+                collection.addSorted(*entry, entry);
                 usedNames.insert(entry->getName());
+                for (auto k : entry->getDefaultKeys())
+                    usedNotes.insert(k);
             }
         }
     }
@@ -418,8 +572,10 @@ void PitchColorMap::deserialize(const ValueTree& tree)
 
 void PitchColorMap::reset()
 {
+    name = "---INIT---";
     collection.clear();
     usedNames.clear();
+    usedNotes.clear();
 }
 
 //===------------------------------------------------------------------===//
@@ -435,8 +591,8 @@ void PitchColorMap::sort()
 
 
 //==============================================================================
-int PitchColorMapNameComparator::compareElements(const PitchColorMap& first, const PitchColorMap& second)
+int PitchColorMapNameComparator::compareElements(const PitchColorMap* const first, const PitchColorMap* const second) noexcept
 {
-    return first.name.compare(second.name);
+    return first->name.compare(second->name);
 }
 

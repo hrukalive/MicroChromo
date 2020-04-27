@@ -13,7 +13,7 @@
 #include "Common.h"
 #include "MidiEvent.h"
 
-#define TEMPO_DEFAULT_BPM 120
+#define TEMPO_DEFAULT_BPM 120.0f
 
 class MidiTrack;
 
@@ -35,13 +35,13 @@ public:
 
     TempoMarkerEvent withDeltaBeat(float beatOffset) const noexcept;
     TempoMarkerEvent withBeat(float newBeat) const noexcept;
-    TempoMarkerEvent withBPM(const int newBpm) const noexcept;
+    TempoMarkerEvent withBPM(const float newBpm) const noexcept;
 
     //===------------------------------------------------------------------===//
     // Accessors
     //===------------------------------------------------------------------===//
 
-    int getBPM() const noexcept;
+    float getBPM() const noexcept;
 
     //===------------------------------------------------------------------===//
     // Serializable
@@ -56,8 +56,20 @@ public:
 
     void applyChanges(const TempoMarkerEvent& parameters) noexcept;
 
+    static inline bool equalWithoutId(const MidiEvent* const first, const MidiEvent* const second) noexcept
+    {
+        return MidiEvent::equalWithoutId(first, second);
+    }
+
+    static inline bool equalWithoutId(const TempoMarkerEvent& first, const TempoMarkerEvent& second) noexcept
+    {
+        return TempoMarkerEvent::equalWithoutId(&first, &second);
+    }
+
+    static bool equalWithoutId(const TempoMarkerEvent* const first, const TempoMarkerEvent* const second) noexcept;
+
 protected:
-    float bpm;
+    float bpm = TEMPO_DEFAULT_BPM;
 
 private:
     JUCE_LEAK_DETECTOR(TempoMarkerEvent);

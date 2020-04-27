@@ -11,14 +11,16 @@
 #pragma once
 
 #include "Common.h"
+#include "Serializable.h"
 #include "PluginWindow.h"
 #include "PluginInstance.h"
 #include "ParameterLinkEditor.h"
 #include "ParameterCcLearn.h"
 
+class ParameterLinker;
 class MicroChromoAudioProcessor;
 
-class PluginBundle : public ChangeBroadcaster, public AudioProcessorParameter::Listener
+class PluginBundle : public ChangeBroadcaster, public AudioProcessorParameter::Listener, public Serializable
 {
 public:
     PluginBundle(MicroChromoAudioProcessor& p, 
@@ -43,6 +45,10 @@ public:
     const PluginDescription getDescription() { return currentDesc; }
 
     //==============================================================================
+    ValueTree serialize() const override { return ValueTree(); }
+    void deserialize(const ValueTree& tree) override {}
+    void reset() override {}
+
     std::unique_ptr<XmlElement> createXml(String rootTag);
     void loadFromXml(const XmlElement* xml, String rootTag);
     void propagateState();

@@ -209,12 +209,21 @@ bool TempoTrack::changeGroup(Array<TempoMarkerEvent>& groupBefore,
 }
 
 //===----------------------------------------------------------------------===//
+// Accessors
+//===----------------------------------------------------------------------===//
+float TempoTrack::getLastBeat() const noexcept
+{
+    float lastBeat = MidiTrack::getLastBeat();
+    return lastBeat + 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Serializable
 //===----------------------------------------------------------------------===//
 
 ValueTree TempoTrack::serialize() const
 {
-    ValueTree tree(Serialization::Midi::tempoMarker);
+    ValueTree tree(Serialization::Midi::tempoMarkers);
 
     for (int i = 0; i < midiEvents.size(); ++i)
     {
@@ -228,17 +237,13 @@ ValueTree TempoTrack::serialize() const
 void TempoTrack::deserialize(const ValueTree& tree)
 {
     reset();
-    using namespace Serialization;
 
     const auto root =
-        tree.hasType(Serialization::Midi::tempoMarker) ?
-        tree : tree.getChildWithName(Serialization::Midi::tempoMarker);
+        tree.hasType(Serialization::Midi::tempoMarkers) ?
+        tree : tree.getChildWithName(Serialization::Midi::tempoMarkers);
 
     if (!root.isValid())
         return;
-
-    float lastBeat = 0;
-    float firstBeat = 0;
 
     for (const auto& e : root)
     {
@@ -248,9 +253,6 @@ void TempoTrack::deserialize(const ValueTree& tree)
             marker->deserialize(e);
 
             midiEvents.add(marker);
-
-            lastBeat = jmax(lastBeat, marker->getBeat());
-            firstBeat = jmin(firstBeat, marker->getBeat());
         }
     }
 

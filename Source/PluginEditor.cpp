@@ -14,7 +14,8 @@
 #include "PluginInstance.h"
 #include "PluginBundle.h"
 #include "MainEditor.h"
-#include "SimpleMidiEditor.h"
+#include "SimpleNoteEditor.h"
+#include "SimpleTimeEditor.h"
 #include "ColorEditor.h"
 
 //==============================================================================
@@ -54,8 +55,9 @@ void MicroChromoAudioProcessorEditor::CustomTabbedComponent::currentTabChanged(i
     switch (newCurrentTabIndex)
     {
     case 0: _owner.setSize(400, 300 + 90); break;
-    case 1: _owner.setSize(500, 500); break;
-    case 2: _owner.setSize(300, 500); break;
+    case 1: _owner.setSize(555, 500); break;
+    case 2: _owner.setSize(305, 500); break;
+    case 3: _owner.setSize(365, 500); break;
     default:
         break;
     }
@@ -116,17 +118,22 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     addAndMakeVisible(transportLabel);
 
     mainEditor.reset(new MainEditor(p, *this));
-    midiEditor.reset(new SimpleMidiEditor(*this));
-    colorEditor.reset(new ColorEditor(*this, *midiEditor));
+    noteEditor.reset(new SimpleNoteEditor(*this));
+    timeEditor.reset(new SimpleTimeEditor(*this));
+    colorEditor.reset(new ColorEditor(*this));
+
 
     tabComp.reset(new CustomTabbedComponent(TabbedButtonBar::Orientation::TabsAtTop, *this));
     tabComp->addTab("Main", Colours::darkgrey, mainEditor.get(), false);
-    tabComp->addTab("MIDI", Colours::darkgrey, midiEditor.get(), false);
+    tabComp->addTab("MIDI", Colours::darkgrey, noteEditor.get(), false);
+    tabComp->addTab("Time", Colours::darkgrey, timeEditor.get(), false);
     tabComp->addTab("Color", Colours::darkgrey, colorEditor.get(), false);
     addAndMakeVisible(tabComp.get());
 
     synthBundle->addChangeListener(this);
     psBundle->addChangeListener(this);
+
+    processor.getProject().addListener(this);
 
     changeListenerCallback(synthBundle.get());
     changeListenerCallback(psBundle.get());
@@ -139,6 +146,8 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
 MicroChromoAudioProcessorEditor::~MicroChromoAudioProcessorEditor()
 {
     stopTimer();
+    processor.getProject().removeListener(this);
+
     knownPluginList.removeChangeListener(this);
 
     synthBundle->removeChangeListener(this);
@@ -213,11 +222,6 @@ void MicroChromoAudioProcessorEditor::timerCallback()
     transportLabel.setText(ss.str(), dontSendNotification);
 }
 
-void MicroChromoAudioProcessorEditor::updateMidiEditor()
-{
-    midiEditor->updateTableContent();
-}
-
 //==============================================================================
 StringArray MicroChromoAudioProcessorEditor::getMenuBarNames()
 {
@@ -277,7 +281,7 @@ void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLe
         case SLOT_MENU_EXPOSE_PARAMETER:  bundle->openParameterLinkEditor(); break;
         case SLOT_MENU_START_CC: bundle->getCcLearnModule().startLearning(); break;
         case SLOT_MENU_MANAGE_CC: bundle->getCcLearnModule().showStatus(); break;
-        case SLOT_MENU_CLEAR_CC: bundle->getCcLearnModule().reset(true); break;
+        case SLOT_MENU_CLEAR_CC: bundle->getCcLearnModule().resetCcLearn(true); break;
         case SLOT_MENU_USE_KONTAKT: processor.toggleUseKontakt(processor.getPitchShiftModulationSource() != USE_KONTAKT); break;
         case SLOT_MENU_COPY_KONTAKT_SCRIPT: 
             SystemClipboard::copyTextToClipboard(String(BinaryData::MicroChromoKontaktScript_txt)
@@ -384,9 +388,9 @@ void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, Applic
         result.setInfo("Redo " + undoManager.getRedoDescription(), "Redo", "Edit",
             undoManager.canRedo() ? 0 : ApplicationCommandInfo::CommandFlags::isDisabled);
 #if JUCE_MAC
-        result.addDefaultKeypress('r', ModifierKeys::commandModifier);
+        result.addDefaultKeypress('z', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
 #else
-        result.addDefaultKeypress('r', ModifierKeys::ctrlModifier);
+        result.addDefaultKeypress('z', ModifierKeys::ctrlModifier | ModifierKeys::shiftModifier);
 #endif
         break;
     case CommandIDs::openPluginScanner:
@@ -412,11 +416,11 @@ bool MicroChromoAudioProcessorEditor::perform(const InvocationInfo& info)
         pluginListWindow->toFront(true);
         break;
     }
-    case CommandIDs::openProject:
-    case CommandIDs::saveProject:
-    case CommandIDs::saveAsProject:
-    case CommandIDs::importMidi:
-    case CommandIDs::exportMidi: break;
+    case CommandIDs::openProject: processor.loadFromUserSpecifiedFile(true); break;
+    case CommandIDs::saveProject: processor.setChangedFlag(true); processor.save(true, true); break;
+    case CommandIDs::saveAsProject: processor.saveAsInteractive(true); break;
+    case CommandIDs::importMidi: mainEditor->dropButton->triggerClick(); break;
+    case CommandIDs::exportMidi: mainEditor->exportMidiDialog(); break;
     case CommandIDs::undoAction: undoManager.undo(); break;
     case CommandIDs::redoAction: undoManager.redo(); break;
     default:
@@ -450,4 +454,9 @@ void MicroChromoAudioProcessorEditor::resized()
 
     menuBar->setBounds(b.removeFromTop(LookAndFeel::getDefaultLookAndFeel().getDefaultMenuBarHeight()));
     tabComp->setBounds(b);
+}
+
+void MicroChromoAudioProcessorEditor::onReloadProjectContent(const Array<MidiTrack*>& tracks)
+{
+    AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon, "Done", "Project loaded.");
 }

@@ -218,8 +218,9 @@ float NoteTrack::getLastBeat() const noexcept
 //===----------------------------------------------------------------------===//
 ValueTree NoteTrack::serialize() const
 {
-    ValueTree tree(Serialization::Midi::track);
-
+    ValueTree tree(Serialization::Midi::notes);
+    tree.setProperty(Serialization::Core::trackName, name, nullptr);
+    tree.setProperty(Serialization::Core::trackChannel, channel, nullptr);
     for (int i = 0; i < midiEvents.size(); ++i)
     {
         const MidiEvent* event = midiEvents.getUnchecked(i);
@@ -234,17 +235,21 @@ void NoteTrack::deserialize(const ValueTree& tree)
     reset();
 
     const auto root =
-        tree.hasType(Serialization::Midi::track) ?
-        tree : tree.getChildWithName(Serialization::Midi::track);
+        tree.hasType(Serialization::Midi::notes) ?
+        tree : tree.getChildWithName(Serialization::Midi::notes);
 
     if (!root.isValid())
         return;
 
+    if (root.hasProperty(Serialization::Core::trackId))
+        id = root.getProperty(Serialization::Core::trackId, IdGenerator::generateId());
+    name = root.getProperty(Serialization::Core::trackName, "empty");
+    channel = root.getProperty(Serialization::Core::trackChannel, 1);
     for (const auto& e : root)
     {
         if (e.hasType(Serialization::Midi::note))
         {
-            auto note = new Note(this);
+            auto* note = new Note(this);
             note->deserialize(e);
 
             midiEvents.add(note);
@@ -253,6 +258,13 @@ void NoteTrack::deserialize(const ValueTree& tree)
 
     sort();
     updateBeatRange(false);
+}
+
+ValueTree NoteTrack::serializeWithId() const
+{
+    auto tree = serialize();
+    tree.setProperty(Serialization::Core::trackId, id, nullptr);
+    return tree;
 }
 
 void NoteTrack::reset()

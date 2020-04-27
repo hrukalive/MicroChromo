@@ -12,6 +12,8 @@
 #include "Project.h"
 #include "NoteTrack.h"
 
+// Note track ID is reference in note actions, therefore, not changing.
+
 //===----------------------------------------------------------------------===//
 // Insert
 //===----------------------------------------------------------------------===//
@@ -27,11 +29,14 @@ bool NoteTrackInsertAction::perform()
 {
     auto* track = project.addTrack(trackState, trackName, trackChannel, false);
     trackId = track->getTrackId();
+    trackState = track->serializeWithId();
+    DBG("Perform [Insert track] " << trackId);
     return track != nullptr;
 }
 
 bool NoteTrackInsertAction::undo()
 {
+    DBG("Undo [Insert track] " << trackId);
     return project.removeTrack(trackId, false);
 }
 
@@ -55,9 +60,8 @@ bool NoteTrackRemoveAction::perform()
     if (NoteTrack* track = project.findTrackById<NoteTrack>(trackId))
     {
         numEvents = track->size();
-        serializedTreeItem = track->serialize();
-        trackName = track->getTrackName();
-        trackChannel = track->getTrackChannel();
+        serializedTreeItem = track->serializeWithId();
+        DBG("Perform [Remove track] " << trackId);
         return project.removeTrack(trackId, false);
     }
     return false;
@@ -68,7 +72,7 @@ bool NoteTrackRemoveAction::undo()
     if (serializedTreeItem.isValid())
     {
         auto* track = project.addTrack(serializedTreeItem, trackName, trackChannel, false);
-        trackId = track->getTrackId();
+        DBG("Undo [Remove track] " << track->getTrackId());
         return track != nullptr;
     }
 
@@ -78,9 +82,6 @@ bool NoteTrackRemoveAction::undo()
 int NoteTrackRemoveAction::getSizeInUnits()
 {
     if (serializedTreeItem.isValid())
-    {
         return (numEvents * sizeof(MidiEvent));
-    }
-
     return 1;
 }

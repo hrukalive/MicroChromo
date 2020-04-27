@@ -49,6 +49,7 @@ public:
     IdGenerator::Id getId() const noexcept;
     float getBeat() const noexcept;
 
+    static bool equalWithoutId(const MidiEvent* const first, const MidiEvent* const second) noexcept;
     static int compareElements(const MidiEvent* const first, const MidiEvent* const second) noexcept;
 
 protected:

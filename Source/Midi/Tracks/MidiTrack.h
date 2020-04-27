@@ -75,9 +75,10 @@ public:
         return this->midiEvents.end();
     }
 
-    inline MidiEvent* getUnchecked(const int index) const noexcept
+    template<typename T = MidiEvent>
+    inline T* getUnchecked(const int index) const noexcept
     {
-        return this->midiEvents.getUnchecked(index);
+        return dynamic_cast<T*>(this->midiEvents.getUnchecked(index));
     }
 
     inline int indexOfSorted(const MidiEvent* const event) const noexcept
@@ -95,6 +96,10 @@ public:
     static int compareElements(const MidiTrack* const first, const MidiTrack* const second) noexcept;
 
 protected:
+    friend class Project;
+
+    void setTrackId(IdGenerator::Id _id) { id = _id; }
+
     Project& project;
 
     IdGenerator::Id id;
@@ -106,6 +111,6 @@ protected:
     float lastStartBeat;
 
 private:
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiTrack)
-    JUCE_DECLARE_WEAK_REFERENCEABLE(MidiTrack)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiTrack);
+    JUCE_DECLARE_WEAK_REFERENCEABLE(MidiTrack);
 };

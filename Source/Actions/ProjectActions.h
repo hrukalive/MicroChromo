@@ -30,10 +30,12 @@ public:
     bool undo() override;
     int getSizeInUnits() override;
 
+    IdGenerator::Id getTrackId() const noexcept { return trackId; }
+
 private:
     Project& project;
 
-    IdGenerator::Id trackId;
+    IdGenerator::Id trackId = -1;
     String trackName;
     int trackChannel;
 

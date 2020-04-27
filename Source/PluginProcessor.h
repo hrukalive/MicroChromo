@@ -11,18 +11,16 @@
 #pragma once
 
 #include "Common.h"
-#include "Note.h"
 #include "PluginInstance.h"
 #include "PluginBundle.h"
-
 #include "Project.h"
-
-using GUICallback = std::function<void()>;
+#include "ParameterLinker.h"
+#include "Note.h"
 
 //==============================================================================
 /**
 */
-class MicroChromoAudioProcessor  : public AudioProcessor, ChangeListener, HighResolutionTimer
+class MicroChromoAudioProcessor : public AudioProcessor, public ChangeListener, public FileBasedDocument, public HighResolutionTimer
 {
 public:
     //==============================================================================
@@ -64,10 +62,7 @@ public:
     void finishLoadingPlugin();
 
     //==============================================================================
-    //ValueTree serialize() const;
-    //void deserialize(const ValueTree& tree);
-    //void reset();
-
+    void reset();
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
@@ -76,17 +71,6 @@ public:
 
     void updateMidiSequence(int newBase = -1);
     void updateCcMidiSequenceWithNewBase(int newBase);
-    void filterNotesWithColorMap();
-    void updateNoteColorMap(Array<ColorPitchBendRecord>& colors);
-    void renameNoteColorMap(String oldName, String newName);
-    void clearNoteColorMap();
-
-
-    //==============================================================================
-    void addNote(const Note& note);
-    void clearNotes();
-    void insertNote(int index, const Note& note);
-    void sortNotes();
 
     //==============================================================================
     void togglePlayback();
@@ -109,11 +93,11 @@ public:
     int getParameterSlotNumber() { return parameterSlotNumber; }
     int getMidiChannel() { return midiChannel; }
     int getCcBase() { return ccBase; }
-    Array<Note>& getNotes() { return notes; }
-    auto& getNoteColorMap() { return noteColorMap; }
     String getSelectedColorPresetName() { return selectedPreset; }
     void setSelectedColorPresetName(String name) { selectedPreset = name; }
     double getMidiSequenceEndTime() { return rangeEndTime; }
+
+    Project& getProject() { return project; }
 
     OwnedArray<MidiMessageSequence>& getNoteMidiSequence() { return notesMidiSeq; }
     OwnedArray<MidiMessageSequence>& getCcMidiSequence() { return ccMidiSeq; }
@@ -129,16 +113,21 @@ public:
 
     void triggerPanic() { panicNoteOff = true; }
 
-
     static const int MAX_INSTANCES = 8;
+
 private:
-
-    void updateMidiSequenceGeneral(Array<SimpleMidiMessage>& sequence);
-    void updateMidiSequenceKontakt(Array<SimpleMidiMessage>& sequence);
-
     void addMessageToAllBuffer(OwnedArray<MidiBuffer>& midiBuffers, MidiMessage& msg, int sampleOffset);
     void sendAllNotesOff();
     void sendAllNotesOffPanic();
+
+    //===------------------------------------------------------------------===//
+    // FileBasedDocument
+    //===------------------------------------------------------------------===//
+    String getDocumentTitle() override;
+    Result loadDocument(const File& file) override;
+    Result saveDocument(const File& file) override;
+    File getLastDocumentOpened() override;
+    void setLastDocumentOpened(const File& file) override;
 
     //==============================================================================
     ApplicationProperties appProperties;
@@ -159,14 +148,12 @@ private:
 
     OwnedArray<ParameterLinker> synthParamPtr, psParamPtr;
 
-    std::shared_ptr<Project> project;
-
-    Array<Note> notes;
-    HashMap<String, ColorPitchBendRecord> noteColorMap;
+    Project project{ *this, "Untitled" };
+    String lastDocumentFilename = "";
     
     OwnedArray<MidiMessageSequence> notesMidiSeq, ccMidiSeq;
 
-    std::atomic<int> ccBase{ 102 }, psModSource{ USE_NONE }, midiChannel{ 1 };
+    std::atomic<int> ccBase{ 102 }, psModSource{ USE_NONE }, midiChannel{ 0 };
 
     //==============================================================================
     AudioPlayHead::CurrentPositionInfo posInfo;
@@ -177,21 +164,21 @@ private:
     std::atomic<bool> isPlayingNote{ false }, panicNoteOff{ false };
     std::atomic<int> isWithIn{ -1 };
     bool wasStopped = true;
-    std::unordered_set<int> playingNotes;
+    std::unordered_map<int, float> playingNotes;
 
     std::atomic<bool> isHostPlaying{ false };
     std::atomic<int> transportState{ PLUGIN_PAUSED };
     std::atomic<double> transportTimeElasped{ 0.0 };
     CriticalSection transportLock;
 
-    float nextStartTime = -1.0, rangeStartTime = FP_INFINITE, rangeEndTime = -FP_INFINITE;
+    float nextStartTime = -1.0, rangeStartTime = FLT_MAX, rangeEndTime = -FLT_MAX;
 
     int synthBundleTotalNumInputChannels, synthBundleMainBusNumInputChannels, synthBundleMainBusNumOutputChannels,
         psBundleTotalNumInputChannels, psBundleTotalNumOutputChannels, psBundleMainBusNumInputChannels, psBundleMainBusNumOutputChannels;
     float sampleLength{ -1 }, bufferLength{ -1 };
 
     bool isCurrentModSrcKontakt = false;
-    bool updateMidSeqSus = false, updateModSrcSus = false, pluginLoadSus = false;
+    std::atomic<bool> updateMidSeqSus = false, updateModSrcSus = false, pluginLoadSus = false, loadingDocument = false;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MicroChromoAudioProcessor)

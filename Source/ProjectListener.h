@@ -19,6 +19,7 @@
 
 class MidiTrack;
 class MidiEvent;
+class PitchColorMap;
 class PitchColorMapEntry;
 
 class ProjectListener
@@ -46,6 +47,7 @@ public:
     virtual void onPostChangePitchColorMapEntry() = 0;
     virtual void onRemovePitchColorMapEntry(const PitchColorMapEntry& entry) = 0;
     virtual void onPostRemovePitchColorMapEntry() = 0;
+    virtual void onChangePitchColorMap(PitchColorMap* const colorMap) = 0;
 
     virtual void onChangeProjectBeatRange(float firstBeat, float lastBeat) = 0;
     virtual void onChangeViewBeatRange(float firstBeat, float lastBeat) = 0;

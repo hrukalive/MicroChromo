@@ -33,10 +33,16 @@ public:
     //===------------------------------------------------------------------===//
     float getLastBeat() const noexcept override;
 
+    inline Note* operator[] (int index) const noexcept
+    {
+        return dynamic_cast<Note*>(midiEvents[index]);
+    }
+
     //===------------------------------------------------------------------===//
     // Serializable
     //===------------------------------------------------------------------===//
     ValueTree serialize() const override;
+    ValueTree serializeWithId() const;
     void deserialize(const ValueTree& tree) override;
     void reset() override;
 

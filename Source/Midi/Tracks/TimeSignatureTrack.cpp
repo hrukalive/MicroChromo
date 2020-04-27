@@ -208,6 +208,15 @@ bool TimeSignatureTrack::changeGroup(Array<TimeSignatureEvent>& groupBefore,
 }
 
 //===----------------------------------------------------------------------===//
+// Accessors
+//===----------------------------------------------------------------------===//
+float TimeSignatureTrack::getLastBeat() const noexcept
+{
+    float lastBeat = MidiTrack::getLastBeat();
+    return lastBeat + 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Serializable
 //===----------------------------------------------------------------------===//
 
@@ -236,9 +245,6 @@ void TimeSignatureTrack::deserialize(const ValueTree& tree)
     if (!root.isValid())
         return;
 
-    float lastBeat = 0;
-    float firstBeat = 0;
-
     for (const auto& e : root)
     {
         if (e.hasType(Serialization::Midi::timeSignature))
@@ -247,9 +253,6 @@ void TimeSignatureTrack::deserialize(const ValueTree& tree)
             signature->deserialize(e);
 
             midiEvents.add(signature);
-
-            lastBeat = jmax(lastBeat, signature->getBeat());
-            firstBeat = jmin(firstBeat, signature->getBeat());
         }
     }
 

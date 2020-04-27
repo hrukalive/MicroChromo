@@ -47,14 +47,14 @@ void Note::exportMessages(MidiMessageSequence& outSequence, double timeOffset, d
 Note Note::withKey(int newKey) const noexcept
 {
     Note other(*this);
-    other.key = jlimit(0, 128, newKey);
+    other.key = jlimit(0, 127, newKey);
     return other;
 }
 
 Note Note::withDeltaKey(int deltaKey) const noexcept
 {
     Note other(*this);
-    other.key = jlimit(0, 128, other.key + deltaKey);
+    other.key = jlimit(0, 127, other.key + deltaKey);
     return other;
 }
 
@@ -75,7 +75,7 @@ Note Note::withDeltaBeat(float deltaPosition) const noexcept
 Note Note::withKeyBeat(int newKey, float newBeat) const noexcept
 {
     Note other(*this);
-    other.key = jlimit(0, 128, newKey);
+    other.key = jlimit(0, 127, newKey);
     other.beat = roundBeat(newBeat);
     return other;
 }
@@ -83,7 +83,7 @@ Note Note::withKeyBeat(int newKey, float newBeat) const noexcept
 Note Note::withKeyLength(int newKey, float newLength) const noexcept
 {
     Note other(*this);
-    other.key = jlimit(0, 128, newKey);
+    other.key = jlimit(0, 127, newKey);
     other.length = jmax(MIN_LENGTH, newLength);
     return other;
 }
@@ -170,28 +170,32 @@ void Note::setPitchColor(String newPitchColor) noexcept
 
 ValueTree Note::serialize() const noexcept
 {
-    using namespace Serialization;
-    ValueTree tree(Midi::note);
-    //tree.setProperty(Midi::id, this->id, nullptr);
-    tree.setProperty(Midi::key, this->key, nullptr);
-    tree.setProperty(Midi::timestamp, int(this->beat * TICKS_PER_BEAT), nullptr);
-    tree.setProperty(Midi::length, int(this->length * TICKS_PER_BEAT), nullptr);
-    tree.setProperty(Midi::volume, int(this->velocity * VELOCITY_SAVE_ACCURACY), nullptr);
-    tree.setProperty(Midi::pitchColor, this->pitchColor, nullptr);
+    ValueTree tree(Serialization::Midi::note);
+    tree.setProperty(Serialization::Midi::key, this->key, nullptr);
+    tree.setProperty(Serialization::Midi::timestamp, int(this->beat * TICKS_PER_BEAT), nullptr);
+    tree.setProperty(Serialization::Midi::length, int(this->length * TICKS_PER_BEAT), nullptr);
+    tree.setProperty(Serialization::Midi::volume, int(this->velocity * VELOCITY_SAVE_ACCURACY), nullptr);
+    tree.setProperty(Serialization::Midi::pitchColor, this->pitchColor, nullptr);
     return tree;
 }
 
 void Note::deserialize(const ValueTree& tree) noexcept
 {
     this->reset();
-    using namespace Serialization;
-    //this->id = tree.getProperty(Midi::id);
-    this->key = tree.getProperty(Midi::key);
-    this->beat = float(tree.getProperty(Midi::timestamp)) / TICKS_PER_BEAT;
-    this->length = float(tree.getProperty(Midi::length)) / TICKS_PER_BEAT;
-    const auto vol = float(tree.getProperty(Midi::volume)) / VELOCITY_SAVE_ACCURACY;
+
+    const auto root =
+        tree.hasType(Serialization::Midi::note) ?
+        tree : tree.getChildWithName(Serialization::Midi::note);
+
+    if (!root.isValid())
+        return;
+
+    this->key = tree.getProperty(Serialization::Midi::key);
+    this->beat = float(tree.getProperty(Serialization::Midi::timestamp, 0)) / TICKS_PER_BEAT;
+    this->length = float(tree.getProperty(Serialization::Midi::length, TICKS_PER_BEAT)) / TICKS_PER_BEAT;
+    const auto vol = float(tree.getProperty(Serialization::Midi::volume, 0.8f)) / VELOCITY_SAVE_ACCURACY;
     this->velocity = jmax(jmin(vol, 1.f), 0.f);
-    this->pitchColor = tree.getProperty(Midi::pitchColor);
+    this->pitchColor = tree.getProperty(Serialization::Midi::pitchColor, "0");
 }
 
 void Note::reset() noexcept {}
@@ -199,11 +203,18 @@ void Note::reset() noexcept {}
 void Note::applyChanges(const Note& other) noexcept
 {
     jassert(this->id == other.id);
-    this->key = roundBeat(other.beat);
-    this->beat = other.beat;
+    this->key = other.key;
+    this->beat = roundBeat(other.beat);
     this->length = other.length;
     this->velocity = other.velocity;
     this->pitchColor = other.pitchColor;
+}
+
+bool Note::equalWithoutId(const Note* const first, const Note* const second) noexcept
+{
+    return first->key == second->key && first->beat == second->beat &&
+        first->length == second->length && first->velocity == second->velocity &&
+        first->pitchColor == second->pitchColor;
 }
 
 int Note::compareElements(const Note* const first, const Note* const second) noexcept
@@ -217,6 +228,17 @@ int Note::compareElements(const Note* const first, const Note* const second) noe
     const int keyDiff = first->key - second->key;
     const int keyResult = (keyDiff > 0) - (keyDiff < 0);
     if (keyResult != 0) { return keyResult; }
+
+    const int colorResult = first->pitchColor.compare(second->pitchColor);
+    if (colorResult != 0) { return colorResult; }
+
+    const int lenDiff = first->length - second->length;
+    const int lenResult = (lenDiff > 0) - (lenDiff < 0);
+    if (lenResult != 0) { return lenResult; }
+
+    const int velDiff = first->velocity - second->velocity;
+    const int velResult = (velDiff > 0) - (velDiff < 0);
+    if (velResult != 0) { return velResult; }
 
     const int idDiff = first->id - second->id;
     const int idResult = (idDiff > 0) - (idDiff < 0);

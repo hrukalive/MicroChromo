@@ -15,7 +15,7 @@ public:
     void processCc(int instanceIndex, int ccNumber, int ccValue, float sampleOffset);
     void addCcLearn(int ccNumber, int parameterIndex, float min, float max);
     void removeCcLearn(int parameterIndex);
-    void reset(bool notify = false);
+    void resetCcLearn(bool notify = false);
     void startLearning();
 
     //==============================================================================
@@ -49,7 +49,7 @@ private:
     {
         String paramName = "";
         int paramIndex{ -1 };
-        float learnedCcMin{ FP_INFINITE }, learnedCcMax{ -FP_INFINITE };
+        float learnedCcMin{ FLT_MAX }, learnedCcMax{ -FLT_MAX };
     };
 
     struct CcItemComparator
@@ -73,7 +73,7 @@ private:
     std::unordered_set<int> learnedIndices;
 
     std::atomic<int> tmpParamIndex{ -1 }, tmpCcSource{ -1 };
-    std::atomic<float> tmpLearnedCcMin{ FP_INFINITE }, tmpLearnedCcMax{ -FP_INFINITE };
+    std::atomic<float> tmpLearnedCcMin{ FLT_MAX }, tmpLearnedCcMax{ -FLT_MAX };
 
     //==============================================================================
     class ProgressWindow : public DocumentWindow

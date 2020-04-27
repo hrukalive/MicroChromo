@@ -43,6 +43,11 @@ float MidiEvent::getBeat() const noexcept
     return beat;
 }
 
+bool MidiEvent::equalWithoutId(const MidiEvent* const first, const MidiEvent* const second) noexcept
+{
+    return first->beat == second->beat;
+}
+
 int MidiEvent::compareElements(const MidiEvent* const first, const MidiEvent* const second) noexcept
 {
     if (first == second) { return 0; }

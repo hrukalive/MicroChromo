@@ -5,7 +5,8 @@
               pluginVST3Category="Instrument" cppLanguageStandard="latest"
               pluginManufacturer="NyLP" pluginManufacturerCode="Nylp" pluginCode="Aaaa"
               aaxIdentifier="com.nylp.MicroChromo" pluginVSTCategory="kPlugCategSynth"
-              pluginAAXCategory="2048" pluginRTASCategory="2048" headerPath="../../soundtouch/include&#10;../../Source/&#10;../../Source/Actions&#10;../../Source/Midi&#10;../../Source/Midi/Events&#10;../../Source/Midi/Tracks">
+              pluginAAXCategory="2048" pluginRTASCategory="2048" headerPath="../../soundtouch/include&#10;../../Source/&#10;../../Source/Actions&#10;../../Source/Midi&#10;../../Source/Midi/Events&#10;../../Source/Midi/Tracks"
+              reportAppUsage="0" displaySplashScreen="0">
   <MAINGROUP id="YsAiD7" name="MicroChromo">
     <GROUP id="{32A9BA9B-4C0F-B1C1-2CB7-430912355187}" name="Resources">
       <FILE id="Oe9g92" name="MicroChromoKontaktScript.txt" compile="0" resource="1"
@@ -80,6 +81,14 @@
       <FILE id="Ojf3wr" name="PitchColorMap.cpp" compile="1" resource="0"
             file="Source/PitchColorMap.cpp"/>
       <FILE id="hyvGtC" name="PitchColorMap.h" compile="0" resource="0" file="Source/PitchColorMap.h"/>
+      <FILE id="FuF3UI" name="VoiceScheduler.cpp" compile="1" resource="0"
+            file="Source/VoiceScheduler.cpp"/>
+      <FILE id="XKSg3r" name="VoiceScheduler.h" compile="0" resource="0"
+            file="Source/VoiceScheduler.h"/>
+      <FILE id="Wwm7Lf" name="ParameterLinker.cpp" compile="1" resource="0"
+            file="Source/ParameterLinker.cpp"/>
+      <FILE id="lho4P0" name="ParameterLinker.h" compile="0" resource="0"
+            file="Source/ParameterLinker.h"/>
       <FILE id="rkfhtY" name="InternalPlugins.cpp" compile="1" resource="0"
             file="Source/InternalPlugins.cpp"/>
       <FILE id="NnANeP" name="InternalPlugins.h" compile="0" resource="0"
@@ -106,12 +115,16 @@
       <FILE id="fD4vtN" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
       <FILE id="VZzcob" name="MainEditor.cpp" compile="1" resource="0" file="Source/MainEditor.cpp"/>
       <FILE id="uz28GU" name="MainEditor.h" compile="0" resource="0" file="Source/MainEditor.h"/>
-      <FILE id="ECYk5f" name="ColorEditor.cpp" compile="1" resource="0" file="Source/ColorEditor.cpp"/>
-      <FILE id="fZY2Pp" name="ColorEditor.h" compile="0" resource="0" file="Source/ColorEditor.h"/>
-      <FILE id="JL7oSn" name="SimpleMidiEditor.cpp" compile="1" resource="0"
-            file="Source/SimpleMidiEditor.cpp"/>
-      <FILE id="SMn1PA" name="SimpleMidiEditor.h" compile="0" resource="0"
-            file="Source/SimpleMidiEditor.h"/>
+      <FILE id="G6L6vJ" name="ColorEditor.cpp" compile="1" resource="0" file="Source/ColorEditor.cpp"/>
+      <FILE id="cviOKq" name="ColorEditor.h" compile="0" resource="0" file="Source/ColorEditor.h"/>
+      <FILE id="LrAIvd" name="SimpleNoteEditor.cpp" compile="1" resource="0"
+            file="Source/SimpleNoteEditor.cpp"/>
+      <FILE id="YhryuO" name="SimpleNoteEditor.h" compile="0" resource="0"
+            file="Source/SimpleNoteEditor.h"/>
+      <FILE id="t04Rcq" name="SimpleTimeEditor.cpp" compile="1" resource="0"
+            file="Source/SimpleTimeEditor.cpp"/>
+      <FILE id="TsNhDk" name="SimpleTimeEditor.h" compile="0" resource="0"
+            file="Source/SimpleTimeEditor.h"/>
       <FILE id="Yz8b1b" name="PluginWindow.h" compile="0" resource="0" file="Source/PluginWindow.h"/>
     </GROUP>
     <GROUP id="{D7A887BC-F737-252E-9A4A-2A38B9EC6D5A}" name="SoundTouch">

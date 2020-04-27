@@ -30,17 +30,13 @@
 
 #include <JuceHeader.h>
 
-class PluginBundle;
-class MicroChromoAudioProcessor;
-class MicroChromoAudioProcessorEditor;
-
 #define BEATS_PER_BAR 4
 #define TICKS_PER_BEAT 16
 #define VELOCITY_SAVE_ACCURACY 1024
 
 inline float roundBeat(float beat)
 {
-    return roundf(beat * static_cast<float>(TICKS_PER_BEAT)) / static_cast<float>(TICKS_PER_BEAT);
+    return jmax(0.0f, roundf(beat * static_cast<float>(TICKS_PER_BEAT)) / static_cast<float>(TICKS_PER_BEAT));
 }
 
 enum
@@ -116,7 +112,7 @@ struct IdGenerator final
         return idCounter++;
     }
 
-    static inline std::atomic<Id> idCounter{ 0 };
+    static inline std::atomic<Id> idCounter{ 1 };
 };
 
 class AudioParameterFloatVariant : public AudioParameterFloat
@@ -138,59 +134,6 @@ protected:
     void valueChanged(float newValue) override;
 };
 
-class ParameterLinker
-{
-    using ABool = std::atomic<bool>;
-public:
-    ParameterLinker(AudioParameterFloatVariant* genericParameter, std::shared_ptr<PluginBundle>& bundle);
-    ~ParameterLinker();
-
-    void linkParameter(int index, AudioProcessorParameter* parameter);
-    void stateReset();
-    void resetLink();
-
-private:
-    class OneToOneListener : public AudioProcessorParameter::Listener
-    {
-    public:
-        OneToOneListener(ABool& thisLockValue, ABool& thisLockGesture, ABool& thisGestureOverride,
-            ABool& otherLockValue, ABool& otherLockGesture, ABool& otherGestureOverride, 
-            AudioProcessorParameter* paramSource, AudioProcessorParameter* paramDest);
-        ~OneToOneListener();
-
-        void parameterValueChanged(int /*parameterIndex*/, float newValue) override;
-        void parameterGestureChanged(int /*parameterIndex*/, bool gestureIsStarting) override;
-
-    private:
-        ABool& _thisLockValue, & _thisLockGesture, & _thisGestureOverride, & _otherLockValue, & _otherLockGesture, & _otherGestureOverride;
-        AudioProcessorParameter* _paramSource, * _paramDest;
-    };
-
-    class OneToManyListener : public AudioProcessorParameter::Listener
-    {
-    public:
-        OneToManyListener(ABool& thisLockValue, ABool& thisLockGesture, ABool& thisGestureOverride,
-            ABool& otherLockValue, ABool& otherLockGesture, ABool& otherGestureOverride,
-            AudioProcessorParameter* paramSource, std::shared_ptr<PluginBundle>& bundle, int index);
-        ~OneToManyListener();
-
-        void parameterValueChanged(int /*parameterIndex*/, float newValue) override;
-        void parameterGestureChanged(int /*parameterIndex*/, bool gestureIsStarting) override;
-
-    private:
-        ABool& _thisLockValue, & _thisLockGesture, & _thisGestureOverride, & _otherLockValue, & _otherLockGesture, & _otherGestureOverride;
-        AudioProcessorParameter* _paramSource;
-        std::shared_ptr<PluginBundle>& _bundle;
-        int _index;
-    };
-
-    std::shared_ptr<PluginBundle>& _bundle;
-    std::atomic<bool> aLockValue{ true }, aLockGesture{ true }, bLockValue{ true }, bLockGesture{ true }, aGestureOverride{ true }, bGestureOverride{ true };
-    AudioParameterFloatVariant* _genericParameter;
-    AudioProcessorParameter* _parameter;
-    int _index;
-    std::unique_ptr<AudioProcessorParameter::Listener> listener1{ nullptr }, listener2{ nullptr };
-};
 
 class ComponentWithTable : public Component, public TableListBoxModel
 {
@@ -198,31 +141,18 @@ public:
     ComponentWithTable();
     ~ComponentWithTable() = default;
 
-    void selectedRowsChanged(int row) override;
-
     virtual String getText(const int rowNumber, const int columnNumber) const { return ""; };
     virtual void setText(const int rowNumber, const int columnNumber, const String& newText) {};
 
     virtual int getSelectedId(const int rowNumber, const int columnNumber) const { return -1; };
     virtual void setSelectedId(const int rowNumber, const int columnNumber, const int newId) {};
 
-    virtual void buttonClicked(const int rowNumber, const int columnNumber, const Colour& newColor) {};
-
-    virtual void updateColorMapList() {}
-
 protected:
     TableListBox table{ {}, this };
     Font font{ 14.0f };
 
-    int lastRow = -1;
-
-    HashMap<String, int> itemTextToitemId;
-    HashMap<int, String> itemIdToitemText;
-    Array<String> itemOrder;
-
     friend class EditableTextCustomComponent;
     friend class ComboBoxCustomComponent;
-    friend class TextButtonCustomComponent;
 };
 
 class EditableTextCustomComponent : public Label
@@ -243,91 +173,10 @@ public:
     ComboBoxCustomComponent(ComponentWithTable& td);
     ~ComboBoxCustomComponent();
 
-    void updateList();
+    void mouseDown(const MouseEvent& event) override;
     void setRowAndColumn(const int newRow, const int newColumn);
     void comboBoxChanged(ComboBox* comboBoxThatHasChanged) override;
 private:
     ComponentWithTable& owner;
     int rowId{ -1 }, columnId{ -1 };
-};
-
-class TextButtonCustomComponent : public TextButton, Button::Listener
-{
-public:
-    TextButtonCustomComponent(ComponentWithTable& td);
-    ~TextButtonCustomComponent();
-
-    void updateColor(Colour newColor);
-    void buttonClicked(Button* btn);
-    void setRowAndColumn(const int newRow, const int newColumn);
-private:
-    ComponentWithTable& owner;
-    int rowId{ -1 }, columnId{ -1 };
-    Colour color;
-};
-
-struct SimpleMidiMessage
-{
-    SimpleMidiMessage(int channel, int key, float timestamp, float velocity, int pitchbend, int cc, bool isNoteOn, float adjustment);
-
-    String toString() const;
-
-    MidiMessage noteMsg, ccMsg;
-    bool noteOn = false;
-};
-
-struct SimpleMidiMessageComparator
-{
-    SimpleMidiMessageComparator() = default;
-
-    static int compareElements(const SimpleMidiMessage& first, const SimpleMidiMessage& second)
-    {
-        const float timeDiff = first.noteMsg.getTimeStamp() - second.noteMsg.getTimeStamp();
-        return (timeDiff > 0.f) - (timeDiff < 0.f);
-    }
-};
-
-class ColorPitchBendRecord
-{
-public:
-    ColorPitchBendRecord();
-    ColorPitchBendRecord(String name, int value, Colour color, int defaultKey = -1);
-
-    String name;
-    int value;
-    Colour color;
-    int defaultKey;
-};
-
-struct ColorPitchBendRecordComparator
-{
-    ColorPitchBendRecordComparator() = default;
-
-    static int compareElements(const ColorPitchBendRecord& first, const ColorPitchBendRecord& second)
-    {
-        const float valDiff = first.value - second.value;
-        return (valDiff > 0.f) - (valDiff < 0.f);
-    }
-};
-
-class ColorPitchBendRecordCollection
-{
-public:
-    ColorPitchBendRecordCollection();
-    ColorPitchBendRecordCollection(String name, const Array<ColorPitchBendRecord>& colors);
-
-    static XmlElement* getColorMapXml(const String& name, const Array<ColorPitchBendRecord>& colors);
-
-    String name;
-    Array<ColorPitchBendRecord> collection;
-};
-
-struct ColorPitchBendRecordCollectionComparator
-{
-    ColorPitchBendRecordCollectionComparator() = default;
-
-    static int compareElements(const ColorPitchBendRecordCollection& first, const ColorPitchBendRecordCollection& second)
-    {
-        return first.name.compare(second.name);
-    }
 };

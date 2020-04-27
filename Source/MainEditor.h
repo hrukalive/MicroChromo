@@ -11,8 +11,10 @@
 #pragma once
 
 #include "Common.h"
+#include "ProjectListener.h"
 
 class MidiTrack;
+class PluginBundle;
 class MicroChromoAudioProcessor;
 class MicroChromoAudioProcessorEditor;
 
@@ -22,6 +24,7 @@ class MicroChromoAudioProcessorEditor;
 class MainEditor :
     public AudioProcessorEditor,
     public ChangeListener,
+    public ProjectListener,
     public Timer,
     public DragAndDropContainer
 {
@@ -34,13 +37,42 @@ public:
     void resized() override;
 
     //==============================================================================
+    void exportMidiDialog();
     void mouseDoubleClick(const MouseEvent& event) override;
     void mouseDrag(const MouseEvent&) override;
 
     //==============================================================================
     void changeListenerCallback(ChangeBroadcaster*) override;
     void timerCallback() override;
-    void itemDroppedCallback(const StringArray& files);
+    void itemDroppedCallback(const Array<File>& files);
+
+    //===------------------------------------------------------------------===//
+    // Project Listener
+    //===------------------------------------------------------------------===//
+    void onAddMidiEvent(const MidiEvent& event) override {}
+    void onPostAddMidiEvent() override {}
+    void onChangeMidiEvent(const MidiEvent& oldEvent, const MidiEvent& newEvent) override {}
+    void onPostChangeMidiEvent() override {}
+    void onRemoveMidiEvent(const MidiEvent& event) override {}
+    void onPostRemoveMidiEvent(MidiTrack* const layer) override {}
+
+    void onAddTrack(MidiTrack* const track) override {}
+    void onChangeTrackProperties(MidiTrack* const track) override {}
+    void onRemoveTrack(MidiTrack* const track) override {}
+    void onPostRemoveTrack() override {}
+
+    void onAddPitchColorMapEntry(const PitchColorMapEntry& entry) override {}
+    void onPostAddPitchColorMapEntry() override {}
+    void onChangePitchColorMapEntry(const PitchColorMapEntry& oldEntry, const PitchColorMapEntry& newEntry) override {}
+    void onPostChangePitchColorMapEntry() override {}
+    void onRemovePitchColorMapEntry(const PitchColorMapEntry& entry) override {}
+    void onPostRemovePitchColorMapEntry() override {}
+    void onChangePitchColorMap(PitchColorMap* const colorMap) override {}
+
+    void onChangeProjectBeatRange(float firstBeat, float lastBeat) override {}
+    void onChangeViewBeatRange(float firstBeat, float lastBeat) override {}
+
+    void onReloadProjectContent(const Array<MidiTrack*>& tracks) override;
 
     //==============================================================================
 
@@ -49,6 +81,8 @@ private:
     MicroChromoAudioProcessorEditor& _parent;
     ApplicationProperties& appProperties;
     std::shared_ptr<PluginBundle> synthBundle, psBundle;
+
+    friend class MicroChromoAudioProcessorEditor;
 
     class TextButtonDropTarget : public TextButton, public FileDragAndDropTarget
     {

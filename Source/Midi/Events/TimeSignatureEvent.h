@@ -61,9 +61,21 @@ public:
 
     void applyChanges(const TimeSignatureEvent& parameters) noexcept;
 
+    static inline bool equalWithoutId(const MidiEvent* const first, const MidiEvent* const second) noexcept
+    {
+        return MidiEvent::equalWithoutId(first, second);
+    }
+
+    static inline bool equalWithoutId(const TimeSignatureEvent& first, const TimeSignatureEvent& second) noexcept
+    {
+        return TimeSignatureEvent::equalWithoutId(&first, &second);
+    }
+
+    static bool equalWithoutId(const TimeSignatureEvent* const first, const TimeSignatureEvent* const second) noexcept;
+
 protected:
-    int numerator;
-    int denominator;
+    int numerator = TIME_SIGNATURE_DEFAULT_NUMERATOR;
+    int denominator = TIME_SIGNATURE_DEFAULT_DENOMINATOR;
 
 private:
     JUCE_LEAK_DETECTOR(TimeSignatureEvent);

@@ -10,6 +10,7 @@
 
 #include "PluginBundle.h"
 #include "PluginProcessor.h"
+#include "ParameterLinker.h"
 
 PluginBundle::PluginBundle(MicroChromoAudioProcessor& p, 
     int maxInstances, 
@@ -30,6 +31,7 @@ PluginBundle::PluginBundle(MicroChromoAudioProcessor& p,
 PluginBundle::~PluginBundle()
 {
     ccLearn = nullptr;
+    resetParameterLink();
     activePluginWindows.clear();
     instances.clear();
     instanceTemps.clear();
@@ -58,7 +60,11 @@ void PluginBundle::loadPlugin(const PluginDescription desc, int numInstances, st
 {
     jassert(desc.name.isNotEmpty());
     if (desc.isDuplicateOf(currentDesc) && _numInstances == numInstances)
+    {
+        if (callback)
+            callback(*this);
         return;
+    }
     preLoadPlugin(numInstances);
     for (auto i = 0; i < numInstances; i++)
     {
@@ -127,7 +133,7 @@ void PluginBundle::checkPluginLoaded(const PluginDescription desc, int numInstan
             instanceStarted = instanceStartedTemp.load();
             _numInstances = numInstances;
 
-            ccLearn->reset();
+            ccLearn->resetCcLearn();
             resetParameterLink();
             linkParameterIndices.clear();
             linkParameterIndicesHistory.clear();
@@ -508,7 +514,8 @@ std::unique_ptr<PopupMenu> PluginBundle::getPluginPopupMenu(KnownPluginList::Sor
 
 bool PluginBundle::isKontakt()
 {
-    if (currentDesc.name.toLowerCase().indexOf("kontakt") > -1)
-        return true;
-    return false;
+    return true;
+    //if (currentDesc.name.toLowerCase().indexOf("kontakt") > -1)
+    //    return true;
+    //return false;
 }
