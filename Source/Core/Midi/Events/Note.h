@@ -92,6 +92,9 @@ public:
 
     static inline int compareElements(const MidiEvent* const first, const MidiEvent* const second) noexcept
     {
+        if (auto _first = dynamic_cast<const Note* const>(first))
+            if (auto _second = dynamic_cast<const Note* const>(second))
+                return compareElements(_first, _second);
         return MidiEvent::compareElements(first, second);
     }
 
