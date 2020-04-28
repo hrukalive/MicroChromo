@@ -41,7 +41,7 @@ SimpleTempoTrackEditor::SimpleTempoTrackEditor(MicroChromoAudioProcessorEditor& 
     table.getHeader().addColumn("Start", columnId++, 50, 50, 100, TableHeaderComponent::notSortable | TableHeaderComponent::sortedForwards);
     table.getHeader().addColumn("Bar", columnId++, 50, 50, 100, TableHeaderComponent::notSortable);
     table.getHeader().addColumn("Beat", columnId++, 50, 50, 100, TableHeaderComponent::notSortable);
-    table.getHeader().addColumn("BPM", columnId++, 50, 50, 100, TableHeaderComponent::notSortable);
+    table.getHeader().addColumn("BPM", columnId++, 100, 100, 120, TableHeaderComponent::notSortable);
 
     table.setColour(ListBox::outlineColourId, Colours::grey);
     table.setOutlineThickness(1);
@@ -235,8 +235,8 @@ SimpleTimeSignatureTrackEditor::SimpleTimeSignatureTrackEditor(MicroChromoAudioP
     table.getHeader().addColumn("Start", columnId++, 50, 50, 100, TableHeaderComponent::notSortable | TableHeaderComponent::sortedForwards);
     table.getHeader().addColumn("Bar", columnId++, 50, 50, 100, TableHeaderComponent::notSortable);
     table.getHeader().addColumn("Beat", columnId++, 50, 50, 100, TableHeaderComponent::notSortable);
-    table.getHeader().addColumn("Numerator", columnId++, 50, 50, 100, TableHeaderComponent::notSortable);
-    table.getHeader().addColumn("Denominator", columnId++, 50, 50, 100, TableHeaderComponent::notSortable);
+    table.getHeader().addColumn("Numerator", columnId++, 70, 70, 100, TableHeaderComponent::notSortable);
+    table.getHeader().addColumn("Denominator", columnId++, 70, 70, 100, TableHeaderComponent::notSortable);
 
     table.setColour(ListBox::outlineColourId, Colours::grey);
     table.setOutlineThickness(1);
@@ -435,7 +435,7 @@ SimpleTimeEditor::SimpleTimeEditor(MicroChromoAudioProcessorEditor& editor) : ow
 {
     addAndMakeVisible(tempoEditor);
     addAndMakeVisible(timeSigEditor);
-    setSize(305, 300);
+    setSize(350, 300);
 }
 
 //===------------------------------------------------------------------===//

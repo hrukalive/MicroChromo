@@ -76,9 +76,9 @@ void MicroChromoAudioProcessorEditor::CustomTabbedComponent::currentTabChanged(i
     switch (newCurrentTabIndex)
     {
     case 0: _owner.setSize(400, 300 + 90); break;
-    case 1: _owner.setSize(555, 500); break;
-    case 2: _owner.setSize(305, 500); break;
-    case 3: _owner.setSize(365, 500); break;
+    case 1: _owner.setSize(570, 580); break;
+    case 2: _owner.setSize(350, 580); break;
+    case 3: _owner.setSize(370, 580); break;
     default:
         break;
     }
@@ -483,7 +483,7 @@ void MicroChromoAudioProcessorEditor::resized()
 {
     auto b = getLocalBounds();
 
-    auto bottomPanel = b.removeFromBottom(90).withSizeKeepingCentre(300, 90);
+    auto bottomPanel = b.removeFromBottom(90).withSizeKeepingCentre(320, 90);
     bottomPanel.reduce(5, 10);
     transportSlider.setBounds(bottomPanel.removeFromTop(24));
     bottomPanel.removeFromTop(6);

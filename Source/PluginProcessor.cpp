@@ -88,13 +88,10 @@ MicroChromoAudioProcessor::MicroChromoAudioProcessor()
     psBundle->loadPluginSync(internalTypes[0], numInstancesParameter);
 
     controllerStateMessage.ensureStorageAllocated(128);
-
-    startTimer(10);
 }
 
 MicroChromoAudioProcessor::~MicroChromoAudioProcessor()
 {
-    stopTimer();
     knownPluginList.removeChangeListener(this);
     synthParamPtr.clear();
     psParamPtr.clear();
@@ -230,9 +227,6 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
     ScopedNoDenormals noDenormals;
 
     posInfo.isPlaying = false;
-    isHostPlaying = false;
-
-    auto startTime = 0.0;
 
     auto* playhead = getPlayHead();
     if (playhead != nullptr)
@@ -241,20 +235,37 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 
         if (posInfo.isPlaying)
         {
-            isHostPlaying = true;
             transportTimeElasped = posInfo.timeInSeconds;
-            startTime = posInfo.timeInSeconds;
+            transportState = HOST_PLAYING;
         }
     }
 
-    if (!posInfo.isPlaying)
+    if (!posInfo.isPlaying && transportState == HOST_PLAYING)
+        transportState = PLUGIN_PAUSED;
+
+    auto startTime = transportTimeElasped.load();
+    auto endTime = startTime + bufferLength;
+
+    switch (transportState)
     {
-        startTime = transportTimeElasped.load();
-        if (transportState == PLUGIN_PLAYING)
-            posInfo.isPlaying = true;
+    case PLUGIN_PLAYING:
+    {
+        transportTimeElasped += bufferLength;
+        if (transportTimeElasped > rangeEndTime)
+            transportState = PLUGIN_QUERY_STOP;
+        posInfo.isPlaying = true;
+        break;
+    }
+    case PLUGIN_QUERY_STOP:
+    {
+        transportTimeElasped = 0;
+        transportState = PLUGIN_STOPPED;
+        break;
+    }
+    default:
+        break;
     }
 
-    auto endTime = startTime + bufferLength;
     auto isWithInNow = (rangeStartTime < rangeEndTime && startTime >= rangeStartTime && startTime < rangeEndTime) ? 1 : 0;
 
     auto forwardMidiBuffer = [&]()
@@ -265,6 +276,8 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
         {
             midiBufferArrayA[0]->addEvent(midiMessage, sampleOffset);
             midiBufferArrayB[0]->addEvent(midiMessage, sampleOffset);
+
+            DBG("[PROC_BLOCK] [FORWARD BOTH] " << midiMessage.getDescription() << " " << sampleOffset);
         }
     };
 
@@ -281,7 +294,7 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
                 for (auto& msg : controllerStateMessage)
                 {
                     ccMidiBufferArray[i]->addEvent(msg, 8);
-                    DBG("[PROC_BLOCK] Recovering CC: " << msg.getControllerNumber() << ": " << msg.getControllerValue() << " Chn: " << msg.getChannel());
+                    DBG("[PROC_BLOCK] [RECOVER CC] " << msg.getControllerNumber() << ": " << msg.getControllerValue() << " Channel: " << msg.getChannel());
                 }
             }
         }
@@ -307,14 +320,11 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
     else
     {
         bool noteOffSent = false;
-        //DBG("[PROC_BLOCK] " << startTime << " " << endTime << " | " << nextStartTime);
-        if ((isHostPlaying && nextStartTime > 0.0 && std::abs(startTime - nextStartTime) > bufferLength)
-            || (!isHostPlaying && hasSeeked))
+        if (nextStartTime > 0.0 && std::abs(startTime - nextStartTime) > bufferLength)
         {
             sendAllNotesOff();
             ensureCcValue();
             noteOffSent = true;
-            hasSeeked = false;
             DBG("[PROC_BLOCK] Playhead moved by cursor or looping");
         }
         nextStartTime = endTime;
@@ -357,22 +367,34 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
                         if (psModSource == USE_PS)
                         {
                             addMessageToAllBuffer(midiBufferArrayA, midiMessage, sampleOffset);
+                            DBG("[PROC_BLOCK] [FORWARD to A] " << midiMessage.getDescription() << " " << sampleOffset);
                             if (!midiMessage.isControllerOfType(psBundle->getCcLearnModule().getCcSource()))
+                            {
                                 addMessageToAllBuffer(midiBufferArrayB, midiMessage, sampleOffset);
+                                DBG("[PROC_BLOCK] [FORWARD to B] " << midiMessage.getDescription() << " " << sampleOffset);
+                            }
                         }
                         else if (psModSource == USE_SYNTH)
                         {
                             if (!midiMessage.isControllerOfType(synthBundle->getCcLearnModule().getCcSource()))
+                            {
                                 addMessageToAllBuffer(midiBufferArrayA, midiMessage, sampleOffset);
+                                DBG("[PROC_BLOCK] [FORWARD to A] " << midiMessage.getDescription() << " " << sampleOffset);
+                            }
                             addMessageToAllBuffer(midiBufferArrayB, midiMessage, sampleOffset);
+                            DBG("[PROC_BLOCK] [FORWARD to B] " << midiMessage.getDescription() << " " << sampleOffset);
                         }
                         else if (psModSource == USE_KONTAKT)
                         {
                             if (!midiMessage.isController() ||
                                 midiMessage.getControllerNumber() < ccBase ||
                                 midiMessage.getControllerNumber() >= ccBase + 12)
+                            {
                                 addMessageToAllBuffer(midiBufferArrayA, midiMessage, sampleOffset);
+                                DBG("[PROC_BLOCK] [FORWARD to A] " << midiMessage.getDescription() << " " << sampleOffset);
+                            }
                             addMessageToAllBuffer(midiBufferArrayB, midiMessage, sampleOffset);
+                            DBG("[PROC_BLOCK] [FORWARD to B] " << midiMessage.getDescription() << " " << sampleOffset);
                         }
                     }
                 }
@@ -390,32 +412,11 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
                             {
                                 midiBufferArrayA[i]->addEvent(evt->message, 2);
                                 playingNotes[evt->message.getNoteNumber()] = evt->message.getTimeStamp();
-                                DBG("[PROC_BLOCK] Retrigger note on " << evt->message.getNoteNumber() << " at " << evt->message.getTimeStamp());
+                                DBG("[PROC_BLOCK] [RETRIGGER] [ON] " << evt->message.getNoteNumber() << " at " << evt->message.getTimeStamp() << "s");
                                 isPlayingNote = true;
                             }
                         }
                     }
-                }
-                // Stop note prior to start time that are not yet off.
-                if (isPlayingNote)
-                {
-                    for (int i = 0; i < numInstancesParameter; i++)
-                    {
-                        const auto noteEvtIndex = notesMidiSeq[i]->getNextIndexAtTime(startTime);
-                        for (int j = 0; j < noteEvtIndex; j++)
-                        {
-                            MidiMessageSequence::MidiEventHolder* evt = notesMidiSeq[i]->getEventPointer(j);
-                            if (evt->message.isNoteOff() && 
-                                playingNotes.find(evt->message.getNoteNumber()) != playingNotes.end() && 
-                                playingNotes[evt->message.getNoteNumber()] < evt->message.getTimeStamp())
-                            {
-                                midiBufferArrayA[i]->addEvent(evt->message, 16);
-                                playingNotes.erase(evt->message.getNoteNumber());
-                                DBG("[PROC_BLOCK] Retrigger note off " << evt->message.getNoteNumber() << " at " << evt->message.getTimeStamp());
-                            }
-                        }
-                    }
-                    isPlayingNote = !playingNotes.empty();
                 }
 
                 // Move messages in sequences to buffer for playback.
@@ -431,12 +432,12 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
                             if (evt->message.isNoteOn() && playingNotes.find(evt->message.getNoteNumber()) == playingNotes.end())
                             {
                                 playingNotes[evt->message.getNoteNumber()] = evt->message.getTimeStamp();
-                                DBG("[PROC_BLOCK] Play note: " << evt->message.getNoteNumber() << " at " << evt->message.getTimeStamp());
+                                DBG("[PROC_BLOCK] [PLAY] " << evt->message.getNoteNumber() << " at " << evt->message.getTimeStamp() << "s");
                             }
                             else if (evt->message.isNoteOff() && playingNotes.find(evt->message.getNoteNumber()) != playingNotes.end())
                             {
                                 playingNotes.erase(evt->message.getNoteNumber());
-                                DBG("[PROC_BLOCK] Stop note: " << evt->message.getNoteNumber() << " at " << evt->message.getTimeStamp());
+                                DBG("[PROC_BLOCK] [STOP] " << evt->message.getNoteNumber() << " at " << evt->message.getTimeStamp() << "s");
                             }
                             isPlayingNote = true;
                         }
@@ -451,7 +452,8 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
                             (midiChannel == 0 || evt->message.isForChannel(midiChannel)))
                         {
                             ccMidiBufferArray[i]->addEvent(evt->message, roundDoubleToInt((evt->message.getTimeStamp() - startTime) * sampleLength));
-                            DBG("[PROC_BLOCK] Adjust CC: " << evt->message.getNoteNumber() << " at " << evt->message.getTimeStamp());
+                            DBG("[PROC_BLOCK] [ADJUST CC] " << evt->message.getControllerNumber() << ": " 
+                                << evt->message.getControllerValue() << " at " << evt->message.getTimeStamp() << "s");
                         }
                         if (evt->message.getTimeStamp() >= endTime)
                             break;
@@ -540,7 +542,7 @@ void MicroChromoAudioProcessor::sendAllNotesOff()
             midiBuffer->addEvent(MidiMessage::allControllersOff(j), 16);
         }
     }
-    DBG("All note off");
+    DBG("*****All note off*****");
 
     isPlayingNote = false;
 }
@@ -572,7 +574,7 @@ void MicroChromoAudioProcessor::sendAllNotesOffPanic()
                 midiBuffer->addEvent(MidiMessage::noteOff(j, k), 18);
         }
     }
-    DBG("All note off (panic)");
+    DBG("*****All note off (panic)*****");
 
     isPlayingNote = false;
 }
@@ -599,9 +601,8 @@ void MicroChromoAudioProcessor::resetState()
     wasStopped = true;
     playingNotes.clear();
 
-    isHostPlaying = false;
     transportTimeElasped = 0;
-    transportState = PLUGIN_STOPPED;
+    transportState = PLUGIN_PAUSED;
 
     nextStartTime = -1.0;
     rangeStartTime = FLT_MAX;
@@ -738,49 +739,23 @@ void MicroChromoAudioProcessor::finishLoadingPlugin()
 //===------------------------------------------------------------------===//
 // Internal Playback
 //===------------------------------------------------------------------===//
-void MicroChromoAudioProcessor::hiResTimerCallback()
-{
-    if (!isHostPlaying)
-    {
-        ScopedLock lock(transportLock);
-        switch (transportState)
-        {
-        case HOST_PLAYING: transportState = PLUGIN_PAUSED; break;
-        case PLUGIN_PLAYING: transportTimeElasped += getTimerInterval() / 1000.0; break;
-        case PLUGIN_QUERY_PLAY: transportState = PLUGIN_PLAYING; break;
-        case PLUGIN_QUERY_PAUSE: transportState = PLUGIN_PAUSED; break;
-        case PLUGIN_QUERY_STOP: transportTimeElasped = 0; transportState = PLUGIN_STOPPED; break;
-        default:
-            break;
-        }
-        if (transportTimeElasped > rangeEndTime)
-            transportState = PLUGIN_QUERY_STOP;
-    }
-    else
-        transportState = HOST_PLAYING;
-}
-
 void MicroChromoAudioProcessor::togglePlayback()
 {
-    ScopedLock lock(transportLock);
     if (transportState == PLUGIN_PAUSED || transportState == PLUGIN_STOPPED)
-        transportState = PLUGIN_QUERY_PLAY;
+        transportState = PLUGIN_PLAYING;
     else if (transportState == PLUGIN_PLAYING)
-        transportState = PLUGIN_QUERY_PAUSE;
+        transportState = PLUGIN_PAUSED;
 }
 
 void MicroChromoAudioProcessor::stopPlayback()
 {
-    ScopedLock lock(transportLock);
     if (transportState == PLUGIN_PLAYING || transportState == PLUGIN_PAUSED)
         transportState = PLUGIN_QUERY_STOP;
 }
 
 void MicroChromoAudioProcessor::setTimeForPlayback(double time)
 {
-    ScopedLock lock(transportLock);
     transportTimeElasped = time;
-    hasSeeked = true;
 }
 
 int MicroChromoAudioProcessor::getTransportState()
@@ -905,6 +880,8 @@ void MicroChromoAudioProcessor::updateCcMidiSequenceWithNewBase(int newBase)
     for (int i = 0; i < numInstancesParameter; i++)
     {
         auto* oldCcSeq = ccMidiSeq[i];
+        if (oldCcSeq == nullptr)
+            return;
         auto* newSeq = new MidiMessageSequence();
         for (auto& cc : *oldCcSeq)
         {
@@ -1024,14 +1001,12 @@ Result MicroChromoAudioProcessor::loadDocument(const File& file)
         loadingDocument = true;
         suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
 
-        stopTimer();
         resetState();
         setStateInformation(block.getData(), block.getSize());
         project.broadcastReloadProjectContent();
 
         prepareToPlay(getSampleRate(), getBlockSize());
 
-        startTimer(10);
         loadingDocument = false;
         suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
 

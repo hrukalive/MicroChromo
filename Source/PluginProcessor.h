@@ -26,7 +26,7 @@
 #include "Note.h"
 
 //==============================================================================
-class MicroChromoAudioProcessor : public AudioProcessor, public ChangeListener, public FileBasedDocument, public HighResolutionTimer
+class MicroChromoAudioProcessor : public AudioProcessor, public ChangeListener, public FileBasedDocument
 {
 public:
     MicroChromoAudioProcessor();
@@ -70,7 +70,6 @@ public:
     //===------------------------------------------------------------------===//
     // Internal Playback
     //===------------------------------------------------------------------===//
-    void hiResTimerCallback() override;
     void togglePlayback();
     void stopPlayback();
     void setTimeForPlayback(double time);
@@ -184,11 +183,8 @@ private:
     bool wasStopped = true;
     std::unordered_map<int, float> playingNotes;
 
-    std::atomic<bool> isHostPlaying{ false };
     std::atomic<int> transportState{ PLUGIN_PAUSED };
     std::atomic<double> transportTimeElasped{ 0.0 };
-    std::atomic<bool> hasSeeked{ false };
-    CriticalSection transportLock;
 
     float nextStartTime = -1.0, rangeStartTime = FLT_MAX, rangeEndTime = -FLT_MAX;
 
