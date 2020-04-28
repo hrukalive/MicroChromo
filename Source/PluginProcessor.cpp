@@ -180,8 +180,6 @@ void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     audioBufferArrayB.clear();
     midiBufferArrayA.clear();
     midiBufferArrayB.clear();
-    notesMidiSeq.clear();
-    ccMidiSeq.clear();
 
     synthBundleTotalNumInputChannels = synthBundle->getTotalNumInputChannels();
     synthBundleMainBusNumInputChannels = synthBundle->getMainBusNumInputChannels();
@@ -198,12 +196,12 @@ void MicroChromoAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
         audioBufferArrayB.add(new AudioBuffer<float>(bChannelNum, samplesPerBlock));
         midiBufferArrayA.add(new MidiBuffer());
         midiBufferArrayB.add(new MidiBuffer());
-        notesMidiSeq.add(new MidiMessageSequence());
-        ccMidiSeq.add(new MidiMessageSequence());
     }
 
     synthBundle->prepareToPlay(sampleRate, samplesPerBlock);
     psBundle->prepareToPlay(sampleRate, samplesPerBlock);
+
+    updateMidiSequence();
 
     properlyPrepared = true;
 }
@@ -689,6 +687,7 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
             if (auto* child = xml->getChildByName("project"))
             {
                 project.deserialize(ValueTree::fromXml(*child));
+                updateMidiSequence();
             }
         }
     }
