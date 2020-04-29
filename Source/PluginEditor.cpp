@@ -78,7 +78,7 @@ void MicroChromoAudioProcessorEditor::CustomTabbedComponent::currentTabChanged(i
     case 0: _owner.setSize(400, 300 + 90); break;
     case 1: _owner.setSize(570, 580); break;
     case 2: _owner.setSize(350, 580); break;
-    case 3: _owner.setSize(370, 580); break;
+    case 3: _owner.setSize(490, 580); break;
     default:
         break;
     }

@@ -35,6 +35,7 @@ PitchColorMapEntry::PitchColorMapEntry() noexcept :
     color(Colours::grey)
 {
     id = IdGenerator::generateId();
+    reset();
 }
 
 PitchColorMapEntry::PitchColorMapEntry(const PitchColorMapEntry& other) noexcept
@@ -45,6 +46,7 @@ PitchColorMapEntry::PitchColorMapEntry(const PitchColorMapEntry& other) noexcept
     value = other.value;
     color = other.color;
     defaultKeys = other.defaultKeys;
+    allowedKeys = other.allowedKeys;
 }
 PitchColorMapEntry& PitchColorMapEntry::operator=(const PitchColorMapEntry& other)
 {
@@ -54,6 +56,7 @@ PitchColorMapEntry& PitchColorMapEntry::operator=(const PitchColorMapEntry& othe
     value = other.value;
     color = other.color;
     defaultKeys = other.defaultKeys;
+    allowedKeys = other.allowedKeys;
     return *this;
 }
 
@@ -64,12 +67,15 @@ PitchColorMapEntry::PitchColorMapEntry(WeakReference<PitchColorMap> owner,
     name(parametersToCopy.name),
     value(parametersToCopy.value),
     color(parametersToCopy.color),
-    defaultKeys(parametersToCopy.defaultKeys) {}
+    defaultKeys(parametersToCopy.defaultKeys),
+    allowedKeys(parametersToCopy.allowedKeys) {}
 
 
 PitchColorMapEntry::PitchColorMapEntry(WeakReference<PitchColorMap> owner, String name,
-    int value, Colour color, const std::unordered_set<int>& defaultSet) noexcept :
-    colorMap(owner), name(name), value(value), color(color), defaultKeys(defaultSet)
+    int value, Colour color, const std::unordered_set<int>& defaultSet,
+    const std::unordered_set<int>& allowedSet) noexcept :
+    colorMap(owner), name(name), value(value), color(color), 
+    defaultKeys(defaultSet), allowedKeys(allowedSet)
 {
     id = IdGenerator::generateId();
 }
@@ -79,6 +85,7 @@ PitchColorMapEntry::PitchColorMapEntry(WeakReference<PitchColorMap> owner, Strin
     colorMap(owner), name(name), value(value), color(color)
 {
     id = IdGenerator::generateId();
+    reset();
 }
 
 PitchColorMapEntry PitchColorMapEntry::withName(const String newName)
@@ -109,6 +116,24 @@ PitchColorMapEntry PitchColorMapEntry::withDefaultKeys(const std::unordered_set<
     return e;
 }
 
+PitchColorMapEntry PitchColorMapEntry::withAllowedKeys(const std::unordered_set<int>& newKeys)
+{
+    PitchColorMapEntry e(*this);
+    e.allowedKeys = newKeys;
+    return e;
+}
+
+PitchColorMapEntry PitchColorMapEntry::withParameters(const PitchColorMapEntry& other)
+{
+    PitchColorMapEntry e(*this);
+    e.name = other.name;
+    e.value = other.value;
+    e.color = other.color;
+    e.defaultKeys = other.defaultKeys;
+    e.allowedKeys = other.allowedKeys;
+    return e;
+}
+
 //===------------------------------------------------------------------===//
 // Accessors
 //===------------------------------------------------------------------===//
@@ -116,26 +141,43 @@ IdGenerator::Id PitchColorMapEntry::getEntryId() const noexcept
 {
     return id;
 }
+
 String PitchColorMapEntry::getName() const noexcept
 {
     return name;
 }
+
 int PitchColorMapEntry::getValue() const noexcept
 {
     return value;
 }
+
 Colour PitchColorMapEntry::getColor() const noexcept
 {
     return color;
 }
+
 std::unordered_set<int> PitchColorMapEntry::getDefaultKeys() const noexcept
 {
     return defaultKeys;
 }
+
+std::unordered_set<int> PitchColorMapEntry::getAllowedKeys() const noexcept
+{
+    return allowedKeys;
+}
+
 PitchColorMap* PitchColorMapEntry::getPitchColorMap()
 {
     jassert(colorMap);
     return colorMap;
+}
+
+bool PitchColorMapEntry::isAllowedForNote(int notenum) const noexcept
+{
+    if (name == "0" || allowedKeys.contains(notenum % 12) || defaultKeys.contains(notenum % 12))
+        return true;
+    return false;
 }
 
 //===------------------------------------------------------------------===//
@@ -148,7 +190,8 @@ ValueTree PitchColorMapEntry::serialize() const noexcept
     tree.setProperty(PitchColor::name, name, nullptr);
     tree.setProperty(PitchColor::value, value, nullptr);
     tree.setProperty(PitchColor::color, color.toString(), nullptr);
-    tree.setProperty(PitchColor::defaultKeys, defaultKeysToString(), nullptr);
+    tree.setProperty(PitchColor::defaultKeys, keysToString(defaultKeys), nullptr);
+    tree.setProperty(PitchColor::allowedKeys, keysToString(allowedKeys), nullptr);
     return tree;
 }
 
@@ -159,12 +202,16 @@ void PitchColorMapEntry::deserialize(const ValueTree& tree) noexcept
     name = tree.getProperty(PitchColor::name, "0");
     value = tree.getProperty(PitchColor::value, 0);
     color = Colour::fromString((StringRef)tree.getProperty(PitchColor::color, "ffafafaf"));
-    defaultKeys = stringToDefaultKeys(tree.getProperty(PitchColor::defaultKeys, ""));
+    defaultKeys = stringToKeys(tree.getProperty(PitchColor::defaultKeys, ""));
+    allowedKeys = stringToKeys(tree.getProperty(PitchColor::allowedKeys, ""));
 }
 
 void PitchColorMapEntry::reset() noexcept
 {
     defaultKeys.clear();
+    allowedKeys.clear();
+    for (int i = 0; i < 12; i++)
+        allowedKeys.insert(i);
 }
 
 //===------------------------------------------------------------------===//
@@ -177,6 +224,7 @@ void PitchColorMapEntry::applyChanges(const PitchColorMapEntry& other) noexcept
     value = other.value;
     color = other.color;
     defaultKeys = other.defaultKeys;
+    allowedKeys = other.allowedKeys;
 }
 
 String PitchColorMapEntry::defaultKeysToNoteNames() const noexcept
@@ -191,50 +239,115 @@ String PitchColorMapEntry::defaultKeysToNoteNames() const noexcept
     return tmp2.joinIntoString(", ");
 }
 
+String PitchColorMapEntry::allowedKeysToNoteNames() const noexcept
+{
+    Array<int> tmp;
+    for (auto k : allowedKeys)
+        tmp.add(k % 12);
+    tmp.sort();
+    StringArray tmp2;
+    for (auto k : tmp)
+        tmp2.add(MidiMessage::getMidiNoteName(k, true, false, 4));
+    return tmp2.joinIntoString(", ");
+}
+
 bool PitchColorMapEntry::equalWithoutId(const PitchColorMapEntry* const first, const PitchColorMapEntry* const second) noexcept
 {
     return first->value == second->value && first->name == second->name &&
-        first->color == second->color && first->defaultKeysToString() == second->defaultKeysToString();
+        first->color == second->color && 
+        first->keysToString(first->defaultKeys) == second->keysToString(second->defaultKeys) &&
+        first->keysToString(first->allowedKeys) == second->keysToString(second->allowedKeys);
 }
 
-int PitchColorMapEntry::compareElements(const PitchColorMapEntry* const first, const PitchColorMapEntry* const second) noexcept
+String PitchColorMapEntry::keysToString(const std::unordered_set<int>& set) const noexcept
 {
-    if (first == second) { return 0; }
-
-    const float valueDiff = first->value - second->value;
-    const int valueResult = (valueDiff > 0.f) - (valueDiff < 0.f);
-    if (valueResult != 0) { return valueResult; }
-
-    const int nameResult = first->name.compare(second->name);
-    if (nameResult != 0) { return nameResult; }
-
-    const int colorResult = first->color.toString().compare(second->color.toString());
-    if (colorResult != 0) { return colorResult; }
-
-    const int defaultKeyResult = first->defaultKeysToString().compare(second->defaultKeysToString());
-    if (defaultKeyResult != 0) { return defaultKeyResult; }
-
-    const int idDiff = first->id - second->id;
-    const int idResult = (idDiff > 0) - (idDiff < 0);
-    return idResult;
+    Array<int> tmp;
+    for (auto k : allowedKeys)
+        tmp.add(k % 12);
+    tmp.sort();
+    StringArray tmp2;
+    for (auto k : tmp)
+        tmp2.add(String(k));
+    return tmp2.joinIntoString(" ");
 }
 
-String PitchColorMapEntry::defaultKeysToString() const noexcept
-{
-    StringArray tmp;
-    for (auto k : defaultKeys)
-        tmp.add(String(k % 12));
-    tmp.sort(true);
-    return tmp.joinIntoString(" ");
-}
-
-std::unordered_set<int> PitchColorMapEntry::stringToDefaultKeys(const String& str) const noexcept
+std::unordered_set<int> PitchColorMapEntry::stringToKeys(const String& str) const noexcept
 {
     std::unordered_set<int> ret;
     auto tmp = StringArray::fromTokens(str.retainCharacters("0123456789 "), false);
     for (auto& s : tmp)
         ret.insert(s.getIntValue() % 12);
     return ret;
+}
+
+//__________________________________________________________________________
+//                                                                          |\
+// PitchColorMapEntryValueComparator                                        | |
+//__________________________________________________________________________| |
+//___________________________________________________________________________\|
+
+int PitchColorMapEntryValueComparator::compareElements(const PitchColorMapEntry* const first,
+    const PitchColorMapEntry* const second) noexcept
+{
+    if (first == second) { return 0; }
+
+    const PitchColorMapEntry* const _first = _ascending ? first : second;
+    const PitchColorMapEntry* const _second = _ascending ? second : first;
+
+    const float valueDiff = _first->value - _second->value;
+    const int valueResult = (valueDiff > 0.f) - (valueDiff < 0.f);
+    if (valueResult != 0) { return valueResult; }
+
+    const int nameResult = _first->name.compare(_second->name);
+    if (nameResult != 0) { return nameResult; }
+
+    const int colorResult = _first->color.toString().compare(_second->color.toString());
+    if (colorResult != 0) { return colorResult; }
+
+    const int defaultKeyResult = _first->keysToString(_first->defaultKeys).compare(_second->keysToString(_second->defaultKeys));
+    if (defaultKeyResult != 0) { return defaultKeyResult; }
+
+    const int allowedKeyResult = _first->keysToString(_first->allowedKeys).compare(_second->keysToString(_second->allowedKeys));
+    if (allowedKeyResult != 0) { return allowedKeyResult; }
+
+    const int idDiff = _first->id - _second->id;
+    const int idResult = (idDiff > 0) - (idDiff < 0);
+    return idResult;
+}
+
+//__________________________________________________________________________
+//                                                                          |\
+// PitchColorMapEntryNameComparator                                        | |
+//__________________________________________________________________________| |
+//___________________________________________________________________________\|
+
+int PitchColorMapEntryNameComparator::compareElements(const PitchColorMapEntry* const first, 
+    const PitchColorMapEntry* const second) noexcept
+{
+    if (first == second) { return 0; }
+
+    const PitchColorMapEntry* const _first = _ascending ? first : second;
+    const PitchColorMapEntry* const _second = _ascending ? second : first;
+
+    const int nameResult = _first->name.compare(_second->name);
+    if (nameResult != 0) { return nameResult; }
+
+    const float valueDiff = _first->value - _second->value;
+    const int valueResult = (valueDiff > 0.f) - (valueDiff < 0.f);
+    if (valueResult != 0) { return valueResult; }
+
+    const int colorResult = _first->color.toString().compare(_second->color.toString());
+    if (colorResult != 0) { return colorResult; }
+
+    const int defaultKeyResult = _first->keysToString(_first->defaultKeys).compare(_second->keysToString(_second->defaultKeys));
+    if (defaultKeyResult != 0) { return defaultKeyResult; }
+
+    const int allowedKeyResult = _first->keysToString(_first->allowedKeys).compare(_second->keysToString(_second->allowedKeys));
+    if (allowedKeyResult != 0) { return allowedKeyResult; }
+
+    const int idDiff = _first->id - _second->id;
+    const int idResult = (idDiff > 0) - (idDiff < 0);
+    return idResult;
 }
 
 //__________________________________________________________________________
@@ -346,7 +459,7 @@ PitchColorMapEntry* PitchColorMap::insert(const PitchColorMapEntry& entry, bool 
     else
     {
         const auto ownedEntry = new PitchColorMapEntry(this, entry);
-        collection.addSorted(*ownedEntry, ownedEntry);
+        collection.addSorted(*entryComparator, ownedEntry);
         usedNames.insert(ownedEntry->getName());
         for (auto k : ownedEntry->getDefaultKeys())
             usedNotes.insert(k);
@@ -371,7 +484,7 @@ bool PitchColorMap::remove(const PitchColorMapEntry& entry, bool undoable)
     }
     else
     {
-        const int index = collection.indexOfSorted(entry, &entry);
+        const int index = collection.indexOfSorted(*entryComparator, &entry);
         jassert(index >= 0);
         if (index >= 0)
         {
@@ -401,7 +514,7 @@ bool PitchColorMap::change(const PitchColorMapEntry& oldEntry, const PitchColorM
     }
     else
     {
-        const int index = collection.indexOfSorted(oldEntry, &oldEntry);
+        const int index = collection.indexOfSorted(*entryComparator, &oldEntry);
         jassert(index >= 0);
         if (index >= 0)
         {
@@ -411,7 +524,7 @@ bool PitchColorMap::change(const PitchColorMapEntry& oldEntry, const PitchColorM
             for (auto k : oldEntry.getDefaultKeys())
                 usedNotes.erase(k);
             collection.remove(index, false);
-            collection.addSorted(*changedEntry, changedEntry);
+            collection.addSorted(*entryComparator, changedEntry);
             usedNames.insert(newEntry.getName());
             for (auto k : newEntry.getDefaultKeys())
                 usedNotes.insert(k);
@@ -446,7 +559,7 @@ bool PitchColorMap::insertGroup(Array<PitchColorMapEntry>& entries, bool undoabl
             if (usedNames.contains(entryParams.getName()))
                 continue;
             const auto ownedEntry = new PitchColorMapEntry(this, entryParams);
-            collection.addSorted(*ownedEntry, ownedEntry);
+            collection.addSorted(*entryComparator, ownedEntry);
             usedNames.insert(ownedEntry->getName());
             for (auto k : ownedEntry->getDefaultKeys())
                 usedNotes.insert(k);
@@ -474,7 +587,7 @@ bool PitchColorMap::removeGroup(Array<PitchColorMapEntry>& entries, bool undoabl
         for (int i = 0; i < entries.size(); ++i)
         {
             const PitchColorMapEntry& entry = entries.getUnchecked(i);
-            const int index = collection.indexOfSorted(entry, &entry);
+            const int index = collection.indexOfSorted(*entryComparator, &entry);
             jassert(index >= 0);
             if (index >= 0)
             {
@@ -516,7 +629,7 @@ bool PitchColorMap::changeGroup(Array<PitchColorMapEntry>& entriesBefore,
             if (oldParams.getName() != newParams.getName() && usedNames.contains(newParams.getName()))
                 continue;
 
-            const int index = collection.indexOfSorted(oldParams, &oldParams);
+            const int index = collection.indexOfSorted(*entryComparator, &oldParams);
 
             jassert(index >= 0);
             if (index >= 0)
@@ -527,7 +640,7 @@ bool PitchColorMap::changeGroup(Array<PitchColorMapEntry>& entriesBefore,
                 for (auto k : oldParams.getDefaultKeys())
                     usedNotes.erase(k);
                 collection.remove(index, false);
-                collection.addSorted(*changedEntry, changedEntry);
+                collection.addSorted(*entryComparator, changedEntry);
                 usedNames.insert(newParams.getName());
                 for (auto k : newParams.getDefaultKeys())
                     usedNotes.insert(k);
@@ -540,6 +653,18 @@ bool PitchColorMap::changeGroup(Array<PitchColorMapEntry>& entriesBefore,
             project->broadcastPostChangePitchColorMapEntry();
         return changed;
     }
+}
+
+void PitchColorMap::changeSortMethod(bool isByValue, bool ascending)
+{
+    if (isByValue)
+        entryComparator.reset(new PitchColorMapEntryValueComparator(ascending));
+    else
+        entryComparator.reset(new PitchColorMapEntryNameComparator(ascending));
+    sort();
+
+    if (project)
+        project->broadcastChangePitchColorMap(this);
 }
 
 //===------------------------------------------------------------------===//
@@ -579,7 +704,7 @@ void PitchColorMap::deserialize(const ValueTree& tree)
 
             if (!usedNames.contains(entry->getName()))
             {
-                collection.addSorted(*entry, entry);
+                collection.addSorted(*entryComparator, entry);
                 usedNames.insert(entry->getName());
                 for (auto k : entry->getDefaultKeys())
                     usedNotes.insert(k);
@@ -603,10 +728,7 @@ void PitchColorMap::reset()
 //===------------------------------------------------------------------===//
 void PitchColorMap::sort()
 {
-    if (collection.size() > 0)
-    {
-        collection.sort(*collection.getFirst(), true);
-    }
+    collection.sort(*entryComparator, true);
 }
 
 //__________________________________________________________________________
@@ -619,4 +741,3 @@ int PitchColorMapNameComparator::compareElements(const PitchColorMap* const firs
 {
     return first->name.compare(second->name);
 }
-

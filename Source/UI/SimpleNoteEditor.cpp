@@ -247,12 +247,14 @@ Component* SimpleNoteEditor::refreshComponentForCell(int rowNumber, int columnId
     }
     if (columnId == 9)
     {
+        auto* track = project.findTrackById<NoteTrack>(trackCombo.getSelectedId());
         auto* comboBox = static_cast<ComboBoxCustomComponent*>(existingComponentToUpdate);
         if (comboBox == nullptr)
             comboBox = new ComboBoxCustomComponent(*this);
         comboBox->clear();
         for (auto* entry : *project.getPitchColorMap())
-            comboBox->addItem(entry->getName(), entry->getEntryId());
+            if (entry->isAllowedForNote((*track)[rowNumber]->getKey()))
+                comboBox->addItem(entry->getName(), entry->getEntryId());
         comboBox->setRowAndColumn(rowNumber, columnId);
         return comboBox;
     }
@@ -331,13 +333,15 @@ int SimpleNoteEditor::getSelectedId(const int rowNumber, const int columnNumber)
         auto* track = project.findTrackById<NoteTrack>(trackCombo.getSelectedId());
         if (auto* c = project.getPitchColorMap()->findEntryByName((*track)[rowNumber]->getPitchColor()))
             return c->getEntryId();
+        else if (auto* c = project.getPitchColorMap()->findEntryByName("0"))
+            return c->getEntryId();
     }
     return 0;
 }
 
 void SimpleNoteEditor::setSelectedId(const int rowNumber, const int /*columnNumber*/, const int newId)
 {
-    if (getSelectedId(rowNumber, 9) != newId)
+    if (getSelectedId(rowNumber, 9) != newId && newId != 0)
     {
         auto* track = project.findTrackById<NoteTrack>(trackCombo.getSelectedId());
 
@@ -482,7 +486,7 @@ void SimpleNoteEditor::onPostRemovePitchColorMapEntry()
             }
         }
         if (hasChanged)
-            track->changeGroup(before, after, false);
+            track->changeGroup(before, after, true);
     }
     for (auto* tk : project)
     {
@@ -501,8 +505,14 @@ void SimpleNoteEditor::onPostRemovePitchColorMapEntry()
             }
         }
         if (hasChanged)
-            tk->changeGroup(before, after, false);
+            tk->changeGroup(before, after, true);
     }
+    table.updateContent();
+    table.repaint();
+}
+
+void SimpleNoteEditor::onChangePitchColorMap(PitchColorMap* const colorMap)
+{
     table.updateContent();
     table.repaint();
 }

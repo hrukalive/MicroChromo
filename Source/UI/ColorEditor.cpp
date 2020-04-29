@@ -67,11 +67,11 @@ void ColorEditor::ColorChooserComponent::resized()
 
 //__________________________________________________________________________
 //                                                                          |\
-// DefaultKeyChooser                                                        | |
+// KeyChooser                                                               | |
 //__________________________________________________________________________| |
 //___________________________________________________________________________\|
 
-ColorEditor::DefaultKeyChooser::DefaultKeyChooser(ColorEditor& parent, const int row, const int col,
+ColorEditor::KeyChooser::KeyChooser(ColorEditor& parent, const int row, const int col,
     const std::unordered_set<int>& used, const std::unordered_set<int>& current) :
     _parent(parent)
 {
@@ -94,17 +94,129 @@ ColorEditor::DefaultKeyChooser::DefaultKeyChooser(ColorEditor& parent, const int
     addAndMakeVisible(okBtn);
     okBtn.onClick = [&]()
     {
-        _parent.defaultKeyChooserClosed(rowId, columnId, selectedSet);
+        _parent.keyChooserClosed(rowId, columnId, selectedSet);
         this->getTopLevelComponent()->exitModalState(0);
     };
+
+    noteList.addMouseListener(this, true);
 
     setSize(300, 400);
 }
 
 //===------------------------------------------------------------------===//
+// Mouse Listeners
+//===------------------------------------------------------------------===//
+void ColorEditor::KeyChooser::mouseDown(const MouseEvent& evt)
+{
+    auto newEvt = evt.getEventRelativeTo(this);
+    if (noteList.getBounds().contains(newEvt.getPosition().getX(), newEvt.getPosition().getY()))
+    {
+        auto newEvt2 = evt.getEventRelativeTo(&noteList);
+        rowStart = noteList.getRowContainingPosition(newEvt2.getPosition().getX(), newEvt2.getPosition().getY());
+        rowPosition = rowStart;
+        if (rowStart != -1)
+        {
+            listBoxItemClicked(rowStart);
+            toSelect = selectedSet.contains(rowStart);
+        }
+    }
+}
+
+void ColorEditor::KeyChooser::mouseDrag(const MouseEvent& evt)
+{
+    if (rowStart == -1)
+        return;
+    auto newEvt = evt.getEventRelativeTo(this);
+    if (noteList.getBounds().contains(newEvt.getPosition().getX(), newEvt.getPosition().getY()))
+    {
+        auto newEvt2 = evt.getEventRelativeTo(&noteList);
+        auto newPos = noteList.getRowContainingPosition(newEvt2.getPosition().getX(), newEvt2.getPosition().getY());
+        if (newPos != rowPosition && newPos != -1)
+        {
+            if (rowPosition == rowStart)
+            {
+                if (newPos < rowPosition)
+                {
+                    for (int i = newPos; i < rowStart; i++)
+                    {
+                        if (toSelect)
+                            selectRow(i);
+                        else
+                            deselectRow(i);
+                    }
+                }
+                else
+                {
+                    for (int i = rowStart; i <= newPos; i++)
+                    {
+                        if (toSelect)
+                            selectRow(i);
+                        else
+                            deselectRow(i);
+                    }
+                }
+            }
+            else if (rowPosition < rowStart)
+            {
+                if (newPos < rowPosition)
+                {
+                    for (int i = newPos; i < rowStart; i++)
+                    {
+                        if (toSelect)
+                            selectRow(i);
+                        else
+                            deselectRow(i);
+                    }
+                }
+                else
+                {
+                    for (int i = rowPosition; i < newPos; i++)
+                    {
+                        if (toSelect)
+                            deselectRow(i);
+                        else
+                            selectRow(i);
+                    }
+                }
+            }
+            else if (rowPosition > rowStart)
+            {
+                if (newPos > rowPosition)
+                {
+                    for (int i = rowStart + 1; i <= newPos; i++)
+                    {
+                        if (toSelect)
+                            selectRow(i);
+                        else
+                            deselectRow(i);
+                    }
+                }
+                else
+                {
+                    for (int i = newPos + 1; i <= rowPosition; i++)
+                    {
+                        if (toSelect)
+                            deselectRow(i);
+                        else
+                            selectRow(i);
+                    }
+                }
+            }
+            rowPosition = newPos;
+        }
+    }
+}
+
+void ColorEditor::KeyChooser::mouseUp(const MouseEvent& evt)
+{
+    rowStart = -1;
+    rowPosition = -1;
+}
+
+//===------------------------------------------------------------------===//
 // ListBoxModel
 //===------------------------------------------------------------------===//
-void ColorEditor::DefaultKeyChooser::paintListBoxItem(int rowNumber, Graphics& g, int width, int height, bool /*rowIsSelected*/)
+void ColorEditor::KeyChooser::paintListBoxItem(int rowNumber, Graphics& g, int width, int height, bool /*rowIsSelected*/)
 {
     if (selectedSet.contains(rowNumber))
         g.fillAll(findColour(TextEditor::highlightColourId));
@@ -122,7 +234,7 @@ void ColorEditor::DefaultKeyChooser::paintListBoxItem(int rowNumber, Graphics& g
         Justification::centredLeft, true);
 }
 
-void ColorEditor::DefaultKeyChooser::listBoxItemClicked(int row, const MouseEvent&)
+void ColorEditor::KeyChooser::listBoxItemClicked(int row)
 {
     if (usedSet.contains(row) && !currentSet.contains(row))
         return;
@@ -133,15 +245,33 @@ void ColorEditor::DefaultKeyChooser::listBoxItemClicked(int row, const MouseEven
     noteList.repaintRow(row);
 }
 
+void ColorEditor::KeyChooser::selectRow(int row)
+{
+    if (usedSet.contains(row) && !currentSet.contains(row))
+        return;
+    if (!selectedSet.contains(row))
+        selectedSet.insert(row);
+    noteList.repaintRow(row);
+}
+
+void ColorEditor::KeyChooser::deselectRow(int row)
+{
+    if (usedSet.contains(row) && !currentSet.contains(row))
+        return;
+    if (selectedSet.contains(row))
+        selectedSet.erase(row);
+    noteList.repaintRow(row);
+}
+
 //===------------------------------------------------------------------===//
 // Components
 //===------------------------------------------------------------------===//
-void ColorEditor::DefaultKeyChooser::paint(Graphics& g)
+void ColorEditor::KeyChooser::paint(Graphics& g)
 {
     g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
 }
 
-void ColorEditor::DefaultKeyChooser::resized()
+void ColorEditor::KeyChooser::resized()
 {
     auto b = getLocalBounds();
     b.reduce(10, 10);
@@ -164,10 +294,11 @@ ColorEditor::ColorEditor(MicroChromoAudioProcessorEditor& editor) :
     loadColorPreset();
 
     int columnId = 1;
-    table.getHeader().addColumn("Name", columnId++, 120, 100, 200, TableHeaderComponent::notSortable);
+    table.getHeader().addColumn("Name", columnId++, 120, 100, 200, TableHeaderComponent::defaultFlags);
     table.getHeader().addColumn("Color", columnId++, 50, 50, 100, TableHeaderComponent::notSortable);
-    table.getHeader().addColumn("Value", columnId++, 50, 50, 100, TableHeaderComponent::notSortable | TableHeaderComponent::sortedForwards);
+    table.getHeader().addColumn("Value", columnId++, 50, 50, 100, TableHeaderComponent::defaultFlags);
     table.getHeader().addColumn("Default Key", columnId++, 120, 100, 200, TableHeaderComponent::notSortable);
+    table.getHeader().addColumn("Allowed Key", columnId++, 120, 100, 200, TableHeaderComponent::notSortable);
 
     table.setColour(ListBox::outlineColourId, Colours::grey);
     table.setOutlineThickness(1);
@@ -201,8 +332,35 @@ ColorEditor::ColorEditor(MicroChromoAudioProcessorEditor& editor) :
             auto* m = colorMapPresets[presetComboBox.getSelectedItemIndex()];
             processor.setSelectedColorPresetName(m->getName());
             processor.getUndoManager().beginNewTransaction("'Apply color map preset [" + m->getName() + "]'");
-            colorMap->removeGroup(colorMap->getAllEntries(), true);
-            colorMap->insertGroup(m->getAllEntries(), true);
+
+            Array<PitchColorMapEntry> toBeRemoved;
+            for (auto* c : *colorMap)
+                if (c->getName() != "0" && m->findEntryByName(c->getName()) == nullptr)
+                    toBeRemoved.add(*c);
+            if (toBeRemoved.size() > 0)
+                colorMap->removeGroup(toBeRemoved, true);
+
+            Array<PitchColorMapEntry> toBeChangedOld, toBeChangedNew;
+            for (auto* c : *colorMap)
+            {
+                if (auto* nc = m->findEntryByName(c->getName()))
+                {
+                    if (!PitchColorMapEntry::equalWithoutId(c, nc))
+                    {
+                        toBeChangedOld.add(*c);
+                        toBeChangedNew.add(c->withParameters(*nc));
+                    }
+                }
+            }
+            if (toBeChangedOld.size() > 0)
+                colorMap->changeGroup(toBeChangedOld, toBeChangedNew, true);
+
+            Array<PitchColorMapEntry> toBeAdded;
+            for (auto* c : *m)
+                if (colorMap->findEntryByName(c->getName()) == nullptr)
+                    toBeAdded.add(*c);
+            if (toBeAdded.size() > 0)
+                colorMap->insertGroup(toBeAdded, true);
 
             checkModified();
         }
@@ -283,7 +441,7 @@ ColorEditor::ColorEditor(MicroChromoAudioProcessorEditor& editor) :
 
     project.addListener(this);
 
-    setSize(365, 300);
+    setSize(490, 300);
 }
 
 ColorEditor::~ColorEditor()
@@ -323,6 +481,11 @@ void ColorEditor::paintCell(Graphics& g, int rowNumber, int columnId, int width,
         String ks = (*project.getPitchColorMap())[rowNumber]->defaultKeysToNoteNames();
         g.drawText(ks.isEmpty() ? "None" : ks, 2, 0, width - 4, height, Justification::centredLeft, true);
     }
+    else if (columnId == 5)
+    {
+        String ks = (*project.getPitchColorMap())[rowNumber]->allowedKeysToNoteNames();
+        g.drawText(ks.isEmpty() ? "None" : ks, 2, 0, width - 4, height, Justification::centredLeft, true);
+    }
 
     g.setColour(getLookAndFeel().findColour(ListBox::backgroundColourId));
     g.fillRect(width - 1, 0, 1, height);
@@ -347,31 +510,43 @@ Component* ColorEditor::refreshComponentForCell(int rowNumber, int columnId, boo
     return nullptr;
 }
 
+void ColorEditor::sortOrderChanged(int newSortColumnId, bool isForwards)
+{
+    if (newSortColumnId == 1)
+    {
+        project.getPitchColorMap()->changeSortMethod(false, isForwards);
+    }
+    else if (newSortColumnId == 3)
+    {
+        project.getPitchColorMap()->changeSortMethod(true, isForwards);
+    }
+}
+
 void ColorEditor::cellClicked(int rowNumber, int columnId, const MouseEvent&)
 {
+    DialogWindow::LaunchOptions dialogOption;
+    dialogOption.dialogBackgroundColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
+    dialogOption.escapeKeyTriggersCloseButton = false;
+    dialogOption.useNativeTitleBar = false;
+    dialogOption.resizable = true;
     if (columnId == 2)
     {
-        DialogWindow::LaunchOptions dialogOption;
-
         dialogOption.dialogTitle = "Color Selector";
-        dialogOption.dialogBackgroundColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
-        dialogOption.escapeKeyTriggersCloseButton = false;
-        dialogOption.useNativeTitleBar = false;
-        dialogOption.resizable = true;
         dialogOption.content.setOwned(new ColorChooserComponent(*this, rowNumber, columnId, (*project.getPitchColorMap())[rowNumber]->getColor()));
         dialogOption.launchAsync();
     }
     else if (columnId == 4)
     {
-        DialogWindow::LaunchOptions dialogOption;
-
         dialogOption.dialogTitle = "Default Key Selector";
-        dialogOption.dialogBackgroundColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
-        dialogOption.escapeKeyTriggersCloseButton = false;
-        dialogOption.useNativeTitleBar = false;
-        dialogOption.resizable = true;
-        dialogOption.content.setOwned(new DefaultKeyChooser(*this, rowNumber, columnId,
+        dialogOption.content.setOwned(new KeyChooser(*this, rowNumber, columnId,
             project.getPitchColorMap()->getUsedNotes(), (*project.getPitchColorMap())[rowNumber]->getDefaultKeys()));
+        dialogOption.launchAsync();
+    }
+    else if (columnId == 5)
+    {
+        dialogOption.dialogTitle = "Allowed Key Selector";
+        dialogOption.content.setOwned(new KeyChooser(*this, rowNumber, columnId,
+            {}, (*project.getPitchColorMap())[rowNumber]->getAllowedKeys()));
         dialogOption.launchAsync();
     }
 }
@@ -430,11 +605,20 @@ void ColorEditor::colorChooserClosed(int rowNumber, int columnId, const Colour& 
         (*project.getPitchColorMap())[rowNumber]->withColor(color), true);
 }
 
-void ColorEditor::defaultKeyChooserClosed(int rowNumber, int columnId, const std::unordered_set<int>& defaultKeys)
+void ColorEditor::keyChooserClosed(int rowNumber, int columnId, const std::unordered_set<int>& newKeys)
 {
-    processor.getUndoManager().beginNewTransaction("'Change pitch color entry's default keys'");
-    project.getPitchColorMap()->change(*(*project.getPitchColorMap())[rowNumber], 
-        (*project.getPitchColorMap())[rowNumber]->withDefaultKeys(defaultKeys), true);
+    if (columnId == 4)
+    {
+        processor.getUndoManager().beginNewTransaction("'Change pitch color entry's default keys'");
+        project.getPitchColorMap()->change(*(*project.getPitchColorMap())[rowNumber],
+            (*project.getPitchColorMap())[rowNumber]->withDefaultKeys(newKeys), true);
+    }
+    else if (columnId == 5)
+    {
+        processor.getUndoManager().beginNewTransaction("'Change pitch color entry's allowed keys'");
+        project.getPitchColorMap()->change(*(*project.getPitchColorMap())[rowNumber],
+            (*project.getPitchColorMap())[rowNumber]->withAllowedKeys(newKeys), true);
+    }
 }
 
 //===------------------------------------------------------------------===//
@@ -513,11 +697,11 @@ void ColorEditor::checkModified()
         {
             for (int i = 0; i < current->size(); i++)
             {
-                if (!PitchColorMapEntry::equalWithoutId((*current)[i], (*selected)[i]))
-                {
-                    hasPresetModified = true;
-                    break;
-                }
+                if (auto* match = selected->findEntryByName((*current)[i]->getName()))
+                    if (PitchColorMapEntry::equalWithoutId((*current)[i], match))
+                        continue;
+                hasPresetModified = true;
+                break;
             }
         }
         savePresetBtn.setEnabled(hasPresetModified);

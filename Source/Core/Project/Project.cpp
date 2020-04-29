@@ -526,7 +526,8 @@ void Project::loadMidiWizard(std::shared_ptr<int> fileCounter, std::shared_ptr<i
                                     evt->message.getNoteNumber(),
                                     evt->message.getTimeStamp() * tickLen,
                                     (evt->noteOffObject->message.getTimeStamp() - evt->message.getTimeStamp()) * tickLen,
-                                    evt->message.getFloatVelocity()));
+                                    evt->message.getFloatVelocity(), 
+                                    pitchColorMap->findDefaultColorForKey(evt->message.getNoteNumber())));
                         }
                         track->insertGroup(seqNotes, true);
                     }

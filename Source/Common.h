@@ -155,6 +155,8 @@ public:
     ComponentWithTable() {}
     ~ComponentWithTable() = default;
 
+    void backgroundClicked(const MouseEvent&) override;
+
     virtual String getText(const int rowNumber, const int columnNumber) const { return ""; };
     virtual void setText(const int rowNumber, const int columnNumber, const String& newText) {};
 

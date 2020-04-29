@@ -274,8 +274,16 @@ void NoteTrack::deserialize(const ValueTree& tree)
 
 ValueTree NoteTrack::serializeWithId() const
 {
-    auto tree = serialize();
+    ValueTree tree(Serialization::Midi::notes);
     tree.setProperty(Serialization::Core::trackId, id, nullptr);
+    tree.setProperty(Serialization::Core::trackName, name, nullptr);
+    tree.setProperty(Serialization::Core::trackChannel, channel, nullptr);
+    for (int i = 0; i < midiEvents.size(); ++i)
+    {
+        auto event = dynamic_cast<const Note*>(midiEvents.getUnchecked(i));
+        tree.appendChild(event->serializeWithId(), nullptr);
+    }
+
     return tree;
 }
 

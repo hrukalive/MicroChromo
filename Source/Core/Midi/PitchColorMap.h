@@ -39,7 +39,8 @@ public:
     PitchColorMapEntry(WeakReference<PitchColorMap> owner, 
         const PitchColorMapEntry& parametersToCopy) noexcept;
     PitchColorMapEntry(WeakReference<PitchColorMap> owner, String name,
-        int value, Colour color, const std::unordered_set<int>& defaultSet) noexcept;
+        int value, Colour color, const std::unordered_set<int>& defaultSet,
+        const std::unordered_set<int>& allowedSet) noexcept;
     explicit PitchColorMapEntry(WeakReference<PitchColorMap> owner, String name = "0", 
         int value = 0, Colour color = Colours::grey) noexcept;
 
@@ -47,6 +48,8 @@ public:
     PitchColorMapEntry withValue(const int newValue);
     PitchColorMapEntry withColor(const Colour& newColor);
     PitchColorMapEntry withDefaultKeys(const std::unordered_set<int>& newkeys);
+    PitchColorMapEntry withAllowedKeys(const std::unordered_set<int>& newkeys);
+    PitchColorMapEntry withParameters(const PitchColorMapEntry& other);
 
     //===------------------------------------------------------------------===//
     // Accessors
@@ -56,7 +59,9 @@ public:
     int getValue() const noexcept;
     Colour getColor() const noexcept;
     std::unordered_set<int> getDefaultKeys() const noexcept;
+    std::unordered_set<int> getAllowedKeys() const noexcept;
     PitchColorMap* getPitchColorMap();
+    bool isAllowedForNote(int notenum) const noexcept;
 
     //===------------------------------------------------------------------===//
     // Serializable
@@ -70,6 +75,7 @@ public:
     //===------------------------------------------------------------------===//
     void applyChanges(const PitchColorMapEntry& parameters) noexcept;
     String defaultKeysToNoteNames() const noexcept;
+    String allowedKeysToNoteNames() const noexcept;
 
     static inline bool equalWithoutId(const PitchColorMapEntry& first, const PitchColorMapEntry& second) noexcept
     {
@@ -78,28 +84,55 @@ public:
 
     static bool equalWithoutId(const PitchColorMapEntry* const first, const PitchColorMapEntry* const second) noexcept;
 
-    static inline int compareElements(const PitchColorMapEntry& first, const PitchColorMapEntry& second) noexcept
-    {
-        return PitchColorMapEntry::compareElements(&first, &second);
-    }
-
-    static int compareElements(const PitchColorMapEntry* const first, const PitchColorMapEntry* const second) noexcept;
-
 private:
     //===------------------------------------------------------------------===//
     // Helpers
     //===------------------------------------------------------------------===//
-    String defaultKeysToString() const noexcept;
-    std::unordered_set<int> stringToDefaultKeys(const String& str) const noexcept;
+    String keysToString(const std::unordered_set<int>& set) const noexcept;
+    std::unordered_set<int> stringToKeys(const String& str) const noexcept;
 
+    //==============================================================================
+    friend struct PitchColorMapEntryValueComparator;
+    friend struct PitchColorMapEntryNameComparator;
+
+    //==============================================================================
     WeakReference<PitchColorMap> colorMap;
     IdGenerator::Id id;
     String name;
     int value;
     Colour color;
-    std::unordered_set<int> defaultKeys;
+    std::unordered_set<int> defaultKeys, allowedKeys;
 
+    //==============================================================================
     JUCE_LEAK_DETECTOR(PitchColorMapEntry)
+};
+
+class PitchColorMapEntryComparator
+{
+public:
+    PitchColorMapEntryComparator(bool ascending) : _ascending(ascending) {}
+
+    virtual inline int compareElements(const PitchColorMapEntry& first, const PitchColorMapEntry& second) noexcept
+    {
+        return compareElements(&first, &second);
+    }
+
+    virtual int compareElements(const PitchColorMapEntry* const first, const PitchColorMapEntry* const second) noexcept = 0;
+
+protected:
+    bool _ascending = true;
+};
+
+struct PitchColorMapEntryValueComparator : public PitchColorMapEntryComparator
+{
+    PitchColorMapEntryValueComparator(bool ascending) : PitchColorMapEntryComparator(ascending) {}
+    int compareElements(const PitchColorMapEntry* const first, const PitchColorMapEntry* const second) noexcept override;
+};
+
+struct PitchColorMapEntryNameComparator : public PitchColorMapEntryComparator
+{
+    PitchColorMapEntryNameComparator(bool ascending) : PitchColorMapEntryComparator(ascending) {}
+    int compareElements(const PitchColorMapEntry* const first, const PitchColorMapEntry* const second) noexcept override;
 };
 
 //==============================================================================
@@ -142,6 +175,8 @@ public:
     bool removeGroup(Array<PitchColorMapEntry>& entries, bool undoable);
     bool changeGroup(Array<PitchColorMapEntry>& entriesBefore, Array<PitchColorMapEntry>& entriesAfter, bool undoable);
 
+    void changeSortMethod(bool isByValue, bool ascending);
+
     //===------------------------------------------------------------------===//
     // Serializable
     //===------------------------------------------------------------------===//
@@ -181,8 +216,8 @@ public:
 
     inline int indexOfSorted(const PitchColorMapEntry* const entry) const noexcept
     {
-        jassert(this->collection[this->collection.indexOfSorted(*entry, entry)] == entry);
-        collection.indexOfSorted(*entry, entry);
+        jassert(this->collection[this->collection.indexOfSorted(*entryComparator, entry)] == entry);
+        collection.indexOfSorted(*entryComparator, entry);
     }
 
 private:
@@ -197,6 +232,8 @@ private:
 
     //==============================================================================
     friend struct PitchColorMapNameComparator;
+
+    std::unique_ptr<PitchColorMapEntryComparator> entryComparator{ new PitchColorMapEntryValueComparator(true) };
 
     //==============================================================================
     JUCE_LEAK_DETECTOR(PitchColorMap);

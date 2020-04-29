@@ -173,6 +173,18 @@ ValueTree Note::serialize() const noexcept
     return tree;
 }
 
+ValueTree Note::serializeWithId() const noexcept
+{
+    ValueTree tree(Serialization::Midi::note);
+    tree.setProperty(Serialization::Midi::id, this->id, nullptr);
+    tree.setProperty(Serialization::Midi::key, this->key, nullptr);
+    tree.setProperty(Serialization::Midi::timestamp, int(this->beat * TICKS_PER_BEAT), nullptr);
+    tree.setProperty(Serialization::Midi::length, int(this->length * TICKS_PER_BEAT), nullptr);
+    tree.setProperty(Serialization::Midi::volume, int(this->velocity * VELOCITY_SAVE_ACCURACY), nullptr);
+    tree.setProperty(Serialization::Midi::pitchColor, this->pitchColor, nullptr);
+    return tree;
+}
+
 void Note::deserialize(const ValueTree& tree) noexcept
 {
     this->reset();
@@ -184,6 +196,8 @@ void Note::deserialize(const ValueTree& tree) noexcept
     if (!root.isValid())
         return;
 
+    if (tree.hasProperty(Serialization::Midi::id))
+        this->id = tree.getProperty(Serialization::Midi::id, IdGenerator::generateId());
     this->key = tree.getProperty(Serialization::Midi::key);
     this->beat = float(tree.getProperty(Serialization::Midi::timestamp, 0)) / TICKS_PER_BEAT;
     this->length = float(tree.getProperty(Serialization::Midi::length, TICKS_PER_BEAT)) / TICKS_PER_BEAT;

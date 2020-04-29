@@ -22,13 +22,16 @@
 MidiEvent::MidiEvent(WeakReference<MidiTrack> owner, const MidiEvent& parameters) noexcept :
     track(owner),
     type(parameters.type),
-    beat(parameters.beat),
-    id(parameters.id) {}
+    id(parameters.id)
+{
+    beat = roundBeat(parameters.beat);
+}
 
 MidiEvent::MidiEvent(WeakReference<MidiTrack> owner, Type type, float beatVal) noexcept
-    : track(owner), type(type), beat(beatVal)
+    : track(owner), type(type)
 {
     id = IdGenerator::generateId();
+    beat = roundBeat(beatVal);
 }
 
 //===------------------------------------------------------------------===//

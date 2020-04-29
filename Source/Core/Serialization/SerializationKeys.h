@@ -117,6 +117,7 @@ namespace Serialization
         static const Identifier value = "value";
         static const Identifier color = "color";
         static const Identifier defaultKeys = "defaultKeys";
+        static const Identifier allowedKeys = "allowedKeys";
     } // namespace PitchColor
 
     namespace Config

@@ -41,6 +41,7 @@ public:
     void paintRowBackground(Graphics& g, int rowNumber, int width, int height, bool rowIsSelected) override;
     void paintCell(Graphics& g, int rowNumber, int columnId, int width, int height, bool rowIsSelected) override;
     Component* refreshComponentForCell(int rowNumber, int columnId, bool isRowSelected, Component* existingComponentToUpdate) override;
+    void sortOrderChanged(int newSortColumnId, bool isForwards) override;
     void cellClicked(int rowNumber, int columnId, const MouseEvent&) override;
 
     //===------------------------------------------------------------------===//
@@ -50,7 +51,7 @@ public:
     void setText(const int rowNumber, const int columnNumber, const String& newText) override;
 
     void colorChooserClosed(int rowNumber, int columnId, const Colour& color);
-    void defaultKeyChooserClosed(int rowNumber, int columnId, const std::unordered_set<int>& defaultKeys);
+    void keyChooserClosed(int rowNumber, int columnId, const std::unordered_set<int>& defaultKeys);
 
     //===------------------------------------------------------------------===//
     // Components
@@ -137,13 +138,20 @@ private:
     };
 
     //==============================================================================
-    class DefaultKeyChooser : public Component, public ListBoxModel
+    class KeyChooser : public Component, public ListBoxModel
     {
     public:
         //==============================================================================
-        DefaultKeyChooser(ColorEditor& parent, const int row, const int col, 
+        KeyChooser(ColorEditor& parent, const int row, const int col,
             const std::unordered_set<int>& used, const std::unordered_set<int>& current);
-        ~DefaultKeyChooser() = default;
+        ~KeyChooser() = default;
+
+        //===------------------------------------------------------------------===//
+        // Mouse Listeners
+        //===------------------------------------------------------------------===//
+        void mouseDown(const MouseEvent& evt) override;
+        void mouseDrag(const MouseEvent& evt) override;
+        void mouseUp(const MouseEvent& evt) override;
 
         //===------------------------------------------------------------------===//
         // Components
@@ -156,11 +164,18 @@ private:
         //===------------------------------------------------------------------===//
         int getNumRows() override { return 12; }
         void paintListBoxItem(int rowNumber, Graphics& g, int width, int height, bool rowIsSelected) override;
-        void listBoxItemClicked(int row, const MouseEvent& e) override;
 
     private:
+        void listBoxItemClicked(int row);
+        void selectRow(int row);
+        void deselectRow(int row);
+
+        //==============================================================================
         ColorEditor& _parent;
         int rowId{ -1 }, columnId{ -1 };
+
+        int rowStart = -1, rowPosition = -1;
+        bool toSelect = true;
 
         std::unordered_set<int> usedSet;
         std::unordered_set<int> currentSet;
@@ -170,7 +185,7 @@ private:
         TextButton okBtn{ "OK" };
 
         //==============================================================================
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DefaultKeyChooser)
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KeyChooser)
     };
 
     //==============================================================================

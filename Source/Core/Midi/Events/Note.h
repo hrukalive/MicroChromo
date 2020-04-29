@@ -70,6 +70,7 @@ public:
     // Serializable
     //===------------------------------------------------------------------===//
     ValueTree serialize() const noexcept override;
+    ValueTree serializeWithId() const noexcept;
     void deserialize(const ValueTree& tree) noexcept override;
     void reset() noexcept override;
 
