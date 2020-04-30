@@ -389,10 +389,9 @@ struct PairComparator
     {
         if (first.second < second.second)
             return -1;
-        if (first.second == second.second)
-            return 0;
         if (first.second > second.second)
             return 1;
+        return 0;
     }
 };
 

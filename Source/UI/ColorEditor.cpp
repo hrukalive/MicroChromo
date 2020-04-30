@@ -669,7 +669,7 @@ void ColorEditor::updatePresetComboBox(String name)
         presetComboBox.addItem(m->getName(), m->getId());
     if (auto* m = findColorMapByName(name))
         presetComboBox.setSelectedId(m->getId(), true);
-    else if(auto* m = findColorMapByName("---INIT---"))
+    else if (auto* m = findColorMapByName("---INIT---"))
         presetComboBox.setSelectedId(m->getId(), true);
     checkModified();
 }

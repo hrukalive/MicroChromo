@@ -34,7 +34,8 @@ VoiceScheduler::InternalMidiMessage::InternalMidiMessage() noexcept
 }
 
 VoiceScheduler::InternalMidiMessage::InternalMidiMessage(int channel, int key, 
-    float timestamp, float velocity, int pitchbend, int cc, bool isNoteOn, float adjustment)
+    float timestamp, float velocity, int pitchbend, int cc, bool isNoteOn, 
+    float adjustment, InternalMidiMessage* noteOnEvt)
 {
     if (isNoteOn)
     {
@@ -46,6 +47,7 @@ VoiceScheduler::InternalMidiMessage::InternalMidiMessage(int channel, int key,
         noteMsg = MidiMessage::noteOff(channel, key, velocity).withTimeStamp(timestamp);
     }
     noteOn = isNoteOn;
+    noteOnPtr = noteOnEvt;
 }
 
 //===------------------------------------------------------------------===//
@@ -96,7 +98,7 @@ void VoiceScheduler::schedule(OwnedArray<MidiMessageSequence>& noteSequences,
     auto* tempoTrack = project.getTempoTrack();
     for (int c = 1; c <= 16; c++)
     {
-        Array<InternalMidiMessage> sequence;
+        OwnedArray<InternalMidiMessage> sequence;
         for (auto* track : project.getNoteTracks())
         {
             if (track->getTrackChannel() == c && track->size() > 0)
@@ -139,19 +141,24 @@ void VoiceScheduler::schedule(OwnedArray<MidiMessageSequence>& noteSequences,
                         beat = timeMult * note->getBeat();
                         timeFactor = timeMult;
                     }
+                    InternalMidiMessage* onMsg;
                     if (kontaktMode)
-                        sequence.add(InternalMidiMessage(c, key, beat, note->getVelocity(), pitchbend, ccBase + key % 12, true, ccTimeAdjustment));
+                        onMsg = new InternalMidiMessage(c, key, beat, note->getVelocity(), pitchbend, ccBase + key % 12, true, ccTimeAdjustment);
                     else
-                        sequence.add(InternalMidiMessage(c, key, beat, note->getVelocity(), pitchbend, ccBase, true, ccTimeAdjustment));
-                    sequence.add(InternalMidiMessage(c, key, beat + timeFactor * note->getLength(), note->getVelocity(), 0, -1, false, 0));
+                        onMsg = new InternalMidiMessage(c, key, beat, note->getVelocity(), pitchbend, ccBase, true, ccTimeAdjustment);
+                    sequence.add(onMsg);
+                    sequence.add(new InternalMidiMessage(c, key, beat + timeFactor * note->getLength(), note->getVelocity(), 0, -1, false, 0, onMsg));
                 }
             }
         }
-        sequence.sort(sequence.getFirst(), true);
-        if (kontaktMode)
-            scheduleKontakt(sequence, noteSequences, ccSequences, n);
-        else
-            scheduleGeneral(sequence, noteSequences, ccSequences, n);
+        if (sequence.size() > 0)
+        {
+            sequence.sort(*sequence.getFirst(), true);
+            if (kontaktMode)
+                scheduleKontakt(sequence, noteSequences, ccSequences, n);
+            else
+                scheduleGeneral(sequence, noteSequences, ccSequences, n);
+        }
     }
     for (auto& seq : noteSequences)
     {
@@ -165,24 +172,25 @@ void VoiceScheduler::schedule(OwnedArray<MidiMessageSequence>& noteSequences,
     }
 }
 
-void VoiceScheduler::scheduleGeneral(const Array<InternalMidiMessage>& sequence,
+void VoiceScheduler::scheduleGeneral(const OwnedArray<InternalMidiMessage>& sequence,
     OwnedArray<MidiMessageSequence>& noteSequences, OwnedArray<MidiMessageSequence>& ccSequences, int n)
 {
-    std::unordered_map<int, std::unordered_set<int>> channelToNote;
+    std::unordered_map<int, std::unordered_set<const InternalMidiMessage*>> channelToNote;
     std::unordered_map<int, int> channelToCcValue;
-    std::unordered_map<int, int> noteToChannel;
+    std::unordered_map<const InternalMidiMessage*, int> noteToChannel;
 
     int channelUseCounter = 0;
     std::map<int, int> channelUseCount;
     for (int i = 0; i < n; i++)
     {
-        channelToNote[i] = std::unordered_set<int>();
+        channelToNote[i] = std::unordered_set<const InternalMidiMessage*>();
         channelToCcValue[i] = -2;
         channelUseCount[i] = 0;
     }
 
-    for (auto& note : sequence)
+    for (auto* noteptr : sequence)
     {
+        auto& note = *noteptr;
         bool needFindEmpty = true;
         bool needOverride = true;
         if (note.noteMsg.isNoteOn())
@@ -193,8 +201,8 @@ void VoiceScheduler::scheduleGeneral(const Array<InternalMidiMessage>& sequence,
                 {
                     noteSequences[i]->addEvent(note.noteMsg);
 
-                    channelToNote[i].insert(note.noteMsg.getNoteNumber());
-                    noteToChannel[note.noteMsg.getNoteNumber()] = i;
+                    channelToNote[i].insert(&note);
+                    noteToChannel[&note] = i;
 
                     channelUseCount[i] = ++channelUseCounter;
 
@@ -221,9 +229,9 @@ void VoiceScheduler::scheduleGeneral(const Array<InternalMidiMessage>& sequence,
                     noteSequences[minIdx]->addEvent(note.noteMsg);
                     ccSequences[minIdx]->addEvent(note.ccMsg);
 
-                    channelToNote[minIdx].insert(note.noteMsg.getNoteNumber());
+                    channelToNote[minIdx].insert(&note);
                     channelToCcValue[minIdx] = note.ccMsg.getControllerValue();
-                    noteToChannel[note.noteMsg.getNoteNumber()] = minIdx;
+                    noteToChannel[&note] = minIdx;
 
                     channelUseCount[minIdx] = ++channelUseCounter;
 
@@ -248,7 +256,8 @@ void VoiceScheduler::scheduleGeneral(const Array<InternalMidiMessage>& sequence,
                 auto& allNotesNow = channelToNote[minIdx];
                 for (auto noteNum : allNotesNow)
                 {
-                    MidiMessage msg = MidiMessage::noteOff(note.noteMsg.getChannel(), noteNum).withTimeStamp(note.noteMsg.getTimeStamp());
+                    MidiMessage msg = MidiMessage::noteOff(note.noteMsg.getChannel(), 
+                        noteNum->noteMsg.getNoteNumber()).withTimeStamp(note.noteMsg.getTimeStamp());
                     noteSequences[minIdx]->addEvent(msg);
                     noteToChannel.erase(noteNum);
                 }
@@ -257,9 +266,9 @@ void VoiceScheduler::scheduleGeneral(const Array<InternalMidiMessage>& sequence,
                 noteSequences[minIdx]->addEvent(note.noteMsg);
                 ccSequences[minIdx]->addEvent(note.ccMsg);
 
-                channelToNote[minIdx].insert(note.noteMsg.getNoteNumber());
+                channelToNote[minIdx].insert(&note);
                 channelToCcValue[minIdx] = note.ccMsg.getControllerValue();
-                noteToChannel[note.noteMsg.getNoteNumber()] = minIdx;
+                noteToChannel[&note] = minIdx;
 
                 channelUseCount[minIdx] = ++channelUseCounter;
 
@@ -268,12 +277,12 @@ void VoiceScheduler::scheduleGeneral(const Array<InternalMidiMessage>& sequence,
         }
         else
         {
-            if (noteToChannel.find(note.noteMsg.getNoteNumber()) != noteToChannel.end())
+            if (note.noteOnPtr != nullptr && noteToChannel.find(note.noteOnPtr) != noteToChannel.end())
             {
-                auto channel = noteToChannel[note.noteMsg.getNoteNumber()];
+                auto channel = noteToChannel[note.noteOnPtr];
                 noteSequences[channel]->addEvent(note.noteMsg);
-                noteToChannel.erase(note.noteMsg.getNoteNumber());
-                channelToNote[channel].erase(note.noteMsg.getNoteNumber());
+                noteToChannel.erase(note.noteOnPtr);
+                channelToNote[channel].erase(note.noteOnPtr);
 
                 DBG("Note off " << channel << " " << note.toString());
             }
@@ -281,24 +290,25 @@ void VoiceScheduler::scheduleGeneral(const Array<InternalMidiMessage>& sequence,
     }
 }
 
-void VoiceScheduler::scheduleKontakt(const Array<InternalMidiMessage>& sequence,
+void VoiceScheduler::scheduleKontakt(const OwnedArray<InternalMidiMessage>& sequence,
     OwnedArray<MidiMessageSequence>& noteSequences, OwnedArray<MidiMessageSequence>& ccSequences, int n)
 {
-    std::unordered_map<int, std::unordered_set<int>> channelToNote;
+    std::unordered_map<int, std::unordered_set<const InternalMidiMessage*>> channelToNote;
     std::unordered_map<int, int> channelToCcValue;
-    std::unordered_map<int, int> noteToChannel;
+    std::unordered_map<const InternalMidiMessage*, int> noteToChannel;
 
     int channelUseCounter = 0;
     std::map<int, int> channelUseCount;
     for (int i = 0; i < n * 12; i++)
     {
-        channelToNote[i] = std::unordered_set<int>();
+        channelToNote[i] = std::unordered_set<const InternalMidiMessage*>();
         channelToCcValue[i] = -2;
         channelUseCount[i] = 0;
     }
 
-    for (auto& note : sequence)
+    for (auto* noteptr : sequence)
     {
+        auto& note = *noteptr;
         bool needFindEmpty = true;
         bool needOverride = true;
         if (note.noteMsg.isNoteOn())
@@ -310,8 +320,8 @@ void VoiceScheduler::scheduleKontakt(const Array<InternalMidiMessage>& sequence,
                 {
                     noteSequences[i]->addEvent(note.noteMsg);
 
-                    channelToNote[realIdx].insert(note.noteMsg.getNoteNumber());
-                    noteToChannel[note.noteMsg.getNoteNumber()] = realIdx;
+                    channelToNote[realIdx].insert(&note);
+                    noteToChannel[&note] = realIdx;
 
                     channelUseCount[realIdx] = ++channelUseCounter;
 
@@ -341,9 +351,9 @@ void VoiceScheduler::scheduleKontakt(const Array<InternalMidiMessage>& sequence,
                     noteSequences[seqIndex]->addEvent(note.noteMsg);
                     ccSequences[seqIndex]->addEvent(note.ccMsg);
 
-                    channelToNote[minIdx].insert(note.noteMsg.getNoteNumber());
+                    channelToNote[minIdx].insert(&note);
                     channelToCcValue[minIdx] = note.ccMsg.getControllerValue();
-                    noteToChannel[note.noteMsg.getNoteNumber()] = minIdx;
+                    noteToChannel[&note] = minIdx;
 
                     channelUseCount[minIdx] = ++channelUseCounter;
 
@@ -368,9 +378,10 @@ void VoiceScheduler::scheduleKontakt(const Array<InternalMidiMessage>& sequence,
                 int seqIndex = minIdx / 12;
 
                 auto& allNotesNow = channelToNote[minIdx];
-                for (auto noteNum : allNotesNow)
+                for (auto* noteNum : allNotesNow)
                 {
-                    MidiMessage msg = MidiMessage::noteOff(note.noteMsg.getChannel(), noteNum).withTimeStamp(note.noteMsg.getTimeStamp());
+                    MidiMessage msg = MidiMessage::noteOff(note.noteMsg.getChannel(), 
+                        noteNum->noteMsg.getNoteNumber()).withTimeStamp(note.noteMsg.getTimeStamp());
                     noteSequences[seqIndex]->addEvent(msg);
                     noteToChannel.erase(noteNum);
                 }
@@ -379,9 +390,9 @@ void VoiceScheduler::scheduleKontakt(const Array<InternalMidiMessage>& sequence,
                 noteSequences[seqIndex]->addEvent(note.noteMsg);
                 ccSequences[seqIndex]->addEvent(note.ccMsg);
 
-                channelToNote[minIdx].insert(note.noteMsg.getNoteNumber());
+                channelToNote[minIdx].insert(&note);
                 channelToCcValue[minIdx] = note.ccMsg.getControllerValue();
-                noteToChannel[note.noteMsg.getNoteNumber()] = minIdx;
+                noteToChannel[&note] = minIdx;
 
                 channelUseCount[minIdx] = ++channelUseCounter;
 
@@ -390,12 +401,12 @@ void VoiceScheduler::scheduleKontakt(const Array<InternalMidiMessage>& sequence,
         }
         else
         {
-            if (noteToChannel.find(note.noteMsg.getNoteNumber()) != noteToChannel.end())
+            if (note.noteOnPtr != nullptr && noteToChannel.find(note.noteOnPtr) != noteToChannel.end())
             {
-                auto channel = noteToChannel[note.noteMsg.getNoteNumber()];
+                auto channel = noteToChannel[note.noteOnPtr];
                 noteSequences[channel / 12]->addEvent(note.noteMsg);
-                noteToChannel.erase(note.noteMsg.getNoteNumber());
-                channelToNote[channel].erase(note.noteMsg.getNoteNumber());
+                noteToChannel.erase(note.noteOnPtr);
+                channelToNote[channel].erase(note.noteOnPtr);
 
                 DBG("Note off " << channel / 12 << " " << channel % 12 << note.toString());
             }

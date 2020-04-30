@@ -180,7 +180,7 @@ private:
 
     std::atomic<bool> isPlayingNote{ false }, panicNoteOff{ false };
     std::atomic<int> isWithIn{ -1 };
-    bool wasStopped = true;
+    bool wasStopped = true, wasPlaying = false;
     std::unordered_map<int, float> playingNotes;
 
     std::atomic<int> transportState{ PLUGIN_PAUSED };

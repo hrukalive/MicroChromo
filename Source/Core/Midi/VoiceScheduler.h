@@ -40,7 +40,7 @@ private:
     {
         InternalMidiMessage() noexcept;
         InternalMidiMessage(int channel, int key, float timestamp, float velocity, int pitchbend, int cc, 
-            bool isNoteOn, float adjustment);
+            bool isNoteOn, float adjustment, InternalMidiMessage* noteOnEvt = nullptr);
 
         //===------------------------------------------------------------------===//
         // Helpers
@@ -49,21 +49,22 @@ private:
 
         static inline int compareElements(const InternalMidiMessage* const first, const InternalMidiMessage* const second)
         {
-            InternalMidiMessage::compareElements(*first, *second);
+            return InternalMidiMessage::compareElements(*first, *second);
         }
 
         static int compareElements(const InternalMidiMessage& first, const InternalMidiMessage& second);
 
         MidiMessage noteMsg, ccMsg;
+        InternalMidiMessage* noteOnPtr;
         bool noteOn = false;
 
         JUCE_LEAK_DETECTOR(InternalMidiMessage);
     };
 
     //==============================================================================
-    void scheduleKontakt(const Array<InternalMidiMessage>& sequence,
+    void scheduleKontakt(const OwnedArray<InternalMidiMessage>& sequence,
         OwnedArray<MidiMessageSequence>& noteSequences, OwnedArray<MidiMessageSequence>& ccSequences, int n);
-    void scheduleGeneral(const Array<InternalMidiMessage>& sequence,
+    void scheduleGeneral(const OwnedArray<InternalMidiMessage>& sequence,
         OwnedArray<MidiMessageSequence>& noteSequences, OwnedArray<MidiMessageSequence>& ccSequences, int n);
 
     //==============================================================================
