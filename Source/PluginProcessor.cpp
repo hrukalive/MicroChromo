@@ -283,16 +283,40 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 
     auto ensureCcValue = [&]()
     {
-        for (int i = 0; i < numInstancesParameter; i++)
+        if (psModSource == USE_NONE)
+            return;
+        if (psModSource == USE_PITCHBEND)
         {
-            for (int k = (midiChannel == 0 ? 1 : midiChannel); k <= (midiChannel == 0 ? 16 : midiChannel); k++)
+            for (int i = 0; i < numInstancesParameter; i++)
             {
-                controllerStateMessage.clear();
-                ccMidiSeq[i]->createControllerUpdatesForTime(k, startTime, controllerStateMessage);
-                for (auto& msg : controllerStateMessage)
+                for (int k = (midiChannel == 0 ? 1 : midiChannel); k <= (midiChannel == 0 ? 16 : midiChannel); k++)
                 {
-                    ccMidiBufferArray[i]->addEvent(msg, 8);
-                    DBG("[PROC_BLOCK] [RECOVER CC] " << msg.getControllerNumber() << ": " << msg.getControllerValue() << " Channel: " << msg.getChannel());
+                    const auto noteEvtIndex = ccMidiSeq[i]->getNextIndexAtTime(startTime);
+                    for (int j = noteEvtIndex; j >= 0; j--)
+                    {
+                        auto* evt = ccMidiSeq[i]->getEventPointer(i);
+                        if (evt && evt->message.isPitchWheel())
+                        {
+                            ccMidiBufferArray[i]->addEvent(evt->message, 8);
+                            DBG("[PROC_BLOCK] [RECOVER PB] " << evt->message.getPitchWheelValue() << " Channel: " << evt->message.getChannel());
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (int i = 0; i < numInstancesParameter; i++)
+            {
+                for (int k = (midiChannel == 0 ? 1 : midiChannel); k <= (midiChannel == 0 ? 16 : midiChannel); k++)
+                {
+                    controllerStateMessage.clear();
+                    ccMidiSeq[i]->createControllerUpdatesForTime(k, startTime, controllerStateMessage);
+                    for (auto& msg : controllerStateMessage)
+                    {
+                        ccMidiBufferArray[i]->addEvent(msg, 8);
+                        DBG("[PROC_BLOCK] [RECOVER CC] " << msg.getControllerNumber() << ": " << msg.getControllerValue() << " Channel: " << msg.getChannel());
+                    }
                 }
             }
         }
@@ -426,7 +450,7 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
                     {
                         MidiMessageSequence::MidiEventHolder* evt = notesMidiSeq[i]->getEventPointer(j);
 
-                        if (evt->message.getTimeStamp() >= startTime && evt->message.getTimeStamp() < endTime)
+                        if (evt && evt->message.getTimeStamp() >= startTime && evt->message.getTimeStamp() < endTime)
                         {
                             midiBufferArrayA[i]->addEvent(evt->message, roundDoubleToInt((evt->message.getTimeStamp() - startTime) * sampleLength));
                             if (evt->message.isNoteOn() && playingNotes.find(evt->message.getNoteNumber()) == playingNotes.end())
@@ -441,21 +465,24 @@ void MicroChromoAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
                             }
                             isPlayingNote = true;
                         }
-                        if (evt->message.getTimeStamp() >= endTime)
+                        if (evt == nullptr || evt->message.getTimeStamp() >= endTime)
                             break;
                     }
                     for (int j = ccMidiSeq[i]->getNextIndexAtTime(startTime); j < ccMidiSeq[i]->getNumEvents(); j++)
                     {
                         MidiMessageSequence::MidiEventHolder* evt = ccMidiSeq[i]->getEventPointer(j);
 
-                        if (evt->message.getTimeStamp() >= startTime && evt->message.getTimeStamp() < endTime && 
+                        if (evt && evt->message.getTimeStamp() >= startTime && evt->message.getTimeStamp() < endTime && 
                             (midiChannel == 0 || evt->message.isForChannel(midiChannel)))
                         {
                             ccMidiBufferArray[i]->addEvent(evt->message, roundDoubleToInt((evt->message.getTimeStamp() - startTime) * sampleLength));
-                            DBG("[PROC_BLOCK] [ADJUST CC] " << evt->message.getControllerNumber() << ": " 
-                                << evt->message.getControllerValue() << " at " << evt->message.getTimeStamp() << "s");
+                            if (psModSource == USE_PITCHBEND)
+                                DBG("[PROC_BLOCK] [ADJUST PB] " << evt->message.getPitchWheelValue() << " at " << evt->message.getTimeStamp() << "s");
+                            else
+                                DBG("[PROC_BLOCK] [ADJUST CC] " << evt->message.getControllerNumber() << ": "
+                                    << evt->message.getControllerValue() << " at " << evt->message.getTimeStamp() << "s");
                         }
-                        if (evt->message.getTimeStamp() >= endTime)
+                        if (evt == nullptr || evt->message.getTimeStamp() >= endTime)
                             break;
                     }
                 }
@@ -628,8 +655,10 @@ void MicroChromoAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml->setAttribute("lastDocumentFilename", lastDocumentFilename);
     xml->setAttribute("numInstances", numInstancesParameter);
     xml->setAttribute("midiChannel", midiChannel);
+    xml->setAttribute("pbRange", pitchBendRange);
+    xml->setAttribute("tailLen", tailLength);
     xml->setAttribute("ccBase", ccBase);
-    xml->setAttribute("isModSrcKontakt", psModSource == USE_KONTAKT ? 1 : 0);
+    xml->setAttribute("modSource", psModSource);
     xml->setAttribute("selectedPreset", selectedPreset);
 
     //xml->addChildElement(new XmlElement(*state.createXml()));
@@ -658,10 +687,14 @@ void MicroChromoAudioProcessor::setStateInformation (const void* data, int sizeI
             psBundle->closeAllWindows();
             numInstancesParameter = xml->getIntAttribute("numInstances", 1);
             updateMidiChannel(xml->getIntAttribute("midiChannel", 1));
+            setTailLength(xml->getDoubleAttribute("tailLen", 0));
             updateCcMidiSequenceWithNewBase(xml->getIntAttribute("ccBase", 102));
             selectedPreset = xml->getStringAttribute("selectedPreset", "---INIT---");
+            setPitchbendRange(xml->getDoubleAttribute("pbRange", 1));
+            if (xml->getIntAttribute("modSource", USE_NONE) == USE_PITCHBEND)
+                toggleUsePitchbend(true);
 
-            auto isModSrcKontakt = xml->getIntAttribute("isModSrcKontakt", 0);
+            auto isModSrcKontakt = xml->getIntAttribute("modSource", USE_NONE) == USE_KONTAKT;
             if (auto* child = xml->getChildByName("synthBundle"))
             {
                 PluginDescription desc;
@@ -720,6 +753,10 @@ void MicroChromoAudioProcessor::startLoadingPlugin()
 {
     pluginLoadSus = true;
     suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
+    DBG("Suspend status: " << (pluginLoadSus ? "true" : "false") << " " << 
+        (updateModSrcSus ? "true" : "false") << " " << 
+        (updateMidSeqSus ? "true" : "false") << " " <<
+        (loadingDocument ? "true" : "false"));
 }
 
 void MicroChromoAudioProcessor::finishLoadingPlugin()
@@ -736,6 +773,10 @@ void MicroChromoAudioProcessor::finishLoadingPlugin()
 
         pluginLoadSus = false;
         suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
+        DBG("Suspend status: " << (pluginLoadSus ? "true" : "false") << " " <<
+            (updateModSrcSus ? "true" : "false") << " " <<
+            (updateMidSeqSus ? "true" : "false") << " " <<
+            (loadingDocument ? "true" : "false"));
     }
 }
 
@@ -776,7 +817,7 @@ double MicroChromoAudioProcessor::getTimeElapsed()
 //===------------------------------------------------------------------===//
 bool MicroChromoAudioProcessor::canLearnCc(const PluginBundle* bundle)
 {
-    if (psModSource == USE_KONTAKT)
+    if (psModSource == USE_KONTAKT || psModSource == USE_PITCHBEND)
         return false;
     if (synthBundle.get() == bundle && psBundle->getCcLearnModule().hasLearned())
         return false;
@@ -787,7 +828,16 @@ bool MicroChromoAudioProcessor::canLearnCc(const PluginBundle* bundle)
 
 bool MicroChromoAudioProcessor::canChooseKontakt()
 {
-    if (!synthBundle->getCcLearnModule().hasLearned() && !psBundle->getCcLearnModule().hasLearned())
+    if (!synthBundle->getCcLearnModule().hasLearned() && !psBundle->getCcLearnModule().hasLearned() &&
+        psModSource != USE_PITCHBEND)
+        return true;
+    return false;
+}
+
+bool MicroChromoAudioProcessor::canChoosePitchbend()
+{
+    if (!synthBundle->getCcLearnModule().hasLearned() && !psBundle->getCcLearnModule().hasLearned() &&
+        psModSource != USE_KONTAKT)
         return true;
     return false;
 }
@@ -829,51 +879,75 @@ void MicroChromoAudioProcessor::updateMidiSequence(int newBase)
 {
     updateMidSeqSus = true;
     suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
+    DBG("Suspend status: " << (pluginLoadSus ? "true" : "false") << " " <<
+        (updateModSrcSus ? "true" : "false") << " " <<
+        (updateMidSeqSus ? "true" : "false") << " " <<
+        (loadingDocument ? "true" : "false"));
 
-    if (newBase != -1 && ccBase != newBase)
-        ccBase = newBase;
-
-    std::unordered_set<int> channels;
-    for (auto* track : project.getNoteTracks())
-        channels.insert(track->getTrackChannel());
-
-    notesMidiSeq.clear();
-    ccMidiSeq.clear();
-    for (int i = 0; i < numInstancesParameter; i++)
+    if (psModSource != USE_NONE)
     {
-        notesMidiSeq.add(new MidiMessageSequence());
-        ccMidiSeq.add(new MidiMessageSequence());
-        for (int j = 0; j < (psModSource == USE_KONTAKT ? 12 : 1); j++)
-            for (auto k : channels)
-                ccMidiSeq[i]->addEvent(MidiMessage::controllerEvent(k, ccBase + j, 50));
+        if (newBase != -1 && ccBase != newBase)
+            ccBase = newBase;
+
+        std::unordered_set<int> channels;
+        for (auto* track : project.getNoteTracks())
+            channels.insert(track->getTrackChannel());
+
+        notesMidiSeq.clear();
+        ccMidiSeq.clear();
+        for (int i = 0; i < numInstancesParameter; i++)
+        {
+            notesMidiSeq.add(new MidiMessageSequence());
+            ccMidiSeq.add(new MidiMessageSequence());
+            for (int j = 0; j < (psModSource == USE_KONTAKT ? 12 : 1); j++)
+            {
+                for (auto k : channels)
+                {
+                    if (psModSource == USE_PITCHBEND)
+                        ccMidiSeq[i]->addEvent(MidiMessage::pitchWheel(k, 8192));
+                    else
+                        ccMidiSeq[i]->addEvent(MidiMessage::controllerEvent(k, ccBase + j, 50));
+                }
+            }
+        }
+
+        project.getScheduler()->schedule(notesMidiSeq, ccMidiSeq, numInstancesParameter, ccBase, psModSource,
+            pitchBendRange, jmin(2048 * sampleLength, 1.1f * bufferLength));
+
+        for (int i = 0; i < notesMidiSeq.size(); i++)
+        {
+            for (int j = 0; j < (psModSource == USE_KONTAKT ? 12 : 1); j++)
+            {
+                for (auto k : channels)
+                {
+                    if (psModSource == USE_PITCHBEND)
+                        ccMidiSeq[i]->addEvent(MidiMessage::pitchWheel(k, 8192).withTimeStamp(notesMidiSeq[i]->getEndTime() + 5));
+                    else
+                        ccMidiSeq[i]->addEvent(MidiMessage::controllerEvent(k, ccBase + j, 50).withTimeStamp(notesMidiSeq[i]->getEndTime() + 5));
+                }
+            }
+        }
+
+        currentModSrc = psModSource;
+        rangeStartTime = FLT_MAX;
+        rangeEndTime = -FLT_MAX;
+        for (auto& seq : notesMidiSeq)
+        {
+            if (rangeStartTime > seq->getStartTime())
+                rangeStartTime = seq->getStartTime();
+            if (rangeEndTime < seq->getEndTime())
+                rangeEndTime = seq->getEndTime();
+        }
+        if (notesMidiSeq.size() > 0)
+            rangeEndTime += tailLength;
     }
-
-    project.getScheduler()->schedule(notesMidiSeq, ccMidiSeq, numInstancesParameter, ccBase, psModSource, 
-        jmin(2048 * sampleLength, 1.1f * bufferLength));
-
-    if (psModSource == USE_KONTAKT)
-        isCurrentModSrcKontakt = true;
-    else
-        isCurrentModSrcKontakt = false;
-
-    for (int i = 0; i < notesMidiSeq.size(); i++)
-        for (int j = 0; j < (psModSource == USE_KONTAKT ? 12 : 1); j++)
-            for (auto k : channels)
-                ccMidiSeq[i]->addEvent(MidiMessage::controllerEvent(k, ccBase + j, 50).withTimeStamp(notesMidiSeq[i]->getEndTime() + 5));
-
-    rangeStartTime = FLT_MAX;
-    rangeEndTime = -FLT_MAX;
-    for (auto& seq : notesMidiSeq)
-    {
-        if (rangeStartTime > seq->getStartTime())
-            rangeStartTime = seq->getStartTime();
-        if (rangeEndTime < seq->getEndTime())
-            rangeEndTime = seq->getEndTime();
-    }
-    rangeEndTime += 1;
 
     updateMidSeqSus = false;
     suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
+    DBG("Suspend status: " << (pluginLoadSus ? "true" : "false") << " " <<
+        (updateModSrcSus ? "true" : "false") << " " <<
+        (updateMidSeqSus ? "true" : "false") << " " <<
+        (loadingDocument ? "true" : "false"));
 }
 
 void MicroChromoAudioProcessor::updateCcMidiSequenceWithNewBase(int newBase)
@@ -917,73 +991,107 @@ void MicroChromoAudioProcessor::updateKontaktCcBase(int newCcBase)
     updateCcMidiSequenceWithNewBase(newCcBase);
 }
 
-void MicroChromoAudioProcessor::updatePitchShiftModulationSource(int useKontakt)
+void MicroChromoAudioProcessor::updatePitchShiftModulationSource(int useKontakt, int usePitchbend)
 {
     updateModSrcSus = true;
     suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
+    DBG("Suspend status: " << (pluginLoadSus ? "true" : "false") << " " <<
+        (updateModSrcSus ? "true" : "false") << " " <<
+        (updateMidSeqSus ? "true" : "false") << " " <<
+        (loadingDocument ? "true" : "false"));
 
-    auto& synthCcLearnModule = synthBundle->getCcLearnModule();
-    auto& psCcLearnModule = psBundle->getCcLearnModule();
-
-    if (useKontakt == 1 && synthBundle->isKontakt())
+    if (usePitchbend == 1)
     {
-        psModSource = USE_KONTAKT;
-        if (synthCcLearnModule.hasLearned())
-            synthCcLearnModule.resetCcLearn();
-        if (psCcLearnModule.hasLearned())
-            psCcLearnModule.resetCcLearn();
-        if (!isCurrentModSrcKontakt)
-            updateMidiSequence(jlimit(0, 116, ccBase.load()));
-        DBG("Mod src now is: Kontakt");
-    }
-    else
-    {
-        if (useKontakt == 1 || (useKontakt == 0 && psModSource == USE_KONTAKT && !synthBundle->isKontakt()))
-            psModSource = USE_NONE;
-
-        if (useKontakt == -1 || psModSource != USE_KONTAKT)
+        if (psModSource != USE_PITCHBEND)
         {
-            if (synthCcLearnModule.hasLearned())
-            {
-                if (psCcLearnModule.hasLearned())
-                    psCcLearnModule.resetCcLearn();
+            psModSource = USE_PITCHBEND;
+            updateMidiSequence(-1);
+            DBG("Mod src now is: Pitchbend");
+        }
+    }
+    else if (usePitchbend == -1 || (usePitchbend == 0 && psModSource != USE_PITCHBEND))
+    {
+        auto& synthCcLearnModule = synthBundle->getCcLearnModule();
+        auto& psCcLearnModule = psBundle->getCcLearnModule();
 
-                psModSource = USE_SYNTH;
-                if (isCurrentModSrcKontakt)
-                    updateMidiSequence(synthCcLearnModule.getCcSource());
-                else
-                    updateCcMidiSequenceWithNewBase(synthCcLearnModule.getCcSource());
-                DBG("Mod src now is: Synth " << ccBase);
-            }
-            else if (psCcLearnModule.hasLearned())
-            {
-                psModSource = USE_PS;
-                if (isCurrentModSrcKontakt)
-                    updateMidiSequence(psCcLearnModule.getCcSource());
-                else
-                    updateCcMidiSequenceWithNewBase(psCcLearnModule.getCcSource());
-                DBG("Mod src now is: Ps " << ccBase);
-            }
-            else
-            {
+        if (useKontakt == 1 && synthBundle->isKontakt())
+        {
+            psModSource = USE_KONTAKT;
+            if (synthCcLearnModule.hasLearned())
+                synthCcLearnModule.resetCcLearn();
+            if (psCcLearnModule.hasLearned())
+                psCcLearnModule.resetCcLearn();
+            if (currentModSrc != USE_KONTAKT)
+                updateMidiSequence(jlimit(0, 116, ccBase.load()));
+            DBG("Mod src now is: Kontakt");
+        }
+        else
+        {
+            if (useKontakt == 1 || (useKontakt == 0 && psModSource == USE_KONTAKT && !synthBundle->isKontakt()))
                 psModSource = USE_NONE;
-                DBG("Mod src now is: None");
+
+            if (useKontakt == -1 || psModSource != USE_KONTAKT)
+            {
+                if (synthCcLearnModule.hasLearned())
+                {
+                    if (psCcLearnModule.hasLearned())
+                        psCcLearnModule.resetCcLearn();
+
+                    psModSource = USE_SYNTH;
+                    if (currentModSrc != psModSource)
+                        updateMidiSequence(synthCcLearnModule.getCcSource());
+                    else
+                        updateCcMidiSequenceWithNewBase(synthCcLearnModule.getCcSource());
+                    DBG("Mod src now is: Synth " << ccBase);
+                }
+                else if (psCcLearnModule.hasLearned())
+                {
+                    psModSource = USE_PS;
+                    if (currentModSrc != psModSource)
+                        updateMidiSequence(psCcLearnModule.getCcSource());
+                    else
+                        updateCcMidiSequenceWithNewBase(psCcLearnModule.getCcSource());
+                    DBG("Mod src now is: Ps " << ccBase);
+                }
+                else
+                {
+                    psModSource = USE_NONE;
+                    DBG("Mod src now is: None");
+                }
             }
         }
     }
 
+    if (psModSource == USE_NONE)
+    {
+        for (int i = 0; i < notesMidiSeq.size(); i++)
+        {
+            notesMidiSeq[i]->clear();
+            ccMidiSeq[i]->clear();
+        }
+        currentModSrc = USE_NONE;
+        rangeStartTime = FLT_MAX;
+        rangeEndTime = -FLT_MAX;
+    }
+
     updateModSrcSus = false;
     suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
+    DBG("Suspend status: " << (pluginLoadSus ? "true" : "false") << " " <<
+        (updateModSrcSus ? "true" : "false") << " " <<
+        (updateMidSeqSus ? "true" : "false") << " " <<
+        (loadingDocument ? "true" : "false"));
 }
 
 void MicroChromoAudioProcessor::toggleUseKontakt(bool isOn)
 {
     if (!synthBundle->isKontakt())
         return;
-    if (isOn)
-        updatePitchShiftModulationSource(1);
-    else
-        updatePitchShiftModulationSource(-1);
+    updatePitchShiftModulationSource(isOn ? 1 : -1);
+}
+
+void MicroChromoAudioProcessor::toggleUsePitchbend(bool isOn)
+{
+    updatePitchShiftModulationSource(0, isOn ? 1 : -1);
 }
 
 //===------------------------------------------------------------------===//
@@ -1004,6 +1112,10 @@ Result MicroChromoAudioProcessor::loadDocument(const File& file)
 
         loadingDocument = true;
         suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
+        DBG("Suspend status: " << (pluginLoadSus ? "true" : "false") << " " <<
+            (updateModSrcSus ? "true" : "false") << " " <<
+            (updateMidSeqSus ? "true" : "false") << " " <<
+            (loadingDocument ? "true" : "false"));
 
         resetState();
         setStateInformation(block.getData(), block.getSize());
@@ -1013,6 +1125,10 @@ Result MicroChromoAudioProcessor::loadDocument(const File& file)
 
         loadingDocument = false;
         suspendProcessing(pluginLoadSus || updateModSrcSus || updateMidSeqSus || loadingDocument);
+        DBG("Suspend status: " << (pluginLoadSus ? "true" : "false") << " " <<
+            (updateModSrcSus ? "true" : "false") << " " <<
+            (updateMidSeqSus ? "true" : "false") << " " <<
+            (loadingDocument ? "true" : "false"));
 
 
         return Result::ok();

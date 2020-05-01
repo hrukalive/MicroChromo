@@ -123,9 +123,9 @@ private:
     //==============================================================================
     std::unique_ptr<Button> synthButton, effectButton, dragButton, dropButton;
     std::unique_ptr<Label> synthLabel, effectLabel;
-    std::unique_ptr<Label> numInstancesLabel, numParameterLabel, midiChannelLabel;
+    std::unique_ptr<Label> numInstancesLabel, numParameterLabel, midiChannelLabel, pbRangeLabel, tailLenLabel;
     std::unique_ptr<ComboBox> numInstancesBox, midiChannelComboBox;
-    std::unique_ptr<TextEditor> numParameterSlot;
+    std::unique_ptr<TextEditor> numParameterSlot, pbRangeTextbox, tailLenTextbox;
     std::unique_ptr<PopupMenu> floatMenu;
 
     std::function<void(int, bool)> bundlePopupMenuSelected;

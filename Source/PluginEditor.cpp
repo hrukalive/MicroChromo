@@ -76,7 +76,7 @@ void MicroChromoAudioProcessorEditor::CustomTabbedComponent::currentTabChanged(i
 {
     switch (newCurrentTabIndex)
     {
-    case 0: _owner.setSize(400, 300 + 90); break;
+    case 0: _owner.setSize(400, 480); break;
     case 1: _owner.setSize(570, 580); break;
     case 2: _owner.setSize(350, 580); break;
     case 3: _owner.setSize(490, 580); break;
@@ -168,7 +168,7 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     changeListenerCallback(synthBundle.get());
     changeListenerCallback(psBundle.get());
 
-    setSize(400, 300 + 90);
+    setSize(400, 480);
 
     startTimer(100);
 }
@@ -360,6 +360,7 @@ void MicroChromoAudioProcessorEditor::menuItemSelected(int menuItemID, int topLe
         case SLOT_MENU_START_CC: bundle->getCcLearnModule().startLearning(); break;
         case SLOT_MENU_MANAGE_CC: bundle->getCcLearnModule().showStatus(); break;
         case SLOT_MENU_CLEAR_CC: bundle->getCcLearnModule().resetCcLearn(true); break;
+        case SLOT_MENU_USE_PITCHBEND: processor.toggleUsePitchbend(processor.getPitchShiftModulationSource() != USE_PITCHBEND); break;
         case SLOT_MENU_USE_KONTAKT: processor.toggleUseKontakt(processor.getPitchShiftModulationSource() != USE_KONTAKT); break;
         case SLOT_MENU_COPY_KONTAKT_SCRIPT: 
             SystemClipboard::copyTextToClipboard(String(BinaryData::MicroChromoKontaktScript_txt)
@@ -456,7 +457,7 @@ void MicroChromoAudioProcessorEditor::timerCallback()
     }
 
     auto seconds = processor.getTimeElapsed();
-    if (!transportSliderDragging)
+    if (!transportSliderDragging && processor.getMidiSequenceEndTime() > 1e-3)
         transportSlider.setValue(seconds / processor.getMidiSequenceEndTime(), dontSendNotification);
 
     std::ostringstream ss;

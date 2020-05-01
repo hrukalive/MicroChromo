@@ -101,6 +101,10 @@ public:
     std::shared_ptr<PluginBundle> getPSBundlePtr() { return psBundle; }
     int getNumInstances() const noexcept { return numInstancesParameter; }
     int getParameterSlotNumber() const noexcept { return parameterSlotNumber; }
+    float getPitchbendRange() const noexcept { return pitchBendRange; }
+    void setPitchbendRange(float newRange) { pitchBendRange = newRange; }
+    float getTailLength() const noexcept { return tailLength; }
+    void setTailLength(float newLength) { tailLength = newLength; }
     int getMidiChannel() const noexcept { return midiChannel; }
     int getCcBase() const noexcept { return ccBase; }
     double getMidiSequenceEndTime() const noexcept { return rangeEndTime; }
@@ -108,6 +112,7 @@ public:
 
     bool canLearnCc(const PluginBundle* bundle);
     bool canChooseKontakt();
+    bool canChoosePitchbend();
     String getSelectedColorPresetName() const noexcept { return selectedPreset; }
     void setSelectedColorPresetName(String name) { selectedPreset = name; }
 
@@ -122,8 +127,9 @@ public:
     void updateMidiChannel(int newMidiChannel);
     void updateKontaktCcBase(int newCcBase);
 
-    void updatePitchShiftModulationSource(int useKontakt = 0);
+    void updatePitchShiftModulationSource(int useKontakt = 0, int usePitchbend = 0);
     void toggleUseKontakt(bool isOn);
+    void toggleUsePitchbend(bool isOn);
 
     void triggerPanic() { panicNoteOff = true; }
 
@@ -156,6 +162,7 @@ private:
 
     //==============================================================================
     std::atomic<int> numInstancesParameter{ 1 }, parameterSlotNumber{ 16 };
+    std::atomic<float> pitchBendRange{ 1.0f }, tailLength{ 1.0f };
     String selectedPreset = "---INIT---";
 
     //==============================================================================
@@ -192,7 +199,7 @@ private:
         psBundleTotalNumInputChannels, psBundleTotalNumOutputChannels, psBundleMainBusNumInputChannels, psBundleMainBusNumOutputChannels;
     float sampleLength{ -1 }, bufferLength{ -1 };
 
-    bool isCurrentModSrcKontakt = false;
+    int currentModSrc = USE_NONE;
     std::atomic<bool> updateMidSeqSus = false, updateModSrcSus = false, pluginLoadSus = false, loadingDocument = false;
 
     //==============================================================================

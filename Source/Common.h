@@ -73,15 +73,16 @@ enum
     SLOT_MENU_CLEAR_CC = 11 + mainMenuIdBase,
     SLOT_MENU_LOAD_EMPTY_PLUGIN = 12 + mainMenuIdBase,
     SLOT_MENU_LOAD_DEFAULT_PLUGIN = 13 + mainMenuIdBase,
-    SLOT_MENU_USE_KONTAKT = 14 + mainMenuIdBase,
-    SLOT_MENU_COPY_KONTAKT_SCRIPT = 15 + mainMenuIdBase,
+    SLOT_MENU_USE_PITCHBEND = 14 + mainMenuIdBase,
+    SLOT_MENU_USE_KONTAKT = 15 + mainMenuIdBase,
+    SLOT_MENU_COPY_KONTAKT_SCRIPT = 16 + mainMenuIdBase,
 
-    PLUGIN_SORT_MANUFACTURER = 16 + mainMenuIdBase,
-    PLUGIN_SORT_CATEGORY = 17 + mainMenuIdBase,
-    PLUGIN_SORT_ALPHABETICALLY = 18 + mainMenuIdBase,
-    PLUGIN_SORT_FORMAT = 19 + mainMenuIdBase,
+    PLUGIN_SORT_MANUFACTURER = 17 + mainMenuIdBase,
+    PLUGIN_SORT_CATEGORY = 18 + mainMenuIdBase,
+    PLUGIN_SORT_ALPHABETICALLY = 19 + mainMenuIdBase,
+    PLUGIN_SORT_FORMAT = 20 + mainMenuIdBase,
 
-    CC_VALUE_BASE = 20 + mainMenuIdBase
+    CC_VALUE_BASE = 21 + mainMenuIdBase
 };
 
 enum
@@ -89,7 +90,8 @@ enum
     USE_NONE = 1,
     USE_PS,
     USE_SYNTH,
-    USE_KONTAKT
+    USE_KONTAKT,
+    USE_PITCHBEND
 };
 
 enum

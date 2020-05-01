@@ -178,6 +178,40 @@ MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEd
     addAndMakeVisible(midiChannelLabel.get());
     midiChannelLabel->setText("MIDI Channel", dontSendNotification);
 
+    pbRangeTextbox.reset(new TextEditor());
+    addAndMakeVisible(pbRangeTextbox.get());
+    pbRangeTextbox->setMultiLine(false);
+    pbRangeTextbox->setReturnKeyStartsNewLine(false);
+    pbRangeTextbox->setReadOnly(false);
+    pbRangeTextbox->setInputRestrictions(4, "0123456789.");
+    pbRangeTextbox->setScrollbarsShown(false);
+    pbRangeTextbox->setCaretVisible(true);
+    pbRangeTextbox->setPopupMenuEnabled(false);
+    pbRangeTextbox->setText(String(processor.getPitchbendRange(), 1));
+    pbRangeTextbox->onTextChange = [&]() {
+        processor.setPitchbendRange(jlimit(0.0f, 12.0f, pbRangeTextbox->getText().getFloatValue()));
+    };
+    pbRangeLabel.reset(new Label());
+    addAndMakeVisible(pbRangeLabel.get());
+    pbRangeLabel->setText("Pitchbend Range", dontSendNotification);
+
+    tailLenTextbox.reset(new TextEditor());
+    addAndMakeVisible(tailLenTextbox.get());
+    tailLenTextbox->setMultiLine(false);
+    tailLenTextbox->setReturnKeyStartsNewLine(false);
+    tailLenTextbox->setReadOnly(false);
+    tailLenTextbox->setInputRestrictions(4, "0123456789.");
+    tailLenTextbox->setScrollbarsShown(false);
+    tailLenTextbox->setCaretVisible(true);
+    tailLenTextbox->setPopupMenuEnabled(false);
+    tailLenTextbox->setText(String(processor.getTailLength(), 1));
+    tailLenTextbox->onTextChange = [&]() {
+        processor.setTailLength(jlimit(0.0f, FLT_MAX, tailLenTextbox->getText().getFloatValue()));
+    };
+    tailLenLabel.reset(new Label());
+    addAndMakeVisible(tailLenLabel.get());
+    tailLenLabel->setText("Tail Length (s)", dontSendNotification);
+
     synthBundle->addChangeListener(this);
     psBundle->addChangeListener(this);
 
@@ -187,7 +221,7 @@ MainEditor::MainEditor(MicroChromoAudioProcessor& p, MicroChromoAudioProcessorEd
     changeListenerCallback(psBundle.get());
 
     setResizable(true, false);
-    setSize(400, 230);
+    setSize(400, 480);
 }
 
 MainEditor::~MainEditor()
@@ -327,38 +361,31 @@ void MainEditor::resized()
 {
     auto b = getLocalBounds();
     b.reduce(10, 10);
-    auto halfWidth = b.proportionOfWidth(0.48);
-    auto halfWidthSpace = b.proportionOfWidth(0.04);
-    auto spaceHeightSmall = jmax(1.0f, (b.getHeight() - 200) / 30.0f * 4);
-    auto spaceHeightLarge = jmax(1.0f, (b.getHeight() - 200) / 30.0f * 9);
 
-    auto tmp = b.removeFromBottom(30);
-    dragButton->setBounds(tmp.removeFromLeft(halfWidth));
-    tmp.removeFromLeft(halfWidthSpace);
-    dropButton->setBounds(tmp);
+    auto slice = b.proportionOfHeight(1 / 27.0f);
+
+    auto tmp = b.removeFromBottom(4 * slice).reduced(0, 2);
+    dragButton->setBounds(tmp.removeFromLeft(tmp.proportionOfWidth(0.5)).reduced(2, 0));
+    dropButton->setBounds(tmp.reduced(2, 0));
 
     auto leftPanel = b.removeFromLeft(b.proportionOfWidth(0.3));
     auto rightPanel = b.withTrimmedLeft(10);
 
-    numInstancesLabel->setBounds(leftPanel.removeFromTop(30));
-    leftPanel.removeFromTop(spaceHeightSmall);
-    numParameterLabel->setBounds(leftPanel.removeFromTop(30));
-    leftPanel.removeFromTop(spaceHeightSmall);
-    midiChannelLabel->setBounds(leftPanel.removeFromTop(30));
-    leftPanel.removeFromTop(spaceHeightLarge);
+    numInstancesLabel->setBounds(leftPanel.removeFromTop(3 * slice).reduced(0, 4));
+    numParameterLabel->setBounds(leftPanel.removeFromTop(3 * slice).reduced(0, 4));
+    midiChannelLabel->setBounds(leftPanel.removeFromTop(3 * slice).reduced(0, 4));
+    pbRangeLabel->setBounds(leftPanel.removeFromTop(3 * slice).reduced(0, 4));
+    tailLenLabel->setBounds(leftPanel.removeFromTop(3 * slice).reduced(0, 4));
 
-    synthButton->setBounds(leftPanel.removeFromTop(40));
-    leftPanel.removeFromTop(spaceHeightSmall);
-    effectButton->setBounds(leftPanel.removeFromTop(40));
+    synthButton->setBounds(leftPanel.removeFromTop(4 * slice).reduced(0, 4));
+    effectButton->setBounds(leftPanel.removeFromTop(4 * slice).reduced(0, 4));
 
-    numInstancesBox->setBounds(rightPanel.removeFromTop(30));
-    rightPanel.removeFromTop(spaceHeightSmall);
-    numParameterSlot->setBounds(rightPanel.removeFromTop(30));
-    rightPanel.removeFromTop(spaceHeightSmall);
-    midiChannelComboBox->setBounds(rightPanel.removeFromTop(30));
-    rightPanel.removeFromTop(spaceHeightLarge);
+    numInstancesBox->setBounds(rightPanel.removeFromTop(3 * slice).reduced(0, 4));
+    numParameterSlot->setBounds(rightPanel.removeFromTop(3 * slice).reduced(0, 4));
+    midiChannelComboBox->setBounds(rightPanel.removeFromTop(3 * slice).reduced(0, 4));
+    pbRangeTextbox->setBounds(rightPanel.removeFromTop(3 * slice).reduced(0, 4));
+    tailLenTextbox->setBounds(rightPanel.removeFromTop(3 * slice).reduced(0, 4));
 
-    synthLabel->setBounds(rightPanel.removeFromTop(40));
-    rightPanel.removeFromTop(spaceHeightSmall);
-    effectLabel->setBounds(rightPanel.removeFromTop(40));
+    synthLabel->setBounds(rightPanel.removeFromTop(4 * slice).reduced(0, 4));
+    effectLabel->setBounds(rightPanel.removeFromTop(4 * slice).reduced(0, 4));
 }

@@ -550,6 +550,7 @@ Array<MidiFile> Project::exportMidiFiles()
 
     voiceScheduler->schedule(noteSeqs, ccSeqs, processor.getNumInstances(),
         processor.getCcBase(), processor.getPitchShiftModulationSource(),
+        processor.getPitchbendRange(),
         processor.getBlockSize() / processor.getSampleRate(), 960);
 
     Array<MidiFile> files;

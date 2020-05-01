@@ -35,12 +35,17 @@ VoiceScheduler::InternalMidiMessage::InternalMidiMessage() noexcept
 
 VoiceScheduler::InternalMidiMessage::InternalMidiMessage(int channel, int key, 
     float timestamp, float velocity, int pitchbend, int cc, bool isNoteOn, 
-    float adjustment, InternalMidiMessage* noteOnEvt)
+    float adjustment, float pbRange, InternalMidiMessage* noteOnEvt)
 {
     if (isNoteOn)
     {
         noteMsg = MidiMessage::noteOn(channel, key, velocity).withTimeStamp(timestamp);
-        ccMsg = MidiMessage::controllerEvent(channel, cc, pitchbend + 50).withTimeStamp(jmax(0.0f, timestamp - adjustment));
+        if (pbRange > 0)
+            ccMsg = MidiMessage::pitchWheel(channel, 
+                jlimit(0, 16383, (int)roundf(((pitchbend / 100.0f + pbRange) / (pbRange * 2)) * 16383)))
+                    .withTimeStamp(jmax(0.0f, timestamp - adjustment));
+        else
+            ccMsg = MidiMessage::controllerEvent(channel, cc, pitchbend + 50).withTimeStamp(jmax(0.0f, timestamp - adjustment));
     }
     else
     {
@@ -55,11 +60,19 @@ VoiceScheduler::InternalMidiMessage::InternalMidiMessage(int channel, int key,
 //===------------------------------------------------------------------===//
 String VoiceScheduler::InternalMidiMessage::toString() const
 {
-    return (noteOn ? " ON " : " OFF ") + ("key: " + String(noteMsg.getNoteNumber())) +
-        " time: " + String(noteMsg.getTimeStamp(), 2) +
-        " vel: " + String(noteMsg.getVelocity()) +
-        " chn: " + String(noteMsg.getChannel()) + 
-        (noteOn ? (" pit: " + String(ccMsg.getControllerValue() - 50) + " cc: " + String(ccMsg.getControllerNumber())) : "");
+    if (ccMsg.isController())
+        return (noteOn ? " ON " : " OFF ") + ("key: " + String(noteMsg.getNoteNumber())) +
+            " time: " + String(noteMsg.getTimeStamp(), 2) +
+            " vel: " + String(noteMsg.getVelocity()) +
+            " chn: " + String(noteMsg.getChannel()) + 
+            (noteOn ? (" pit: " + String(ccMsg.getControllerValue() - 50) + " cc: " + String(ccMsg.getControllerNumber())) : "");
+    else
+        return (noteOn ? " ON " : " OFF ") + ("key: " + String(noteMsg.getNoteNumber())) +
+            " time: " + String(noteMsg.getTimeStamp(), 2) +
+            " vel: " + String(noteMsg.getVelocity()) +
+            " chn: " + String(noteMsg.getChannel()) +
+            (noteOn ? (" pb: " + String(ccMsg.getPitchWheelValue()) + " (" + 
+                String((ccMsg.getPitchWheelValue() / 16383.0f) * 2 - 1, 4) + ")") : "");
 }
 
 int VoiceScheduler::InternalMidiMessage::compareElements(const InternalMidiMessage& first, const InternalMidiMessage& second)
@@ -92,7 +105,7 @@ VoiceScheduler::VoiceScheduler(Project& owner) : project(owner) {}
 //===------------------------------------------------------------------===//
 void VoiceScheduler::schedule(OwnedArray<MidiMessageSequence>& noteSequences,
     OwnedArray<MidiMessageSequence>& ccSequences, int n, int ccBase, int modSource, 
-    float ccTimeAdjustment, float timeMult)
+    float pbRange, float ccTimeAdjustment, float timeMult)
 {
     auto* colorMap = project.getPitchColorMap();
     auto* tempoTrack = project.getTempoTrack();
@@ -145,12 +158,14 @@ void VoiceScheduler::schedule(OwnedArray<MidiMessageSequence>& noteSequences,
                         timeFactor = timeMult;
                     }
                     InternalMidiMessage* onMsg;
-                    if (modSource == USE_KONTAKT)
-                        onMsg = new InternalMidiMessage(c, key, beat, note->getVelocity(), pitchbend, ccBase + key % 12, true, ccTimeAdjustment);
+                    if (modSource == USE_PITCHBEND)
+                        onMsg = new InternalMidiMessage(c, key, beat, note->getVelocity(), pitchbend, ccBase, true, ccTimeAdjustment, pbRange);
+                    else if (modSource == USE_KONTAKT)
+                        onMsg = new InternalMidiMessage(c, key, beat, note->getVelocity(), pitchbend, ccBase + key % 12, true, ccTimeAdjustment, -1);
                     else
-                        onMsg = new InternalMidiMessage(c, key, beat, note->getVelocity(), pitchbend, ccBase, true, ccTimeAdjustment);
+                        onMsg = new InternalMidiMessage(c, key, beat, note->getVelocity(), pitchbend, ccBase, true, ccTimeAdjustment, -1);
                     sequence.add(onMsg);
-                    sequence.add(new InternalMidiMessage(c, key, beat + timeFactor * note->getLength(), note->getVelocity(), 0, -1, false, 0, onMsg));
+                    sequence.add(new InternalMidiMessage(c, key, beat + timeFactor * note->getLength(), note->getVelocity(), 0, -1, false, 0, -1, onMsg));
                 }
             }
         }
@@ -200,7 +215,8 @@ void VoiceScheduler::scheduleGeneral(const OwnedArray<InternalMidiMessage>& sequ
         {
             for (int i = 0; i < n; i++)
             {
-                if (note.ccMsg.getControllerValue() == channelToCcValue[i])
+                if ((note.ccMsg.isPitchWheel() && note.ccMsg.getPitchWheelValue() == channelToCcValue[i]) ||
+                    (note.ccMsg.isController() && note.ccMsg.getControllerValue() == channelToCcValue[i]))
                 {
                     noteSequences[i]->addEvent(note.noteMsg);
 
@@ -233,7 +249,7 @@ void VoiceScheduler::scheduleGeneral(const OwnedArray<InternalMidiMessage>& sequ
                     ccSequences[minIdx]->addEvent(note.ccMsg);
 
                     channelToNote[minIdx].insert(&note);
-                    channelToCcValue[minIdx] = note.ccMsg.getControllerValue();
+                    channelToCcValue[minIdx] = note.ccMsg.isController() ? note.ccMsg.getControllerValue() : note.ccMsg.getPitchWheelValue();
                     noteToChannel[&note] = minIdx;
 
                     channelUseCount[minIdx] = ++channelUseCounter;
@@ -270,7 +286,7 @@ void VoiceScheduler::scheduleGeneral(const OwnedArray<InternalMidiMessage>& sequ
                 ccSequences[minIdx]->addEvent(note.ccMsg);
 
                 channelToNote[minIdx].insert(&note);
-                channelToCcValue[minIdx] = note.ccMsg.getControllerValue();
+                channelToCcValue[minIdx] = note.ccMsg.isController() ? note.ccMsg.getControllerValue() : note.ccMsg.getPitchWheelValue();
                 noteToChannel[&note] = minIdx;
 
                 channelUseCount[minIdx] = ++channelUseCounter;

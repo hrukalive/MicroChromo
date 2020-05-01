@@ -538,7 +538,12 @@ std::unique_ptr<PopupMenu> PluginBundle::getMainPopupMenu()
     if (this == processor.getSynthBundlePtr().get() && isKontakt())
     {
         floatMenu->addSeparator();
-        floatMenu->addItem(SLOT_MENU_USE_KONTAKT, "Kontakt Specific", canChooseKontakt, processor.getPitchShiftModulationSource() == USE_KONTAKT);
+        floatMenu->addItem(SLOT_MENU_USE_PITCHBEND, "Pitchbend", processor.canChoosePitchbend(), 
+            processor.getPitchShiftModulationSource() == USE_PITCHBEND);
+
+        floatMenu->addSeparator();
+        floatMenu->addItem(SLOT_MENU_USE_KONTAKT, "Kontakt Specific", canChooseKontakt, 
+            processor.getPitchShiftModulationSource() == USE_KONTAKT);
         floatMenu->addItem(SLOT_MENU_COPY_KONTAKT_SCRIPT, "Copy Kontakt Script", canChooseKontakt);
 
         PopupMenu subMenu;

@@ -33,14 +33,14 @@ public:
     // Utility
     //===------------------------------------------------------------------===//
     void schedule(OwnedArray<MidiMessageSequence>& noteSequences, OwnedArray<MidiMessageSequence>& ccSequences, 
-        int n, int ccBase, int modSource, float ccTimeAdjustment, float timeMult = -1);
+        int n, int ccBase, int modSource, float pbRange, float ccTimeAdjustment, float timeMult = -1);
 
 private:
     struct InternalMidiMessage
     {
         InternalMidiMessage() noexcept;
         InternalMidiMessage(int channel, int key, float timestamp, float velocity, int pitchbend, int cc, 
-            bool isNoteOn, float adjustment, InternalMidiMessage* noteOnEvt = nullptr);
+            bool isNoteOn, float adjustment, float pbRange, InternalMidiMessage* noteOnEvt = nullptr);
 
         //===------------------------------------------------------------------===//
         // Helpers
