@@ -69,10 +69,44 @@ private:
     int numEvents = 0;
 
     ValueTree serializedTreeItem;
-    String trackName;
-    int trackChannel;
 
     JUCE_DECLARE_NON_COPYABLE(NoteTrackRemoveAction)
 };
 
+//===----------------------------------------------------------------------===//
+// Change A
+//===----------------------------------------------------------------------===//
+class TuningChangeStandardNoteFrequencyAction final : public UndoableAction
+{
+public:
+    explicit TuningChangeStandardNoteFrequencyAction(Project& project) noexcept : project(project) {}
+    TuningChangeStandardNoteFrequencyAction(Project& project, int oldFreq, int newFreq) noexcept;
 
+    bool perform() override;
+    bool undo() override;
+    int getSizeInUnits() override;
+private:
+    Project& project;
+    int oldf = 440, newf = 440;
+
+    JUCE_DECLARE_NON_COPYABLE(TuningChangeStandardNoteFrequencyAction)
+};
+
+//===----------------------------------------------------------------------===//
+// Change Tuning
+//===----------------------------------------------------------------------===//
+class TuningChangeAction final : public UndoableAction
+{
+public:
+    explicit TuningChangeAction(Project& project) noexcept : project(project) {}
+    TuningChangeAction(Project& project, int noteNum, int oldCent, int newCent) noexcept;
+
+    bool perform() override;
+    bool undo() override;
+    int getSizeInUnits() override;
+private:
+    Project& project;
+    int n = 0, oc = 0, nc = 0;
+
+    JUCE_DECLARE_NON_COPYABLE(TuningChangeAction)
+};

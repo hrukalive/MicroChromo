@@ -78,7 +78,7 @@ bool NoteTrackRemoveAction::undo()
 {
     if (serializedTreeItem.isValid())
     {
-        auto* track = project.addTrack(serializedTreeItem, trackName, trackChannel, false);
+        auto* track = project.addTrack(serializedTreeItem, "", 1, false);
         DBG("Undo [Remove track] " << track->getTrackId());
         return track != nullptr;
     }
@@ -91,4 +91,47 @@ int NoteTrackRemoveAction::getSizeInUnits()
     if (serializedTreeItem.isValid())
         return (numEvents * sizeof(MidiEvent));
     return 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Change Pitch Standard
+//===----------------------------------------------------------------------===//
+TuningChangeStandardNoteFrequencyAction::TuningChangeStandardNoteFrequencyAction
+    (Project& project, int oldFreq, int newFreq) noexcept 
+    : project(project), oldf(oldFreq), newf(newFreq) {}
+
+bool TuningChangeStandardNoteFrequencyAction::perform()
+{
+    return project.tuning->changeFreqOfA(newf, false);
+}
+
+bool TuningChangeStandardNoteFrequencyAction::undo()
+{
+    return project.tuning->changeFreqOfA(oldf, false);
+}
+
+int TuningChangeStandardNoteFrequencyAction::getSizeInUnits()
+{
+    return sizeof(int) * 2;
+}
+
+//===----------------------------------------------------------------------===//
+// Change Tuning
+//===----------------------------------------------------------------------===//
+TuningChangeAction::TuningChangeAction(Project& project, int noteNum, int oldCent, int newCent) noexcept 
+    : project(project), n(noteNum), oc(oldCent), nc(newCent) {}
+
+bool TuningChangeAction::perform()
+{
+    return project.tuning->changeTuning(n, nc, false);
+}
+
+bool TuningChangeAction::undo()
+{
+    return project.tuning->changeTuning(n, oc, false);
+}
+
+int TuningChangeAction::getSizeInUnits()
+{
+    return sizeof(int) * 3;
 }

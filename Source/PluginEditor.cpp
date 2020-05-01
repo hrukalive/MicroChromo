@@ -28,6 +28,7 @@
 #include "ColorEditor.h"
 #include "SimpleNoteEditor.h"
 #include "SimpleTimeEditor.h"
+#include "TuningEditor.h"
 
 //__________________________________________________________________________
 //                                                                          |\
@@ -79,6 +80,7 @@ void MicroChromoAudioProcessorEditor::CustomTabbedComponent::currentTabChanged(i
     case 1: _owner.setSize(570, 580); break;
     case 2: _owner.setSize(350, 580); break;
     case 3: _owner.setSize(490, 580); break;
+    case 4: _owner.setSize(350, 580); break;
     default:
         break;
     }
@@ -147,6 +149,7 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     noteEditor.reset(new SimpleNoteEditor(*this));
     timeEditor.reset(new SimpleTimeEditor(*this));
     colorEditor.reset(new ColorEditor(*this));
+    tuningEditor.reset(new TuningEditor(*this));
 
 
     tabComp.reset(new CustomTabbedComponent(TabbedButtonBar::Orientation::TabsAtTop, *this));
@@ -154,6 +157,7 @@ MicroChromoAudioProcessorEditor::MicroChromoAudioProcessorEditor (MicroChromoAud
     tabComp->addTab("MIDI", Colours::darkgrey, noteEditor.get(), false);
     tabComp->addTab("Time", Colours::darkgrey, timeEditor.get(), false);
     tabComp->addTab("Color", Colours::darkgrey, colorEditor.get(), false);
+    tabComp->addTab("Tuning", Colours::darkgrey, tuningEditor.get(), false);
     addAndMakeVisible(tabComp.get());
 
     synthBundle->addChangeListener(this);
@@ -227,7 +231,7 @@ void MicroChromoAudioProcessorEditor::getCommandInfo(CommandID commandID, Applic
 #endif
         break;
     case CommandIDs::saveAsProject:
-        result.setInfo("Save As", "Save as", "File", 0);
+        result.setInfo("Save Project As", "Save as", "File", 0);
 #if JUCE_MAC
         result.addDefaultKeypress('s', ModifierKeys::commandModifier | ModifierKeys::shiftModifier);
 #else

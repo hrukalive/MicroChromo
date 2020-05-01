@@ -526,11 +526,11 @@ void MicroChromoAudioProcessor::sendAllNotesOff()
         midiBuffer->clear();
         for (auto j = 1; j <= 16; j++)
         {
-            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 16);
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 1);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 1);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 1);
             for (auto& n : playingNotes)
-                midiBuffer->addEvent(MidiMessage::noteOff(j, n.first), 18);
+                midiBuffer->addEvent(MidiMessage::noteOff(j, n.first), 2);
         }
     }
     for (auto* midiBuffer : midiBufferArrayB)
@@ -538,9 +538,9 @@ void MicroChromoAudioProcessor::sendAllNotesOff()
         midiBuffer->clear();
         for (auto j = 1; j <= 16; j++)
         {
-            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 16);
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 1);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 1);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 1);
         }
     }
     playingNotes.clear();
@@ -556,11 +556,11 @@ void MicroChromoAudioProcessor::sendAllNotesOffPanic()
         midiBuffer->clear();
         for (auto j = 1; j <= 16; j++)
         {
-            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 18);
-            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 18);
-            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 18);
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 1);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 1);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 1);
             for (int k = 0; k < 128; k++)
-                midiBuffer->addEvent(MidiMessage::noteOff(j, k), 18);
+                midiBuffer->addEvent(MidiMessage::noteOff(j, k), 2);
         }
     }
     for (auto* midiBuffer : midiBufferArrayB)
@@ -568,11 +568,11 @@ void MicroChromoAudioProcessor::sendAllNotesOffPanic()
         midiBuffer->clear();
         for (auto j = 1; j <= 16; j++)
         {
-            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 16);
-            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 16);
+            midiBuffer->addEvent(MidiMessage::allNotesOff(j), 1);
+            midiBuffer->addEvent(MidiMessage::allSoundOff(j), 1);
+            midiBuffer->addEvent(MidiMessage::allControllersOff(j), 1);
             for (int k = 0; k < 128; k++)
-                midiBuffer->addEvent(MidiMessage::noteOff(j, k), 18);
+                midiBuffer->addEvent(MidiMessage::noteOff(j, k), 2);
         }
     }
     playingNotes.clear();
@@ -848,7 +848,8 @@ void MicroChromoAudioProcessor::updateMidiSequence(int newBase)
                 ccMidiSeq[i]->addEvent(MidiMessage::controllerEvent(k, ccBase + j, 50));
     }
 
-    project.getScheduler()->schedule(notesMidiSeq, ccMidiSeq, numInstancesParameter, ccBase, psModSource == USE_KONTAKT, jmin(2048 * sampleLength, 2 * bufferLength));
+    project.getScheduler()->schedule(notesMidiSeq, ccMidiSeq, numInstancesParameter, ccBase, psModSource, 
+        jmin(2048 * sampleLength, 1.1f * bufferLength));
 
     if (psModSource == USE_KONTAKT)
         isCurrentModSrcKontakt = true;

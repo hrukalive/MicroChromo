@@ -78,6 +78,8 @@ public:
     void onPostRemovePitchColorMapEntry() override {}
     void onChangePitchColorMap(PitchColorMap* const colorMap) override {}
 
+    void onPostTuningChange() override {}
+
     void onChangeProjectBeatRange(float firstBeat, float lastBeat) override {}
     void onChangeViewBeatRange(float firstBeat, float lastBeat) override {}
 
@@ -146,6 +148,8 @@ public:
     void onRemovePitchColorMapEntry(const PitchColorMapEntry& entry) override {}
     void onPostRemovePitchColorMapEntry() override {}
     void onChangePitchColorMap(PitchColorMap* const colorMap) override {}
+
+    void onPostTuningChange() override {}
 
     void onChangeProjectBeatRange(float firstBeat, float lastBeat) override {}
     void onChangeViewBeatRange(float firstBeat, float lastBeat) override {}

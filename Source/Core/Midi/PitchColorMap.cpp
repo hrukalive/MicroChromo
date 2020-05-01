@@ -262,7 +262,7 @@ bool PitchColorMapEntry::equalWithoutId(const PitchColorMapEntry* const first, c
 String PitchColorMapEntry::keysToString(const std::unordered_set<int>& set) const noexcept
 {
     Array<int> tmp;
-    for (auto k : allowedKeys)
+    for (auto k : set)
         tmp.add(k % 12);
     tmp.sort();
     StringArray tmp2;

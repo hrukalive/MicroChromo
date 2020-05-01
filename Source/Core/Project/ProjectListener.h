@@ -51,6 +51,8 @@ public:
     virtual void onPostRemovePitchColorMapEntry() = 0;
     virtual void onChangePitchColorMap(PitchColorMap* const colorMap) = 0;
 
+    virtual void onPostTuningChange() = 0;
+
     virtual void onChangeProjectBeatRange(float firstBeat, float lastBeat) = 0;
     virtual void onChangeViewBeatRange(float firstBeat, float lastBeat) = 0;
 

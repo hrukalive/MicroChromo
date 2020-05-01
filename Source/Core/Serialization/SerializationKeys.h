@@ -118,6 +118,11 @@ namespace Serialization
         static const Identifier color = "color";
         static const Identifier defaultKeys = "defaultKeys";
         static const Identifier allowedKeys = "allowedKeys";
+
+        static const Identifier tuning = "tuningModule";
+        static const Identifier tuningEntry = "tuningEntry";
+        static const Identifier freqOfA = "freqOfA";
+        static const Identifier tuningValue = "tuningVal";
     } // namespace PitchColor
 
     namespace Config

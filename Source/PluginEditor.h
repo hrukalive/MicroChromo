@@ -27,6 +27,7 @@ class MainEditor;
 class ColorEditor;
 class SimpleNoteEditor;
 class SimpleTimeEditor;
+class TuningEditor;
 
 //==============================================================================
 class MicroChromoAudioProcessorEditor  : 
@@ -102,6 +103,8 @@ public:
     void onPostRemovePitchColorMapEntry() override {}
     void onChangePitchColorMap(PitchColorMap* const colorMap) override {}
 
+    void onPostTuningChange() override {}
+
     void onChangeProjectBeatRange(float firstBeat, float lastBeat) override {}
     void onChangeViewBeatRange(float firstBeat, float lastBeat) override {}
 
@@ -124,6 +127,7 @@ private:
     std::unique_ptr<SimpleNoteEditor> noteEditor;
     std::unique_ptr<SimpleTimeEditor> timeEditor;
     std::unique_ptr<ColorEditor> colorEditor;
+    std::unique_ptr<TuningEditor> tuningEditor;
 
     //==============================================================================
     std::unique_ptr<MenuBarComponent> menuBar;

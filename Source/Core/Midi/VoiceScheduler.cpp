@@ -91,7 +91,7 @@ VoiceScheduler::VoiceScheduler(Project& owner) : project(owner) {}
 // Utility
 //===------------------------------------------------------------------===//
 void VoiceScheduler::schedule(OwnedArray<MidiMessageSequence>& noteSequences,
-    OwnedArray<MidiMessageSequence>& ccSequences, int n, int ccBase, bool kontaktMode, 
+    OwnedArray<MidiMessageSequence>& ccSequences, int n, int ccBase, int modSource, 
     float ccTimeAdjustment, float timeMult)
 {
     auto* colorMap = project.getPitchColorMap();
@@ -120,21 +120,24 @@ void VoiceScheduler::schedule(OwnedArray<MidiMessageSequence>& noteSequences,
                         j++;
                     }
 
-                    int pitchbend = 0;
-                    if (auto* color = colorMap->findEntryByName(note->getPitchColor()))
-                        pitchbend = color->getValue();
                     auto key = note->getKey();
-                    while (pitchbend > 50)
+                    int pitchbend = 0;
+                    if (modSource != USE_NONE)
                     {
-                        key++;
-                        pitchbend -= 100;
+                        if (auto* color = colorMap->findEntryByName(note->getPitchColor()))
+                            pitchbend = color->getValue() + (project.getTuning(note->getKey()) - project.getTuning(9) + project.centDiffOfA());
+                        while (pitchbend > 50)
+                        {
+                            key++;
+                            pitchbend -= 100;
+                        }
+                        while (pitchbend < -50)
+                        {
+                            key--;
+                            pitchbend += 100;
+                        }
+                        key = jlimit(0, 127, key);
                     }
-                    while (pitchbend < -50)
-                    {
-                        key--;
-                        pitchbend += 100;
-                    }
-                    key = jlimit(0, 127, key);
                     auto beat = tempoElapsed + timeFactor * (note->getBeat() - lastMarkerBeat);
                     if (timeMult > 0)
                     {
@@ -142,7 +145,7 @@ void VoiceScheduler::schedule(OwnedArray<MidiMessageSequence>& noteSequences,
                         timeFactor = timeMult;
                     }
                     InternalMidiMessage* onMsg;
-                    if (kontaktMode)
+                    if (modSource == USE_KONTAKT)
                         onMsg = new InternalMidiMessage(c, key, beat, note->getVelocity(), pitchbend, ccBase + key % 12, true, ccTimeAdjustment);
                     else
                         onMsg = new InternalMidiMessage(c, key, beat, note->getVelocity(), pitchbend, ccBase, true, ccTimeAdjustment);
@@ -154,7 +157,7 @@ void VoiceScheduler::schedule(OwnedArray<MidiMessageSequence>& noteSequences,
         if (sequence.size() > 0)
         {
             sequence.sort(*sequence.getFirst(), true);
-            if (kontaktMode)
+            if (modSource == USE_KONTAKT)
                 scheduleKontakt(sequence, noteSequences, ccSequences, n);
             else
                 scheduleGeneral(sequence, noteSequences, ccSequences, n);

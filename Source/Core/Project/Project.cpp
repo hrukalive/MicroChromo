@@ -24,7 +24,125 @@
 #include "ProjectListener.h"
 #include "ProjectActions.h"
 
-//==============================================================================
+//__________________________________________________________________________
+//                                                                          |\
+// Tuning                                                                   | |
+//__________________________________________________________________________| |
+//___________________________________________________________________________\|
+
+Project::Tuning::Tuning(Project& owner) noexcept : project(owner)
+{
+    for (int i = 0; i < 12; i++)
+        tuning.add(0);
+}
+
+//===------------------------------------------------------------------===//
+// Undoable editing
+//===------------------------------------------------------------------===//
+bool Project::Tuning::changeFreqOfA(int freq, bool undoable)
+{
+    jassert(freq >= 400 && freq <= 480);
+    if (undoable)
+    {
+        project.getUndoManager().
+            perform(new TuningChangeStandardNoteFrequencyAction(project, freqOfA, freq));
+    }
+    else
+    {
+        freqOfA = freq;
+        project.broadcastPostTuningChange();
+    }
+    return true;
+}
+
+bool Project::Tuning::changeTuning(int noteNum, int newCent, bool undoable)
+{
+    jassert(noteNum >= 0 && noteNum < 128);
+    noteNum %= 12;
+    if (undoable)
+    {
+        project.getUndoManager().
+            perform(new TuningChangeAction(project, noteNum, tuning[noteNum], newCent));
+    }
+    else
+    {
+        tuning.set(noteNum, newCent);
+        project.broadcastPostTuningChange();
+    }
+    return true;
+}
+
+//===------------------------------------------------------------------===//
+// Accessors
+//===------------------------------------------------------------------===//
+int Project::Tuning::getFreqOfA() const noexcept
+{
+    return freqOfA;
+}
+
+int Project::Tuning::centDiffOfA() const noexcept
+{
+    return roundf(1200 * log2f(freqOfA / 440.f));
+}
+
+int Project::Tuning::getTuning(int noteNum) const noexcept
+{
+    return tuning[noteNum % 12];
+}
+
+//===------------------------------------------------------------------===//
+// Serializable
+//===------------------------------------------------------------------===//
+ValueTree Project::Tuning::serialize() const
+{
+    ValueTree tree(Serialization::PitchColor::tuning);
+    tree.setProperty(Serialization::PitchColor::freqOfA, freqOfA, nullptr);
+    for (int i = 0; i < 12; i++)
+    {
+        ValueTree child(Serialization::PitchColor::tuningEntry);
+        child.setProperty(Serialization::Midi::key, i, nullptr);
+        child.setProperty(Serialization::PitchColor::tuningValue, tuning[i], nullptr);
+        tree.appendChild(child, nullptr);
+    }
+    return tree;
+}
+
+void Project::Tuning::deserialize(const ValueTree& tree)
+{
+    reset();
+
+    const auto root =
+        tree.hasType(Serialization::PitchColor::tuning) ?
+        tree : tree.getChildWithName(Serialization::PitchColor::tuning);
+
+    if (!root.isValid())
+        return;
+
+    freqOfA = root.getProperty(Serialization::PitchColor::freqOfA, 440);
+
+    for (const auto& e : root)
+    {
+        if (e.hasType(Serialization::PitchColor::tuningEntry))
+        {
+            tuning.set(((int)e.getProperty(Serialization::Midi::key, 0) % 12 + 12) % 12,
+                e.getProperty(Serialization::PitchColor::tuningValue, 0));
+        }
+    }
+}
+
+void Project::Tuning::reset()
+{
+    tuning.clear();
+    for (int i = 0; i < 12; i++)
+        tuning.add(0);
+}
+
+//__________________________________________________________________________
+//                                                                          |\
+// Project                                                                  | |
+//__________________________________________________________________________| |
+//___________________________________________________________________________\|
+
 Project::Project(MicroChromoAudioProcessor& p, String title) :
     processor(p), undoManager(p.getUndoManager()), _title(title)
 {
@@ -35,6 +153,7 @@ Project::Project(MicroChromoAudioProcessor& p, String title) :
     addTrack(ValueTree(), "empty", 1, false);
     pitchColorMap.reset(new PitchColorMap(this));
 
+    tuning.reset(new Tuning(*this));
     voiceScheduler.reset(new VoiceScheduler(*this));
 }
 
@@ -81,9 +200,34 @@ bool Project::removeTrack(IdGenerator::Id trackId, bool undoable)
     return true;
 }
 
+bool Project::changeFreqOfA(int freq, bool undoable)
+{
+    return tuning->changeFreqOfA(freq, undoable);
+}
+
+bool Project::changeTuning(int noteNum, int newCent, bool undoable)
+{
+    return tuning->changeTuning((noteNum % 12 + 12) % 12, newCent, undoable);
+}
+
 //===------------------------------------------------------------------===//
 // Accessors
 //===------------------------------------------------------------------===//
+int Project::getFreqOfA() const noexcept
+{
+    return tuning->getFreqOfA();
+}
+
+int Project::centDiffOfA() const noexcept
+{
+    return tuning->centDiffOfA();
+}
+
+int Project::getTuning(int noteNum) const noexcept
+{
+    return tuning->getTuning((noteNum % 12 + 12) % 12);
+}
+
 Array<MidiTrack*> Project::getAllTracks() const
 {
     Array<MidiTrack*> tracks;
@@ -279,6 +423,12 @@ void Project::broadcastChangePitchColorMap(PitchColorMap* const colorMap)
     sendChangeMessage();
 }
 
+void Project::broadcastPostTuningChange()
+{
+    changeListeners.call(&ProjectListener::onPostTuningChange);
+    sendChangeMessage();
+}
+
 Point<float> Project::broadcastChangeProjectBeatRange()
 {
     const auto beatRange = getProjectRangeInBeats();
@@ -313,6 +463,7 @@ ValueTree Project::serialize() const
     tree.appendChild(tempoMarkerTrack->serialize(), nullptr);
     tree.appendChild(timeSignatureTrack->serialize(), nullptr);
     tree.appendChild(pitchColorMap->serialize(), nullptr);
+    tree.appendChild(tuning->serialize(), nullptr);
     for (auto* track : noteTracks)
         tree.appendChild(track->serialize(), nullptr);
     return tree;
@@ -333,6 +484,7 @@ void Project::deserialize(const ValueTree& tree)
     tempoMarkerTrack->deserialize(tree);
     timeSignatureTrack->deserialize(tree);
     pitchColorMap->deserialize(tree);
+    tuning->deserialize(tree);
     for (const auto& e : root)
     {
         if (e.hasType(Serialization::Midi::notes))
@@ -397,7 +549,7 @@ Array<MidiFile> Project::exportMidiFiles()
     }
 
     voiceScheduler->schedule(noteSeqs, ccSeqs, processor.getNumInstances(),
-        processor.getCcBase(), processor.getPitchShiftModulationSource() == USE_KONTAKT,
+        processor.getCcBase(), processor.getPitchShiftModulationSource(),
         processor.getBlockSize() / processor.getSampleRate(), 960);
 
     Array<MidiFile> files;

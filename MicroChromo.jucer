@@ -122,6 +122,9 @@
               file="Source/UI/SimpleTimeEditor.cpp"/>
         <FILE id="vYomCT" name="SimpleTimeEditor.h" compile="0" resource="0"
               file="Source/UI/SimpleTimeEditor.h"/>
+        <FILE id="NC95xc" name="TuningEditor.cpp" compile="1" resource="0"
+              file="Source/UI/TuningEditor.cpp"/>
+        <FILE id="Vvk85q" name="TuningEditor.h" compile="0" resource="0" file="Source/UI/TuningEditor.h"/>
       </GROUP>
       <FILE id="m8jVPX" name="Common.cpp" compile="1" resource="0" file="Source/Common.cpp"/>
       <FILE id="pY9Nty" name="Common.h" compile="0" resource="0" file="Source/Common.h"/>

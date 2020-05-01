@@ -46,6 +46,8 @@ public:
     //===------------------------------------------------------------------===//
     NoteTrack* addTrack(ValueTree& serializedState, const String& name, int channel, bool undoable);
     bool removeTrack(IdGenerator::Id trackId, bool undoable);
+    bool changeFreqOfA(int freq, bool undoable);
+    bool changeTuning(int noteNum, int newCent, bool undoable);
 
     //===------------------------------------------------------------------===//
     // Accessors
@@ -56,6 +58,10 @@ public:
     TimeSignatureTrack* getTimeSignatureTrack() { return timeSignatureTrack.get(); }
     PitchColorMap* getPitchColorMap() { return pitchColorMap.get(); }
     VoiceScheduler* getScheduler() { return voiceScheduler.get(); }
+
+    int getFreqOfA() const noexcept;
+    int centDiffOfA() const noexcept;
+    int getTuning(int noteNum) const noexcept;
 
     Array<MidiTrack*> getAllTracks() const;
     Point<float> getProjectRangeInBeats() const;
@@ -104,6 +110,8 @@ public:
     void broadcastRemovePitchColorMapEntry(const PitchColorMapEntry& entry);
     void broadcastPostRemovePitchColorMapEntry();
     void broadcastChangePitchColorMap(PitchColorMap* const colorMap);
+
+    void broadcastPostTuningChange();
 
     void broadcastChangeViewBeatRange(float firstBeat, float lastBeat);
     void broadcastReloadProjectContent();
@@ -158,6 +166,43 @@ public:
 private:
     friend class NoteTrackInsertAction;
     friend class NoteTrackRemoveAction;
+    friend class TuningChangeStandardNoteFrequencyAction;
+    friend class TuningChangeAction;
+
+    class Tuning : public Serializable
+    {
+    public:
+        Tuning(Project& owner) noexcept;
+        ~Tuning() = default;
+
+        //===------------------------------------------------------------------===//
+        // Undoable editing
+        //===------------------------------------------------------------------===//
+        bool changeFreqOfA(int freq, bool undoable);
+        bool changeTuning(int noteNum, int newCent, bool undoable);
+
+        //===------------------------------------------------------------------===//
+        // Accessors
+        //===------------------------------------------------------------------===//
+        int getFreqOfA() const noexcept;
+        int centDiffOfA() const noexcept;
+        int getTuning(int noteNum) const noexcept;
+
+        //===------------------------------------------------------------------===//
+        // Serializable
+        //===------------------------------------------------------------------===//
+        ValueTree serialize() const override;
+        void deserialize(const ValueTree& tree) override;
+        void reset() override;
+
+    private:
+        Project& project;
+        Array<int> tuning;
+        int freqOfA = 440;
+
+        //==============================================================================
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Tuning);
+    };
 
     //===------------------------------------------------------------------===//
     // Private Helpers
@@ -185,6 +230,7 @@ private:
     OwnedArray<NoteTrack> noteTracks;
     std::unique_ptr<PitchColorMap> pitchColorMap;
 
+    std::unique_ptr<Tuning> tuning;
     std::unique_ptr<VoiceScheduler> voiceScheduler;
 
     //==============================================================================

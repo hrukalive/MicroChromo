@@ -33,7 +33,7 @@ public:
     // Utility
     //===------------------------------------------------------------------===//
     void schedule(OwnedArray<MidiMessageSequence>& noteSequences, OwnedArray<MidiMessageSequence>& ccSequences, 
-        int n, int ccBase, bool kontaktMode, float ccTimeAdjustment, float timeMult = -1);
+        int n, int ccBase, int modSource, float ccTimeAdjustment, float timeMult = -1);
 
 private:
     struct InternalMidiMessage
