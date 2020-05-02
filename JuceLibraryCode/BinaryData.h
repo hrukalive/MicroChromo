@@ -8,11 +8,14 @@
 
 namespace BinaryData
 {
+    extern const char*   icon_large_png;
+    const int            icon_large_pngSize = 15475;
+
     extern const char*   MicroChromoKontaktScript_txt;
     const int            MicroChromoKontaktScript_txtSize = 1998;
 
     // Number of elements in the namedResourceList and originalFileNames arrays.
-    const int namedResourceListSize = 1;
+    const int namedResourceListSize = 2;
 
     // Points to the start of a list of resource names.
     extern const char* namedResourceList[];

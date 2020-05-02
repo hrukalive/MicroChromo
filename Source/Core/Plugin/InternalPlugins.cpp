@@ -584,21 +584,22 @@ public:
         const int numInputChannels = getMainBusNumInputChannels();
         const int numSamples = buffer.getNumSamples();
         
-        //for (int i = 0; i < numSamples; i++)
-        //{
-        //    for (int channel = 0; channel < numInputChannels; channel++)
-        //    {
-        //        shifters[channel]->setPitchSemiTones(psValue.getNextValue());
-        //        shifters[channel]->putSamples(buffer.getReadPointer(channel, i), 1);
-        //    }
-        //}
+        // for (int i = 0; i < numSamples; i++)
+        // {
+        //     auto val = psValue.getNextValue();
+        //     for (int channel = 0; channel < numInputChannels; channel++)
+        //     {
+        //         shifters[channel]->setPitchSemiTones(val);
+        //         shifters[channel]->putSamples(buffer.getReadPointer(channel, i), 1);
+        //     }
+        // }
         for (int channel = 0; channel < numInputChannels; channel++)
         {
-            shifters[channel]->setPitchSemiTones(*psParameter);
-            for (int i = 0; i < numSamples; i++)
-            {
-                shifters[channel]->putSamples(buffer.getReadPointer(channel, i), 1);
-            }
+           shifters[channel]->setPitchSemiTones(*psParameter);
+           for (int i = 0; i < numSamples; i++)
+           {
+               shifters[channel]->putSamples(buffer.getReadPointer(channel, i), 1);
+           }
         }
         for (int channel = 0; channel < numInputChannels; channel++)
             shifters[channel]->receiveSamples(buffer.getWritePointer(channel), numSamples);
